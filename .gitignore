@@ -11,3 +11,7 @@ Builds/
 Logs/
 UserSettings/
 .DS_Store
+
+backend/.env.local
+backend/.env.*
+
