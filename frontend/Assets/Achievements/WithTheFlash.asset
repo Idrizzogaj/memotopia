@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2819e005d8b2f04bae9abb1051882ae, type: 3}
+  m_Name: WithTheFlash
+  m_EditorClassIdentifier: 
+  icon: {fileID: 21300000, guid: 5f10eb0f4bf351c40846d3b6310406d8, type: 3}
+  title: With the Flash!
+  description: Playing game of flash first time
+  constantString: with-the-flash

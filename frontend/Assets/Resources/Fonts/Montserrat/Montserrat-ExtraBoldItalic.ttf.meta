@@ -1,0 +1,23 @@
+fileFormatVersion: 2
+guid: c99886a1d773dd2448b98c1d99cc76fa
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontName: Montserrat ExtraBold
+  fontNames:
+  - Montserrat ExtraBold
+  fallbackFontReferences:
+  - {fileID: 12800000, guid: 0161b41c99874db42a3e707b8c40a51b, type: 3}
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -1,0 +1,13 @@
+.env
+.env.*
+node_modules/
+dist/
+coverage/
+Library/
+Temp/
+Obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+.DS_Store

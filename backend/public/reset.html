@@ -1,0 +1,62 @@
+<html>
+    <head>
+        <link href="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+        <script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>              
+    <div class="container">	
+            <div class="row">
+                <h2 class="me-fshi"><strong>Memotopia Reset Password</strong></h2><br/>
+                <div id="X"></div>
+                <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12 me-fshi">
+                    <!-- Start form -->
+                            <form id='form' method="POST">
+                                <div class="form-group">
+                                <label for="exampleInputPassword1">Password</label>
+                                <input type="password" class="form-control" name="password" id="password" placeholder="Password">
+                                </div>
+                                <div class="form-group">
+                                <label for="exampleInputPassword1">Password</label>
+                                <input type="password" class="form-control" name="confirm" id="confirm" placeholder="Confirm password">
+                                </div>
+                                <div class="form-check">
+                                <button type="submit" class="btn btn-primary">Submit</button>
+                                </div>
+                            </form>
+                    <!-- End form -->
+                </div>
+            </div>
+        </div>
+        <script>
+            $(() => {
+                const $form = $('#form');
+
+                $form.on('submit', handleSignup)
+                let x = window.location.pathname.split('/');
+ 
+                function handleSignup (e) {
+                    e.preventDefault()
+                    $.ajax({
+                        url:  window.location.href,
+                        type:'POST',
+                        contentType: 'application/json',
+                        dataType: 'json',
+                        data: JSON.stringify({
+                            //'token': x[3],
+                            'password': $("input[name=password]").val(),
+                            'confirm': $("input[name=confirm]").val()
+                        })
+                    }).done(data => {
+                        console.log(data);
+                        if(data) {
+                            $(".me-fshi").css("display", "none")
+                            $("#X").append("<h2>Your password has been changed, you can login with your new password now.</h2>");
+                        }
+                    })
+                }
+            })
+        </script>
+    </body>
+</html>
