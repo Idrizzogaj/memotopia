@@ -15,3 +15,7 @@ UserSettings/
 backend/.env.local
 backend/.env.*
 
+
+backend/.env.local
+backend/.env.*
+
