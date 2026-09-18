@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 
-import { APP_CONFIG, AppConfig } from '~app.config';
+import { APP_CONFIG, AppConfig } from './app.config';
 import { HealthCheckDto } from '~health-check.dto';
 import { secondsToDhms } from '~utils/duration';
 

@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, InternalServerErrorException } from '@
 
 import { Achievement } from '~common/db/entities/achievement.entity';
 import { User } from '~common/db/entities/user.entity';
-import { ConflictException } from '~common/exceptions';
 
 import { AchievementRepository } from './achievements.repository';
 import { AchievementsDto } from './dto/achievements.dto';
@@ -30,8 +29,9 @@ export class AchievementsService {
             try {
                 await this.achievementRepository.save(achievement);
             } catch (error) {
-                if (error.code == 23505)
-                    throw new ConflictException('User already has this achievement.');
+                // The client and challenge completion can award the same badge.
+                // A retry must not fail the match or skip subsequent achievements.
+                if (error.code == '23505') continue;
 
                 throw new InternalServerErrorException(error);
             }

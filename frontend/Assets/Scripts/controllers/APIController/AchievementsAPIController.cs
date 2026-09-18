@@ -1,92 +1,77 @@
-﻿using Assets.Script.Constants;
+using Assets.Script.Constants;
 using Assets.Script.Models;
 using Assets.Script.Models.RequestModels;
-using Assets.Script.Models.ResponseModels;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace Assets.Script.Controllers
 {
     public class AchievementsAPIController : MonoBehaviour
     {
-        APIConstants _apiConstants;
-        DataController _dataController;
-
-        private void Awake()
-        {
-            _apiConstants = new APIConstants();
-            _dataController = new DataController();
-        }
+        private readonly HashSet<string> sending = new HashSet<string>();
 
         public void GetAchievements(Action<Achievements> onSuccess, Action<AlertMessageContainer> onFailure)
         {
-            WWWForm form = new WWWForm();
-            Dictionary<string, string> headers = form.headers;
-            headers["Content-Type"] = "application/json";
-            headers["Authorization"] = _dataController.Token;
-            WWW request = new WWW(_apiConstants.Achievements, null, headers);
-
-            StartCoroutine(GetAchievementsRequest(request, onSuccess, onFailure));
+            StartCoroutine(Request(null, text =>
+            {
+                Achievements response;
+                try
+                {
+                    response = JsonUtility.FromJson<Achievements>("{\"achievements\":" + text + "}");
+                    if (response == null || response.achievements == null) throw new ArgumentException();
+                }
+                catch (Exception)
+                {
+                    onFailure(new AlertMessageContainer { ErrorMessage = "Could not read achievements. Please try again.", StatusCode = "invalid-response" });
+                    return;
+                }
+                onSuccess(response);
+            }, onFailure));
         }
 
-        private IEnumerator GetAchievementsRequest(WWW request, Action<Achievements> onSuccess, Action<AlertMessageContainer> onFailure)
+        public void AddAchievements(string[] achievements, Action<string> onSuccess, Action<AlertMessageContainer> onFailure)
         {
-            yield return request;
-
-            if (String.IsNullOrEmpty(request.error))
-            {
-                string JSONToParse = "{\"achievements\":" + request.text + "}";
-                var responseObject = JsonUtility.FromJson<Achievements>(JSONToParse);
-
-                onSuccess(responseObject);
-            }
-            else
-            {
-                var responseObject = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
-                onFailure(ReturnAlertMessageType(responseObject.Message, responseObject.Code));
-            }
+            StartCoroutine(Request(JsonUtility.ToJson(new Achievements { achievements = achievements }), onSuccess, onFailure));
         }
 
-        public void AddAchievements(string[] achievements, Action<String> onSuccess, Action<AlertMessageContainer> onFailure)
+        private IEnumerator Request(string body, Action<string> onSuccess, Action<AlertMessageContainer> onFailure)
         {
-            var requestObject = new Achievements();
-            requestObject.achievements = achievements;
-            string jsonRequestObject = JsonUtility.ToJson(requestObject);
-
-            WWWForm form = new WWWForm();
-            Dictionary<string, string> headers = form.headers;
-            headers["Content-Type"] = "application/json";
-            headers["Authorization"] = _dataController.Token;
-            byte[] formData = Encoding.UTF8.GetBytes(jsonRequestObject);
-            WWW request = new WWW(_apiConstants.Achievements, formData, headers);
-
-            StartCoroutine(AddAchievementsRequest(request, onSuccess, onFailure));
-        }
-
-        private IEnumerator AddAchievementsRequest(WWW request, Action<String> onSuccess, Action<AlertMessageContainer> onFailure)
-        {
-            yield return request;
-
-            if (String.IsNullOrEmpty(request.error))
+            using (var request = new UnityWebRequest(new APIConstants().Achievements, body == null ? "GET" : "POST"))
             {
-                onSuccess("Done");
-            }
-            else
-            {
-                var responseObject = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
-                onFailure(ReturnAlertMessageType(responseObject.Message, responseObject.Code));
+                request.downloadHandler = new DownloadHandlerBuffer();
+                if (body != null) request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
+                request.SetRequestHeader("Content-Type", "application/json");
+                request.SetRequestHeader("Authorization", PlayerPrefs.GetString("token"));
+                request.timeout = 12;
+                yield return request.SendWebRequest();
+                if (!request.isNetworkError && !request.isHttpError) onSuccess(request.downloadHandler.text);
+                else onFailure(new AlertMessageContainer { ErrorMessage = "Achievements could not sync. They will retry when you open Achievements.", StatusCode = request.responseCode.ToString() });
             }
         }
 
-        #region AlertMessage
-        AlertMessageContainer ReturnAlertMessageType(string message, string code)
+        public void FlushPending()
         {
-            Debug.LogError($"Unhandled: [{message}]");
-            return new AlertMessageContainer() { ErrorMessage = message, StatusCode = code };
+            int owner = GameManager.AchievementUserId;
+            foreach (string key in GameManager.PendingAchievements)
+            {
+                string requestKey = owner + ":" + key;
+                if (!sending.Add(requestKey)) continue;
+                AddAchievements(new[] { key }, result =>
+                {
+                    sending.Remove(requestKey);
+                    if (GameManager.AchievementUserId == owner) GameManager.ConfirmAchievement(key);
+                }, error =>
+                {
+                    sending.Remove(requestKey);
+                    // The server also awards challenge achievements. Already owned is success.
+                    if (error.StatusCode == "409" && GameManager.AchievementUserId == owner) GameManager.ConfirmAchievement(key);
+                    else Debug.LogWarning(error.ErrorMessage);
+                });
+            }
         }
-        #endregion
     }
 }

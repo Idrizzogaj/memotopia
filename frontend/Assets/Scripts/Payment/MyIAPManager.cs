@@ -66,6 +66,17 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
         UnityPurchasing.Initialize(this, builder);
     }
 
+    public static bool CanBuySubscriptions
+    {
+        get
+        {
+            if (m_StoreController == null || m_StoreExtensionProvider == null) return false;
+            var monthly = m_StoreController.products.WithID(monthlySubscription);
+            var yearly = m_StoreController.products.WithID(yearlySubscription);
+            return monthly != null && monthly.availableToPurchase && yearly != null && yearly.availableToPurchase;
+        }
+    }
+
     private bool IsInitialized()
     {
         return m_StoreController != null && m_StoreExtensionProvider != null;

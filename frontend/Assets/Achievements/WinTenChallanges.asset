@@ -14,5 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   icon: {fileID: 21300000, guid: cd77bed66130d154694c47338ed9b89f, type: 3}
   title: 10 Wins!
-  description: Win 10 matches in challenge
+  description: Win 10 challenges.
   constantString: win-ten-challenge

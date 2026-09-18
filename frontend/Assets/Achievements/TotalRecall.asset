@@ -14,5 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   icon: {fileID: 21300000, guid: 051207b76f0445f41b10c43f94989195, type: 3}
   title: Total Recall!
-  description: finish all levels in flash
+  description: Complete all 20 levels in Flash.
   constantString: flash-all-levels

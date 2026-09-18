@@ -1,4 +1,4 @@
-﻿using UnityEngine.UI;
+using UnityEngine.UI;
 using UnityEngine;
 using System;
 
@@ -13,6 +13,14 @@ public class TutorialController : MonoBehaviour
     private IGameable gameable;
     private int tutorialIndex;
 
+    private string SeenKey { get { return "tutorial.v1." + LevelProgress.Owner + "." + Assets.Script.Constants.StaticVar.s_game; } }
+    private void BeginGame()
+    {
+        PlayerPrefs.SetInt(SeenKey, 1); PlayerPrefs.Save();
+        DisableTutorialObjects(true);
+        gameable.InitializeGame();
+    }
+
     /// <summary>
     /// Initializes tutorial objects 
     /// </summary>
@@ -20,11 +28,12 @@ public class TutorialController : MonoBehaviour
     {
         gameable = gameManagers.GetComponent<IGameable>();
 
+        if (PlayerPrefs.GetInt(SeenKey, 0) == 1) { BeginGame(); return; }
         DisableTutorialObjects(false);
         for (int i = 0; i < tutorialGameObjects.Length; i++)
         {
             tutorialGameObjects[i].transform.GetChild(3).GetComponent<Button>().onClick.AddListener(() => NextTutorialObject());
-            tutorialGameObjects[i].transform.GetChild(4).GetComponent<Button>().onClick.AddListener(() => gameable.InitializeGame());
+            tutorialGameObjects[i].transform.GetChild(4).GetComponent<Button>().onClick.AddListener(() => BeginGame());
 
             if ((int)(Math.Round((float)Screen.width / (float)Screen.height * 4)) == 3 && iPadIncluded)
             {
@@ -45,7 +54,7 @@ public class TutorialController : MonoBehaviour
         {
             DisableTutorialObjects(false);
             tutorialGameObjects[tutorialIndex].SetActive(false);
-            gameable.InitializeGame();
+            BeginGame();
         }
         else
         {

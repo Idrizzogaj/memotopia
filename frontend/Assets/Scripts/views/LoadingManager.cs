@@ -1,77 +1,67 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class LoadingManager : MonoBehaviour
 {
-    private static GameObject instance;
+    private static LoadingManager instance;
     private GameObject loadingScreen;
+    private bool navigating;
+    public bool IsNavigating { get { return navigating; } }
 
-    private void Awake() {
-        loadingScreen = gameObject.transform.GetChild(0).gameObject;
+    private void Awake()
+    {
+        loadingScreen = transform.childCount > 0 ? transform.GetChild(0).gameObject : null;
+        if (instance != null && instance != this)
+        {
+            if (instance.loadingScreen != null || loadingScreen == null) { Destroy(gameObject); return; }
+            Destroy(instance.gameObject); // Replace an editor-only fallback with the real loading canvas.
+        }
+        instance = this;
         DontDestroyOnLoad(gameObject);
-
-        if (instance == null)
-            instance = gameObject;
-        else
-            Destroy(gameObject);
     }
 
-    public void StartLoading() {
-        loadingScreen.SetActive(true);
-    }
-
-    public void EndLoading() {
-        if (loadingScreen.activeSelf)
-            loadingScreen.SetActive(false);
-    }
-
-    public void GoToSceneWithLoading(string sceneToLoad)
+    public static void Navigate(string scene)
     {
-        StartCoroutine(StartLoad(sceneToLoad));
+        if (instance == null) instance = FindObjectOfType<LoadingManager>();
+        if (instance == null) instance = new GameObject("SceneTransitions").AddComponent<LoadingManager>();
+        instance.GoToSceneWithLoading(scene);
     }
 
-    public void GoToSceneWithLoadingInstantly(string sceneToLoad)
+    public void StartLoading() { if (loadingScreen != null) loadingScreen.SetActive(true); }
+    public void EndLoading() { if (!navigating && loadingScreen != null) loadingScreen.SetActive(false); }
+    public void EndLoadingWithDelay() { EndLoading(); }
+    public void GoToSceneWithLoadingInstantly(string scene) { GoToSceneWithLoading(scene); }
+    public void GoToSceneWithLoading(string scene)
     {
-        StartCoroutine(StartInstantLoad(sceneToLoad));
+        if (navigating || string.IsNullOrEmpty(scene)) return;
+        navigating = true;
+        StartCoroutine(Load(scene));
     }
 
-    IEnumerator StartLoad(string sceneToLoad)
+    private IEnumerator Fade(UnityEngine.CanvasGroup group, float from, float to, float duration)
     {
-        loadingScreen.SetActive(true);
-        yield return new WaitForSeconds(2);
-        // yield return StartCoroutine(FadeLoadingScreen(1, 1));
-
-        AsyncOperation operation = SceneManager.LoadSceneAsync(sceneToLoad);
-        while (!operation.isDone)
+        for (float elapsed = 0; elapsed < duration; elapsed += Time.unscaledDeltaTime)
         {
+            if (group != null) group.alpha = Mathf.Lerp(from, to, elapsed / duration);
             yield return null;
         }
-
-        // yield return StartCoroutine(FadeLoadingScreen(0, 1));
-        loadingScreen.SetActive(false);
+        if (group != null) group.alpha = to;
     }
 
-    IEnumerator StartInstantLoad(string sceneToLoad)
+    private IEnumerator Load(string scene)
     {
-        loadingScreen.SetActive(true);
-        AsyncOperation operation = SceneManager.LoadSceneAsync(sceneToLoad);
-        while (!operation.isDone)
-        {
-            yield return null;
-        }
-        loadingScreen.SetActive(false);
-    }
-
-    public void EndLoadingWithDelay()
-    {
-        if (loadingScreen.activeSelf)
-            StartCoroutine(EndLoadingWithDelayEnum());
-    }
-
-    IEnumerator EndLoadingWithDelayEnum()
-    {
-        yield return new WaitForSeconds(2);
-        loadingScreen.SetActive(false);
+        float started = Time.realtimeSinceStartup;
+        StartLoading();
+        var fade = loadingScreen == null ? null : loadingScreen.GetComponent<UnityEngine.CanvasGroup>();
+        if (loadingScreen != null && fade == null) fade = loadingScreen.AddComponent<UnityEngine.CanvasGroup>();
+        yield return Fade(fade, 0, 1, .075f);
+        var operation = SceneManager.LoadSceneAsync(scene);
+        if (operation != null) yield return operation;
+        yield return Fade(fade, 1, 0, .075f);
+        navigating = false;
+        EndLoading();
+        if (fade != null) fade.alpha = 1;
+        Debug.Log("Scene transition " + scene + ": " + ((Time.realtimeSinceStartup - started) * 1000f).ToString("F0") + " ms");
     }
 }

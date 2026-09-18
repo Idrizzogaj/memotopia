@@ -14,5 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   icon: {fileID: 21300000, guid: 5f10eb0f4bf351c40846d3b6310406d8, type: 3}
   title: With the Flash!
-  description: Playing game of flash first time
+  description: Complete a level in Flash.
   constantString: with-the-flash

@@ -1,4 +1,4 @@
-﻿using Assets.Script.Constants;
+using Assets.Script.Constants;
 using Assets.Script.Controllers;
 using Assets.Script.Models;
 using System.Collections;
@@ -21,9 +21,9 @@ public class GamesScript : MonoBehaviour
     public void InitializeGameScript()
     {
         Debug.Log("AAA InitializeGameScript");
-        gameAPIController = gameObject.AddComponent<GameAPIController>();
-        challengeAPIController = gameObject.AddComponent<ChallengeAPIController>();
-        userStatisticsAPIController = gameObject.AddComponent<UserStatisticsAPIController>();
+        gameAPIController = ProgressSync.Instance.GetApi<GameAPIController>();
+        challengeAPIController = ProgressSync.Instance.GetApi<ChallengeAPIController>();
+        userStatisticsAPIController = ProgressSync.Instance.GetApi<UserStatisticsAPIController>();
         dataController = gameObject.AddComponent<DataController>();
 
     }
@@ -31,8 +31,26 @@ public class GamesScript : MonoBehaviour
     public IEnumerator ShowRSG(GameObject rsg)
     {
         rsg.SetActive(true);
-        yield return new WaitForSeconds(3);
+        var animator = rsg.GetComponentInChildren<Animator>();
+        float originalSpeed = animator == null ? 1f : animator.speed;
+        if (animator != null && !ChallengeConstants.s_isChallenge) animator.speed = originalSpeed * 1.5f;
+        yield return new WaitForSeconds(ChallengeConstants.s_isChallenge ? 3f : 2f);
+        if (animator != null) animator.speed = originalSpeed;
         rsg.SetActive(false);
+    }
+
+    protected IEnumerator MovePanel(Transform panel, Transform target)
+    {
+        Vector3 start = panel.position;
+        float elapsed = 0;
+        const float duration = .2f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            panel.position = Vector3.Lerp(start, target.position, Mathf.Clamp01(elapsed / duration));
+            yield return null;
+        }
+        panel.position = target.position;
     }
 
     public void Shuffle(int[] array)
@@ -100,7 +118,7 @@ public class GamesScript : MonoBehaviour
             {
                 initLoadingAndStart();
                 ChallengeConstants.s_isChallenge = false;
-                SceneManager.LoadScene(SceneName.s_gameMenu);
+                LoadingManager.Navigate(SceneName.s_gameMenu);
             });
         }
         else
@@ -108,7 +126,7 @@ public class GamesScript : MonoBehaviour
             QuitPanel.transform.GetChild(0).transform.GetChild(3).GetComponent<Button>().onClick.AddListener(() =>
             {
                 initLoadingAndStart();
-                SceneManager.LoadScene(SceneName.s_levelsScene);
+                LoadingManager.Navigate(SceneName.s_levelsScene);
             });
         }
 
@@ -122,13 +140,13 @@ public class GamesScript : MonoBehaviour
 
         LosePanelCopy.transform.GetChild(0).transform.GetChild(2).GetComponent<Button>().onClick.AddListener(() =>
         {
-            SceneManager.UnloadSceneAsync(gameScene);
-            SceneManager.LoadScene(gameScene);
+
+            LoadingManager.Navigate(gameScene);
         });
         LosePanelCopy.transform.GetChild(0).transform.GetChild(3).GetComponent<Button>().onClick.AddListener(() =>
         {
             initLoadingAndStart();
-            SceneManager.LoadScene(SceneName.s_levelsScene);
+            LoadingManager.Navigate(SceneName.s_levelsScene);
         });
 
         LosePanelCopy.transform.SetParent(GameObject.Find("Canvas").transform, false);
@@ -142,81 +160,39 @@ public class GamesScript : MonoBehaviour
         WinPanelCopy.transform.GetChild(0).transform.GetChild(0).transform.GetChild(0).GetComponent<Text>().text = "LEVEL " + LevelScript._selectedLevel;
         WinPanelCopy.transform.GetChild(0).transform.GetChild(10).transform.GetChild(0).GetComponent<Text>().text = score;
 
-        WinPanelCopy.transform.GetChild(0).transform.GetChild(11).GetComponent<Button>().onClick.AddListener(() => {
-            try
+        var container = WinPanelCopy.transform.GetChild(0);
+        var replay = container.GetChild(11).GetComponent<Button>();
+        var next = container.GetChild(12).GetComponent<Button>();
+        int completedLevel = LevelScript._selectedLevel;
+        var replayRect = replay.GetComponent<RectTransform>();
+        var nextRect = next.GetComponent<RectTransform>();
+        replayRect.anchoredPosition = new Vector2(replayRect.anchoredPosition.x, -215);
+        nextRect.anchoredPosition = new Vector2(nextRect.anchoredPosition.x, -215);
+        replay.onClick.AddListener(() => LoadingManager.Navigate(gameScene));
+        next.GetComponentInChildren<Text>().text = completedLevel < 20 ? "NEXT LEVEL" : "LEVELS";
+        next.onClick.AddListener(() =>
+        {
+            if (completedLevel < 20)
             {
-                gameAPIController.GetLevels(game,
-                    (OnSuccess) =>
-                    {
-                        var responseObject = OnSuccess;
-
-                        if (responseObject.levels.Length > -1)
-                        {
-                            switch (game)
-                            {
-                                case "Pairs":
-                                    GameLevelConstants.s_pairsLevels = responseObject.levels;
-                                    break;
-                                case "Boxes":
-                                    GameLevelConstants.s_boxesLevels = responseObject.levels;
-                                    break;
-                                case "Flash":
-                                    GameLevelConstants.s_flashLevels = responseObject.levels;
-                                    break;
-                            }
-                        }
-
-                        SceneManager.UnloadSceneAsync(gameScene);
-                        SceneManager.LoadScene(gameScene);
-                    },
-                    (OnFailure) =>
-                    {
-                        print("fail");
-                    }
-                );
+                LevelScript._selectedLevel = completedLevel + 1;
+                LoadingManager.Navigate(gameScene);
             }
-            catch (UserException e)
-            {
-                Debug.Log(e.Message);
-            }
+            else LoadingManager.Navigate(SceneName.s_levelsScene);
         });
-        WinPanelCopy.transform.GetChild(0).transform.GetChild(12).GetComponent<Button>().onClick.AddListener(() => {
-            initLoadingAndStart();
-            try
-            {
-                gameAPIController.GetLevels(game,
-                    (OnSuccess) =>
-                    {
-                        var responseObject = OnSuccess;
-
-                        if (responseObject.levels.Length > -1)
-                        {
-                            switch (game)
-                            {
-                                case "Pairs":
-                                    GameLevelConstants.s_pairsLevels = responseObject.levels;
-                                    break;
-                                case "Boxes":
-                                    GameLevelConstants.s_boxesLevels = responseObject.levels;
-                                    break;
-                                case "Flash":
-                                    GameLevelConstants.s_flashLevels = responseObject.levels;
-                                    break;
-                            }
-                        }
-                        TrainingNavigation.goToScene(SceneName.s_levelsScene);
-                    },
-                    (OnFailure) =>
-                    {
-                        print("fail");
-                    }
-                );
-            }
-            catch (UserException e)
-            {
-                Debug.Log(e.Message);
-            }
-        });
+        if (completedLevel < 20)
+        {
+            var levels = Instantiate(next.gameObject, container);
+            levels.name = "LevelsButton";
+            var button = levels.GetComponent<Button>();
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener(() => LoadingManager.Navigate(SceneName.s_levelsScene));
+            levels.GetComponentInChildren<Text>().text = "LEVELS";
+            levels.GetComponentInChildren<Text>().color = new Color(0, .65f, .78f);
+            levels.GetComponent<Image>().color = new Color(1, 1, 1, 0);
+            var rect = levels.GetComponent<RectTransform>();
+            rect.anchoredPosition = new Vector2(0, -315);
+            rect.sizeDelta = new Vector2(300, 80);
+        }
 
         WinPanelCopy.transform.SetParent(GameObject.Find("Canvas").transform, false);
         WinPanelCopy.transform.SetAsLastSibling();
@@ -230,7 +206,7 @@ public class GamesScript : MonoBehaviour
             initLoadingAndStart();
             dataController = gameObject.AddComponent<DataController>();
             dataController.MenuLastPage = NavigationConstants.s_challengeNav;
-            SceneManager.LoadScene(SceneName.s_gameMenu);
+            LoadingManager.Navigate(SceneName.s_gameMenu);
         });
 
         panelCopy.transform.SetParent(GameObject.Find("Canvas").transform, false);
@@ -253,7 +229,7 @@ public class GamesScript : MonoBehaviour
 
     public void UpdateRestrictions()
     {
-        restrictionsAPIController = gameObject.AddComponent<RestrictionsAPIController>();
+        restrictionsAPIController = ProgressSync.Instance.GetApi<RestrictionsAPIController>();
         string currentDate = System.DateTime.Now.ToString("yyyy-MM-dd");
 
         restrictionsAPIController.updateRestrictions(
@@ -278,7 +254,7 @@ public class GamesScript : MonoBehaviour
     }
 
     public void ChallangeFinished(string timeText, GameObject challengeFirstPlayPanel,
-        GameObject challengeLossPanel, GameObject challengeWinPanel, GameObject challengeDrawPanel, 
+        GameObject challengeLossPanel, GameObject challengeWinPanel, GameObject challengeDrawPanel,
         string thisGame, GameObject thisAchievementsPanelPrefab, List<Achievement> thisAchievementsList, AchievementsController achievementsController)
     {
         challengeAPIController.UpdateChallenge(float.Parse(timeText), "DONE", ChallengeConstants.s_challengeId,
@@ -302,40 +278,9 @@ public class GamesScript : MonoBehaviour
 
     public void LevelCompleted(string timeText, GameLevel[] gameLevels, string game)
     {
-        bool levelExists = false;
-        int levelId = 0;
-        for (int i = 0; i < gameLevels.Length; i++)
-        {
-            if (gameLevels[i].level == LevelScript._selectedLevel)
-            {
-                levelExists = true;
-                levelId = gameLevels[i].id;
-            }
-        }
-        if (levelExists)
-        {
-            try
-            {
-                gameAPIController.UpdateGameLevel(levelId, setStars(int.Parse(timeText)), int.Parse(timeText),
-                    (OnSuccess) => print("success"), (OnFailure) => print("fail"));
-            }
-            catch (UserException e)
-            {
-                Debug.Log(e.Message);
-            }
-        } 
-        else
-        {
-            try
-            {
-                gameAPIController.CreateGameLevel(setStars(int.Parse(timeText)), int.Parse(timeText), LevelScript._selectedLevel, game,
-                    (OnSuccess) => print("success"), (OnFailure) => print("fail"));
-            }
-            catch (UserException e)
-            {
-                Debug.Log(e.Message);
-            }
-        }
+        int score;
+        if (!int.TryParse(timeText, out score)) return;
+        ProgressSync.Instance.Complete(game, LevelScript._selectedLevel, setStars(score), score);
     }
 
     public void GameOver(GameObject challengeLossPanel, GameObject losePanel, string scene)
@@ -358,7 +303,7 @@ public class GamesScript : MonoBehaviour
         userStatisticsAPIController.IncreaseTimePlayed(timeToIncrease,
             (OnSuccess) =>
             {
-                
+
             },
             (OnFailure) =>
             {

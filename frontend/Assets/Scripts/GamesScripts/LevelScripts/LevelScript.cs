@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -39,8 +39,8 @@ public class LevelScript : MonoBehaviour
         {
             case Games.Boxes:
                 CellImage = Resources.Load<Sprite>("GamesResources/Levels/BoxesLevelCell") as Sprite;
-                BackgroundImage.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources\\Levels\\BoxesBackground") as Sprite;
-                TopGameName.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources\\Levels\\BoxesTop") as Sprite;
+                BackgroundImage.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources/Levels/BoxesBackground") as Sprite;
+                TopGameName.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources/Levels/BoxesTop") as Sprite;
                 r = 234;
                 g = 24;
                 b = 100;
@@ -50,8 +50,8 @@ public class LevelScript : MonoBehaviour
 
             case Games.Pairs:
                 CellImage = Resources.Load<Sprite>("GamesResources/Levels/PairsLevelCell") as Sprite;
-                BackgroundImage.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources\\Levels\\PairsBackground") as Sprite;
-                TopGameName.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources\\Levels\\PairsTop") as Sprite;
+                BackgroundImage.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources/Levels/PairsBackground") as Sprite;
+                TopGameName.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources/Levels/PairsTop") as Sprite;
                 r = 36;
                 g = 189;
                 b = 224;
@@ -61,8 +61,8 @@ public class LevelScript : MonoBehaviour
 
             case Games.Flash:
                 CellImage = Resources.Load<Sprite>("GamesResources/Levels/FlashLevelCell") as Sprite;
-                BackgroundImage.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources\\Levels\\FlashBackground") as Sprite;
-                TopGameName.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources\\Levels\\FlashTop") as Sprite;
+                BackgroundImage.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources/Levels/FlashBackground") as Sprite;
+                TopGameName.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources/Levels/FlashTop") as Sprite;
                 r = 254;
                 g = 191;
                 b = 75;
@@ -73,46 +73,16 @@ public class LevelScript : MonoBehaviour
 
         for (int i = 0; i < LevelsCell.Length; i++)
         {
-            if (game == Games.Pairs && i <= GameLevelConstants.s_pairsLevels.Length)
-            {             
-                LevelsCell[i].GetComponent<Image>().sprite = OpenCellImage;
-                LevelsCell[i].transform.GetChild(1).GetComponent<Button>().onClick.AddListener(delegate () { StartGame(); });
-
-                if(i != GameLevelConstants.s_pairsLevels.Length)
-                    InitStars(LevelsCell[i].transform.GetChild(0), GameLevelConstants.s_pairsLevels[i].stars);
-                else
-                    LevelsCell[i].transform.GetChild(0).gameObject.SetActive(false);
-            }
-            else if (game == Games.Boxes && i <= GameLevelConstants.s_boxesLevels.Length)
-            {
-                LevelsCell[i].GetComponent<Image>().sprite = OpenCellImage;
-                LevelsCell[i].transform.GetChild(1).GetComponent<Button>().onClick.AddListener(delegate () { StartGame(); });
-
-                if(i != GameLevelConstants.s_boxesLevels.Length)
-                    InitStars(LevelsCell[i].transform.GetChild(0), GameLevelConstants.s_boxesLevels[i].stars);
-                else
-                    LevelsCell[i].transform.GetChild(0).gameObject.SetActive(false);
-            }
-            else if(game == Games.Flash && i <= GameLevelConstants.s_flashLevels.Length)
-            {
-                LevelsCell[i].GetComponent<Image>().sprite = OpenCellImage;
-                LevelsCell[i].transform.GetChild(1).GetComponent<Button>().onClick.AddListener(delegate () { StartGame(); });
-
-                if(i != GameLevelConstants.s_flashLevels.Length)
-                    InitStars(LevelsCell[i].transform.GetChild(0), GameLevelConstants.s_flashLevels[i].stars);
-                else
-                    LevelsCell[i].transform.GetChild(0).gameObject.SetActive(false);
-            }
-            else if(i == 0)
-            {
-                LevelsCell[i].GetComponent<Image>().sprite = OpenCellImage;
-                LevelsCell[i].transform.GetChild(1).GetComponent<Button>().onClick.AddListener(delegate () { StartGame(); });
-            }
-            else
-            {
-                LevelsCell[i].GetComponent<Image>().sprite = CellImage;
-                LevelsCell[i].transform.GetChild(0).gameObject.SetActive(false);
-            }
+            var levels = LevelProgress.Get(StaticVar.s_game) ?? new Assets.Script.Models.GameLevel[0];
+            int levelNumber = i + 1;
+            var completed = System.Array.Find(levels, entry => entry.level == levelNumber);
+            bool unlocked = levelNumber == 1 || completed != null || System.Array.Exists(levels, entry => entry.level == levelNumber - 1);
+            var levelButton = LevelsCell[i].transform.GetChild(1).GetComponent<Button>();
+            levelButton.interactable = unlocked;
+            LevelsCell[i].sprite = unlocked ? OpenCellImage : CellImage;
+            if (unlocked) levelButton.onClick.AddListener(() => StartGame());
+            if (completed != null) InitStars(LevelsCell[i].transform.GetChild(0), completed.stars);
+            else LevelsCell[i].transform.GetChild(0).gameObject.SetActive(false);
 
 
             LevelsCell[i].transform.GetChild(1).transform.GetChild(0).GetComponent<Text>().color = new Color32(r, g, b, c);
@@ -130,22 +100,22 @@ public class LevelScript : MonoBehaviour
             case Games.Boxes:
                 if((int)(Math.Round((float)Screen.width / (float)Screen.height * 4)) == 3)
                 {
-                    SceneManager.LoadScene(SceneName.s_boxesSceneIpad);
+                    LoadingManager.Navigate(SceneName.s_boxesSceneIpad);
                 }
                 else
                 {
-                    SceneManager.LoadScene(SceneName.s_boxesScene);
+                    LoadingManager.Navigate(SceneName.s_boxesScene);
                 }
 
                 break;
 
             case Games.Pairs:
-                SceneManager.LoadScene(SceneName.s_pairsScene);
+                LoadingManager.Navigate(SceneName.s_pairsScene);
 
                 break;
 
             case Games.Flash:
-                SceneManager.LoadScene(SceneName.s_flashScene);
+                LoadingManager.Navigate(SceneName.s_flashScene);
 
                 break;
         }
@@ -159,18 +129,18 @@ public class LevelScript : MonoBehaviour
             case "Boxes":
                 if ((int)(Math.Round((float)Screen.width / (float)Screen.height * 4)) == 3)
                 {
-                    SceneManager.LoadScene(SceneName.s_boxesSceneIpad);
+                    LoadingManager.Navigate(SceneName.s_boxesSceneIpad);
                 }
                 else
                 {
-                    SceneManager.LoadScene(SceneName.s_boxesScene);
+                    LoadingManager.Navigate(SceneName.s_boxesScene);
                 }
                 break;
             case "Pairs":
-                SceneManager.LoadScene(SceneName.s_pairsScene);
+                LoadingManager.Navigate(SceneName.s_pairsScene);
                 break;
             case "Flash":
-                SceneManager.LoadScene(SceneName.s_flashScene);
+                LoadingManager.Navigate(SceneName.s_flashScene);
                 break;
         }
     }
@@ -182,7 +152,7 @@ public class LevelScript : MonoBehaviour
             case "Flash":
                 game = Games.Flash;
                 break;
-            case "Paris":
+            case "Pairs":
                 game = Games.Pairs;
                 break;
             case "Boxes":
@@ -193,7 +163,7 @@ public class LevelScript : MonoBehaviour
 
     public void LoadGameMenu()
     {
-        //SceneManager.LoadScene("GameMenu");
+        //LoadingManager.Navigate("GameMenu");
         _loadingScreen.GoToSceneWithLoadingInstantly(SceneName.s_gameMenu);
     }
 
@@ -204,11 +174,11 @@ public class LevelScript : MonoBehaviour
             string starImage = "";
 
             if(j == 0){
-                starImage = "GamesResources\\Levels\\Asset 15";
+                starImage = "GamesResources/Levels/Asset 15";
             } else if (j == 1) {
-                starImage = "GamesResources\\Levels\\Asset 14";
+                starImage = "GamesResources/Levels/Asset 14";
             } else if (j == 2) {
-                starImage = "GamesResources\\Levels\\Asset 13";
+                starImage = "GamesResources/Levels/Asset 13";
             }
 
             StarsCell.transform.GetChild(j).GetComponent<Image>().sprite = Resources.Load<Sprite>(starImage) as Sprite;

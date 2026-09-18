@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Assets.Script.Constants;
@@ -7,376 +7,139 @@ using UnityEngine;
 
 public class AchievementsController : MonoBehaviour
 {
-    private UserStatisticsAPIController userStatisticsAPIController;
-    private AchievementsAPIController achievementsAPIController;
+    private UserStatisticsAPIController statisticsApi;
+    private AchievementsAPIController achievementsApi;
+    private List<Achievement> catalog = new List<Achievement>();
+    private readonly Queue<Achievement> awards = new Queue<Achievement>();
+    private GameObject achievementsPanelPrefab, winPanel, activePopup;
+    private string score, gameScene, game;
+    private int nrStars, generation;
+    private bool isChallange, finished;
 
-    private List<Achievement> allAchievementsList = new List<Achievement>();
-    private List<Achievement> achievementsToShowList = new List<Achievement>();
-
-    private GameObject achievementsPanelPrefab;
-    private GameObject winPanel;
-    private string score;
-    private string gameScene;
-    private string game;
-    private int nrStars;
-
-    private bool isChallange;
-
-    int achievementCount = 0;
-
-    private void Start()
+    private void Awake()
     {
-        userStatisticsAPIController = gameObject.AddComponent<UserStatisticsAPIController>();
-        achievementsAPIController = gameObject.AddComponent<AchievementsAPIController>();
+        statisticsApi = gameObject.AddComponent<UserStatisticsAPIController>();
+        achievementsApi = gameObject.AddComponent<AchievementsAPIController>();
     }
 
-    private void ResetAll()
+    private void Begin(GameObject panel, string mode, GameObject prefab, List<Achievement> achievements)
     {
-        isChallange = false;
-        allAchievementsList.Clear();
-        achievementsToShowList.Clear();
-        achievementCount = 0;
-
-        achievementsPanelPrefab = null;
-        winPanel = null;
-        score = "";
-        gameScene = "";
-        game = "";
-        nrStars = 0;
+        generation++;
+        StopAllCoroutines();
+        if (activePopup != null) Destroy(activePopup);
+        activePopup = null;
+        awards.Clear();
+        finished = false;
+        winPanel = panel;
+        game = mode;
+        achievementsPanelPrefab = prefab;
+        // Never clear or mutate the game's serialized catalog.
+        catalog = achievements == null ? new List<Achievement>() : achievements.Where(a => a != null).ToList();
     }
 
     public void LevelCompletedAchievements(string thisScore, int thisNrStars,
         GameObject thisWinPanel, string thisGameScene, string thisGame,
         GameObject thisAchievementsPanelPrefab, List<Achievement> thisAchievementsList)
     {
+        Begin(thisWinPanel, thisGame, thisAchievementsPanelPrefab, thisAchievementsList);
         isChallange = false;
-        ResetAll();
-
-        allAchievementsList = thisAchievementsList;
-        achievementsPanelPrefab = thisAchievementsPanelPrefab;
-        winPanel = thisWinPanel;
         score = thisScore;
-        gameScene = thisGameScene;
-        game = thisGame;
         nrStars = thisNrStars;
-
-        StartCoroutine(FirstGlobal());
-        InTheBox();
-        PairingUp();
-        WithTheFlash();
-
-        ChallengeThem();
-        LookingAround();
-        ThinkOutSideTheBox();
-        TotalRecall();
-        TrueMatchMaker();
+        gameScene = thisGameScene;
+        CheckProgress();
+        achievementsApi.FlushPending();
+        ShowNext();
+        StartCoroutine(CheckRemoteProgress(generation));
     }
 
-    public void ChallangecompletedAchievements(GameObject challangePanel, string thisGame,
-        GameObject thisAchievementsPanelPrefab, List<Achievement> thisAchievementsList)
+    public void ChallangecompletedAchievements(GameObject panel, string mode,
+        GameObject prefab, List<Achievement> achievements)
     {
-        ResetAll();
+        Begin(panel, mode, prefab, achievements);
         isChallange = true;
-        winPanel = challangePanel;
-        game = thisGame;
-        achievementsPanelPrefab = thisAchievementsPanelPrefab;
-        allAchievementsList = thisAchievementsList;
-
-        WinTenChallanges();
-        FirstChallengeGame();
+        CheckProgress();
+        achievementsApi.FlushPending();
+        ShowNext();
+        StartCoroutine(CheckRemoteProgress(generation));
     }
 
-    private void AchievementsCheck()
+    private void CheckProgress()
     {
-        achievementCount++;
+        var user = UserConstants.s_user;
+        var stats = user == null ? null : user.userStatistics;
+        foreach (string key in AchievementRules.Eligible(isChallange ? null : game,
+            isChallange ? 0 : LevelScript._selectedLevel,
+            GameLevelConstants.s_boxesLevels, GameLevelConstants.s_pairsLevels, GameLevelConstants.s_flashLevels,
+            stats == null ? 0 : stats.xp, stats == null ? 0 : stats.numberOfWinChallenges)) Award(key);
+    }
 
-        if (isChallange)
+    private void Award(string key)
+    {
+        var achievement = catalog.Find(a => a.constantString == key);
+        if (achievement != null && GameManager.UnlockAchievement(key))
         {
-            if (achievementCount >= 2)
-            {
-                if (achievementsToShowList.Count >= 1)
-                    AchievementPopup();
-                else
-                    ChallangePopup();
-            }
-        }
-        else
-        {
-            if (achievementCount >= 9)
-            {
-                if (achievementsToShowList.Count >= 1)
-                    AchievementPopup();
-                else
-                    WinPopup();
-            }
+            // Remote awards update the collection without blocking or reopening the result screen.
+            if (!finished) awards.Enqueue(achievement);
         }
     }
 
-    #region Achievements
-
-    private void FirstChallengeGame()
+    private IEnumerator CheckRemoteProgress(int run)
     {
-        if (UserConstants.s_user.userStatistics.numberOfWinChallenges == 1)
+        bool checkedStats = false, checkedLeaderboard = isChallange;
+        bool accepting = true;
+        int owner = GameManager.AchievementUserId;
+        statisticsApi.GetUserStatisticsChallengeGames(stats =>
         {
-            foreach (var item in allAchievementsList)
+            if (!accepting || generation != run || GameManager.AchievementUserId != owner) return;
+            if (stats != null && UserConstants.s_user != null) UserConstants.s_user.userStatistics = stats;
+            CheckProgress();
+            achievementsApi.FlushPending();
+            checkedStats = true;
+        }, error => checkedStats = true);
+        if (!isChallange)
+            statisticsApi.GetGlobalScore(result =>
             {
-                if (item.constantString == "first-challenge" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("first-challenge");
-                }
-            }
-        }
-        AchievementsCheck();
+                if (!accepting || generation != run || GameManager.AchievementUserId != owner) return;
+                if (result != null && result.statistics != null && result.statistics.Length > 0 &&
+                    result.statistics[0] != null && result.statistics[0].user != null && result.statistics[0].user.ID == owner)
+                    Award("first-global-score");
+                achievementsApi.FlushPending();
+                checkedLeaderboard = true;
+            }, error => checkedLeaderboard = true);
+        float deadline = Time.realtimeSinceStartup + 12f;
+        while ((!checkedStats || !checkedLeaderboard) && Time.realtimeSinceStartup < deadline) yield return null;
+        accepting = false;
+        if (generation != run) yield break;
+        achievementsApi.FlushPending();
     }
 
-    private void WinTenChallanges()
+    private void ShowNext()
     {
-        if (UserConstants.s_user.userStatistics.numberOfWinChallenges == 10)
+        if (finished) return;
+        if (awards.Count == 0 || achievementsPanelPrefab == null)
         {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "win-ten-challenge" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("win-ten-challenge");
-                }
-            }
+            finished = true;
+            if (isChallange) ChallangePopup(); else WinPopup();
+            return;
         }
-        AchievementsCheck();
-    }
-
-    private void TrueMatchMaker()
-    {
-        if (game == StaticVar.s_gamePairs && LevelScript._selectedLevel == 20 &&
-            GameLevelConstants.s_pairsLevels.Length == 19)
+        var canvas = GetComponentInParent<Canvas>();
+        var canvasObject = canvas == null ? GameObject.Find("Canvas") : canvas.gameObject;
+        if (canvasObject == null) { awards.Clear(); ShowNext(); return; }
+        var award = awards.Dequeue();
+        activePopup = Instantiate(achievementsPanelPrefab, canvasObject.transform, false);
+        activePopup.transform.SetAsLastSibling();
+        var view = activePopup.GetComponent<AchievementPopupView>();
+        view.Bind(award, catalog);
+        var popup = activePopup;
+        foreach (var close in activePopup.GetComponentsInChildren<UnityEngine.UI.Button>(true))
+            close.onClick.AddListener(() =>
         {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "pairs-all-levels" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("pairs-all-levels");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private void TotalRecall()
-    {
-        if (game == StaticVar.s_gameFlash && LevelScript._selectedLevel == 20 &&
-            GameLevelConstants.s_flashLevels.Length == 19)
-        {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "flash-all-levels" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("flash-all-levels");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private void ThinkOutSideTheBox()
-    {
-        if (game == StaticVar.s_gameBoxes && LevelScript._selectedLevel == 20 &&
-            GameLevelConstants.s_boxesLevels.Length == 19)
-        {
-
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "boxes-all-levels" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("boxes-all-levels");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private void LookingAround()
-    {
-        if(LookingAroundBoxes() || LookingAroundPairs() || LookingAroundFlash())
-        {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "looking-around" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("looking-around");
-                }
-            }
-        }
-
-
-
-        if (LevelScript._selectedLevel == 1 && GameLevelConstants.s_boxesLevels.Length >= 1
-            && GameLevelConstants.s_pairsLevels.Length >= 1
-            && GameLevelConstants.s_flashLevels.Length >= 1)
-        {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "looking-around" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("looking-around");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private void ChallengeThem()
-    {
-        if(UserConstants.s_user.userStatistics.xp >= 400)
-        {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "unlock-challenge" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("unlock-challenge");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private void InTheBox()
-    {
-        if (game == StaticVar.s_gameBoxes && LevelScript._selectedLevel == 1 &&
-            GameLevelConstants.s_boxesLevels.Length == 0)
-        {
-
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "in-the-box" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("in-the-box");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private void PairingUp()
-    {
-        if (game == StaticVar.s_gamePairs && LevelScript._selectedLevel == 1 &&
-            GameLevelConstants.s_pairsLevels.Length == 0)
-        {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "pairing-up" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("pairing-up");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private void WithTheFlash()
-    {
-        if (game == StaticVar.s_gameFlash && LevelScript._selectedLevel == 1 &&
-            GameLevelConstants.s_flashLevels.Length == 0)
-        {
-            foreach (var item in allAchievementsList)
-            {
-                if (item.constantString == "with-the-flash" &&
-                    !GameManager.completedAchievements.Contains(item.constantString))
-                {
-                    achievementsToShowList.Add(item);
-                    OnAchievementCompleted("with-the-flash");
-                }
-            }
-        }
-        AchievementsCheck();
-    }
-
-    private IEnumerator FirstGlobal()
-    {
-        bool checkedScore = false;
-        userStatisticsAPIController.GetGlobalScore(
-             (OnSuccess) =>
-             {
-                 if (OnSuccess.statistics[0].user.ID == UserConstants.s_user.ID)
-                 {
-                     foreach (var item in allAchievementsList)
-                     {
-                         if (item.constantString == "first-global-score" &&
-                            !GameManager.completedAchievements.Contains(item.constantString))
-                         {
-                             achievementsToShowList.Add(item);
-                             OnAchievementCompleted("first-global-score");
-                         }
-                     }
-                 }
-                 checkedScore = true;
-             },
-             (OnFailure) =>
-             {
-                 print("fail");
-                 checkedScore = true;
-             }
-         );
-        yield return new WaitUntil(() => checkedScore == true);
-        AchievementsCheck();
-    }
-
-    #endregion
-
-    #region Popup Controllers
-
-    private void AchievementPopup()
-    {
-        GameObject achievementsPanel = Instantiate(achievementsPanelPrefab) as GameObject;
-        achievementsPanel.transform.SetParent(GameObject.Find("Canvas").transform, false);
-        achievementsPanel.transform.SetAsLastSibling();
-
-        AchievementPopupView achievementPopupView = achievementsPanel.GetComponent<AchievementPopupView>();
-
-        achievementPopupView.closeButton.onClick.AddListener(() =>
-        {
-            NextPopup(achievementsPanel);
+            if (activePopup != popup) return;
+            activePopup = null;
+            popup.SetActive(false);
+            Destroy(popup);
+            ShowNext();
         });
-
-        achievementPopupView.icon.sprite = achievementsToShowList[0].icon;
-        achievementPopupView.title.text = achievementsToShowList[0].title;
-        achievementPopupView.description.text = achievementsToShowList[0].description;
-    }
-
-    private void NextPopup(GameObject achievementsPanel)
-    {
-        Destroy(achievementsPanel);
-
-        if (achievementsToShowList.Count > 0)
-            achievementsToShowList.RemoveAt(0);
-
-        if (achievementsToShowList.Count > 0)
-            AchievementPopup();
-        else
-        {
-            if(!isChallange)
-                WinPopup();
-            else
-                ChallangePopup();
-        }
     }
 
     private void WinPopup()
@@ -414,82 +177,5 @@ public class AchievementsController : MonoBehaviour
         }
     }
 
-    #endregion
 
-    #region Add/Update Achievement
-
-    private void OnAchievementCompleted(string achievementName)
-    {
-        try
-        {
-            achievementsAPIController.AddAchievements(
-                new string[] { achievementName },
-                (OnSuccess) =>
-                {
-                    print("success");
-                    UpdatetcompletedAchievements();
-                },
-                (OnFailure) =>
-                {
-                    print("fail");
-                }
-            );
-        }
-        catch (UserException e)
-        {
-            Debug.Log(e.Message);
-        }
-    }
-
-    private void UpdatetcompletedAchievements()
-    {
-        try
-        {
-            achievementsAPIController.GetAchievements(
-                (OnSuccess) =>
-                {
-                    GameManager.completedAchievements = OnSuccess.achievements.ToList();
-                    print("success");
-                },
-                (OnFailure) =>
-                {
-                    print("fail");
-                }
-            );
-        }
-        catch (UserException e)
-        {
-            Debug.Log(e.Message);
-        }
-    }
-
-    #endregion
-
-    #region ExtrasAchievements
-
-    private bool LookingAroundBoxes()
-    {
-        return game == StaticVar.s_gameBoxes && LevelScript._selectedLevel == 1
-            && GameLevelConstants.s_boxesLevels.Length == 0
-            && GameLevelConstants.s_pairsLevels.Length >= 1
-            && GameLevelConstants.s_flashLevels.Length >= 1;
-    }
-
-    private bool LookingAroundPairs()
-    {
-        return game == StaticVar.s_gamePairs && LevelScript._selectedLevel == 1
-            && GameLevelConstants.s_boxesLevels.Length >= 1
-            && GameLevelConstants.s_pairsLevels.Length == 0
-            && GameLevelConstants.s_flashLevels.Length >= 1;
-    }
-
-    private bool LookingAroundFlash()
-    {
-        return game == StaticVar.s_gameFlash && LevelScript._selectedLevel == 1
-            && GameLevelConstants.s_boxesLevels.Length >= 1
-            && GameLevelConstants.s_pairsLevels.Length >= 1
-            && GameLevelConstants.s_flashLevels.Length == 0;
-    }
-
-    #endregion
 }

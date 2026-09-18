@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Assets.Script.Constants;
 using Assets.Script.Controllers;
@@ -35,41 +35,49 @@ public class StatisticsView : MonoBehaviour
     [SerializeField]
     private TextMeshProUGUI starsPerGame;
 
+    private int rankingRequest;
+    private readonly Dictionary<Text, Color> rankingColors = new Dictionary<Text, Color>();
+
+    public static int[] RankingRows(UserStatistics[] statistics, int owner, int capacity)
+    {
+        var rows = new List<int>();
+        if (statistics == null || capacity <= 0) return rows.ToArray();
+        int ownIndex = -1;
+        for (int i = 0; i < statistics.Length; i++)
+        {
+            if (statistics[i] == null || statistics[i].user == null) continue;
+            if (rows.Count < capacity) rows.Add(i);
+            if (owner > 0 && statistics[i].user.ID == owner) ownIndex = i;
+        }
+        // A missing account must never fall back to the winner at index zero.
+        if (ownIndex >= 0 && !rows.Contains(ownIndex)) rows[rows.Count - 1] = ownIndex;
+        return rows.ToArray();
+    }
+
+    private void OnEnable()
+    {
+        if (userStatisticsAPIController == null)
+            userStatisticsAPIController = gameObject.AddComponent<UserStatisticsAPIController>();
+        int request = ++rankingRequest;
+        int owner = UserConstants.s_user == null ? 0 : UserConstants.s_user.ID;
+        foreach (var person in peoples) person.SetActive(false);
+        userStatisticsAPIController.GetGlobalScore(result =>
+        {
+            if (request != rankingRequest || !isActiveAndEnabled || UserConstants.s_user == null || UserConstants.s_user.ID != owner) return;
+            var statistics = result == null ? null : result.statistics;
+            int[] rows = RankingRows(statistics, owner, peoples.Length);
+            for (int i = 0; i < rows.Length; i++)
+            {
+                peoples[i].SetActive(true);
+                setupUserRaw(peoples[i], statistics, rows[i]);
+            }
+        }, error => { /* Keep unknown ranks hidden rather than displaying stale sample rows. */ });
+    }
+
+    private void OnDisable() { rankingRequest++; }
+
     void Start()
     {
-        userStatisticsAPIController = gameObject.AddComponent<UserStatisticsAPIController>();
-        userStatisticsAPIController.GetGlobalScore(
-            (OnSuccess) =>
-            {
-                bool inFirstTen = false;
-                int myUserOrderNr = 0;
-
-                for (int i = 0; i < OnSuccess.statistics.Length; i++)
-                {
-                    if (i < 10 && OnSuccess.statistics[i].user.ID == UserConstants.s_user.ID)
-                        inFirstTen = true;
-
-                    if (i >= 10 && OnSuccess.statistics[i].user.ID == UserConstants.s_user.ID)
-                        myUserOrderNr = i;
-                }
-
-                for (int i = 0; i < peoples.Length; i++)
-                {
-                    peoples[i].SetActive(true);
-                    setupUserRaw(peoples[i], OnSuccess.statistics, i);
-                }
-
-                if (!inFirstTen)
-                {
-                    setupUserRaw(peoples[9], OnSuccess.statistics, myUserOrderNr);
-                }
-            },
-            (OnFailure) =>
-            {
-                print("fail");
-            }
-        );
-
         string compleatedAchievements = GameManager.completedAchievements.Count.ToString();
 
         if ((int)(Math.Round((float)Screen.width / (float)Screen.height * 4)) == 3)
@@ -207,7 +215,12 @@ public class StatisticsView : MonoBehaviour
         texts[2].text = statistics[idx].xp + "xp";
         images[0].sprite = Resources.Load<Sprite>("Memotopia_UI/AccountAndSettings/" + statistics[idx].user.Avatar);
 
-        if (statistics[idx].user.ID == UserConstants.s_user.ID)
+        foreach (var text in texts)
+        {
+            if (!rankingColors.ContainsKey(text)) rankingColors[text] = text.color;
+            text.color = rankingColors[text];
+        }
+        if (UserConstants.s_user != null && statistics[idx].user.ID == UserConstants.s_user.ID)
         {
             texts[0].color = new Color(123f / 255f, 67f / 255f, 245f / 255f);
             texts[1].color = new Color(123f / 255f, 67f / 255f, 245f / 255f);

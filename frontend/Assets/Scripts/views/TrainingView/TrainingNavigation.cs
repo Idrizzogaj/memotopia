@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Assets.Script.Constants;
 using Assets.Script.Controllers;
 using UnityEngine;
@@ -40,61 +40,51 @@ public class TrainingNavigation : MonoBehaviour
         dataController = gameObject.AddComponent<DataController>();
     }
 
+    private bool opening;
+    private Text connectionMessage;
+
     public void GoToLevels(string game)
     {
+        if (opening) return;
+        opening = true;
+        if (connectionMessage != null) connectionMessage.gameObject.SetActive(false);
         dataController.MenuLastPage = NavigationConstants.s_trainingNav;
         StaticVar.s_game = game;
-
-        SetGameLevelsConstants(StaticVar.s_gameBoxes);
-        SetGameLevelsConstants(StaticVar.s_gameFlash);
-        SetGameLevelsConstants(StaticVar.s_gamePairs);
-
-        
+        var sync = ProgressSync.Instance;
+        if (LevelProgress.Get(game) == null) ShowConnectionMessage("Loading levels…");
+        sync.GetLevels(game, success =>
+        {
+            if (this == null) return;
+            if (success) LoadingManager.Navigate(SceneName.s_levelsScene);
+            else
+            {
+                opening = false;
+                ShowConnectionMessage();
+            }
+        });
+        foreach (var other in new[] { "Boxes", "Pairs", "Flash" })
+            if (other != game) sync.GetLevels(other, null);
     }
 
-    public void SetGameLevelsConstants(string game)
+    private void ShowConnectionMessage(string message = "Could not load levels. Check your connection and tap the game to retry.")
     {
-        try
+        if (connectionMessage == null)
         {
-            gameApiController.GetLevels(game,
-                (OnSuccess) =>
-                {
-                    var responseObject = OnSuccess;
-
-                    if (responseObject.levels.Length > -1)
-                    {
-                        switch (game)
-                        {
-                            case StaticVar.s_gamePairs:
-                                GameLevelConstants.s_pairsLevels = responseObject.levels;
-                                break;
-                            case StaticVar.s_gameBoxes:
-                                GameLevelConstants.s_boxesLevels = responseObject.levels;
-                                break;
-                            case StaticVar.s_gameFlash:
-                                GameLevelConstants.s_flashLevels = responseObject.levels;
-                                break;
-                        }
-                    }
-
-                    if (GameLevelConstants.s_pairsLevels != null && GameLevelConstants.s_boxesLevels != null && GameLevelConstants.s_flashLevels != null)
-                    {
-                        goToScene(SceneName.s_levelsScene);
-                    }
-                },
-                (OnFailure) =>
-                {
-                    print("fail");
-                }
-            );
+            var obj = new GameObject("Connection message", typeof(RectTransform), typeof(Text));
+            obj.transform.SetParent(pairsImage.canvas.transform, false);
+            connectionMessage = obj.GetComponent<Text>();
+            connectionMessage.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            connectionMessage.fontSize = 24; connectionMessage.color = new Color(.5f, .1f, .1f);
+            connectionMessage.alignment = TextAnchor.MiddleCenter;
+            connectionMessage.raycastTarget = false;
+            var rect = connectionMessage.rectTransform;
+            rect.anchorMin = new Vector2(.05f, .02f); rect.anchorMax = new Vector2(.95f, .10f);
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
-        catch (UserException e)
-        {
-            Debug.Log(e.Message);
-        }
+        connectionMessage.text = message;
+        connectionMessage.gameObject.SetActive(true);
     }
 
-    public static void goToScene(string sceneName) {
-        SceneManager.LoadScene(sceneName);
-    }
+    public void SetGameLevelsConstants(string game) { ProgressSync.Instance.GetLevels(game, null); }
+    public static void goToScene(string sceneName) { LoadingManager.Navigate(sceneName); }
 }

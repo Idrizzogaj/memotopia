@@ -6,7 +6,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { Severity } from '@sentry/node';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-import { APP_CONFIG, AppConfig } from '~app.config';
+import { APP_CONFIG, AppConfig } from './app.config';
 import { usage } from '~utils/usage';
 import { LoggerService } from '~modules/logger/logger.service';
 import { logEvent } from '~modules/logger/logger.utils';

@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: LookingAround
   m_EditorClassIdentifier: 
   icon: {fileID: 21300000, guid: b0cb294b5442dbd4da644f5628d30047, type: 3}
-  title: Looking around!
-  description: Finish first level in all games
+  title: Looking Around!
+  description: Complete level 1 in Boxes, Pairs and Flash.
   constantString: looking-around

@@ -1,4 +1,4 @@
-﻿using Assets.Script.Constants;
+using Assets.Script.Constants;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -114,7 +114,7 @@ public class BoxesManager : GamesScript, IGameable
 
     void InitArrays()
     {
-        numbersOfImages = new int[95];
+        numbersOfImages = new int[MajorSystemImages.Count];
     }
 
     /// <summary>
@@ -214,13 +214,15 @@ public class BoxesManager : GamesScript, IGameable
             {
                 imagesArray[i - 1].GetComponentsInChildren<Image>()[0].name = imageNumbers[j].ToString() + " Number";
 
-                imagesArray[i].GetComponentsInChildren<Image>()[0].sprite = Resources.Load<Sprite>("3DImages\\Artboard  (" + imageNumbers[j] + ")") as Sprite;
+                imagesArray[i].GetComponentsInChildren<Image>()[0].sprite = MajorSystemImages.Load(imageNumbers[j]);
+                BoxesPicturePerspective.Attach(imagesArray[i].GetComponentsInChildren<Image>()[0]);
                 imagesArray[i - 1].GetComponent<DragAndDropCell>().enabled = false;
                 imagesArray[i].GetComponent<DragAndDropItem>().enabled = false;
 
                 GameObject g = Instantiate(imagePrefab) as GameObject;
                 g.GetComponentsInChildren<Image>()[1].name = imageNumbers[j].ToString();
-                g.GetComponentsInChildren<Image>()[1].sprite = Resources.Load<Sprite>("3DImages\\Artboard  (" + imageNumbers[j] + ")") as Sprite;
+                g.GetComponentsInChildren<Image>()[1].sprite = MajorSystemImages.Load(imageNumbers[j]);
+                BoxesPicturePerspective.Attach(g.GetComponentsInChildren<Image>()[1]);
                 g.transform.SetParent(scrollViewContent, false);
                 g.SetActive(true);
 
@@ -268,12 +270,7 @@ public class BoxesManager : GamesScript, IGameable
 
     IEnumerator SetBottomPanelToPlace()
     {
-        float t = (Time.time - sTime) / timeSpeed;
-        while (true)
-        {
-            bottomIconsContainer.transform.position = Vector2.Lerp(bottomIconsContainer.transform.position, nextPosBottom.transform.position, t);
-            yield return null;
-        }
+        yield return MovePanel(bottomIconsContainer.transform, nextPosBottom.transform);
     }
 
     void RemoveImagesAfterRecall()

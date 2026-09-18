@@ -1,0 +1,503 @@
+[
+  {
+    "number": "00",
+    "source": "ImagesWithoutBackground/Artboard-55",
+    "matched_existing": true
+  },
+  {
+    "number": "01",
+    "source": "ImagesWithoutBackground/Artboard-10",
+    "matched_existing": true
+  },
+  {
+    "number": "02",
+    "source": "ImagesWithoutBackground/Artboard-40",
+    "matched_existing": true
+  },
+  {
+    "number": "03",
+    "source": "ImagesWithoutBackground/Artboard-5",
+    "matched_existing": true
+  },
+  {
+    "number": "04",
+    "source": "MajorSystem/04",
+    "matched_existing": false
+  },
+  {
+    "number": "05",
+    "source": "ImagesWithoutBackground/Artboard-21",
+    "matched_existing": true
+  },
+  {
+    "number": "06",
+    "source": "ImagesWithoutBackground/Artboard-9",
+    "matched_existing": true
+  },
+  {
+    "number": "07",
+    "source": "ImagesWithoutBackground/Artboard-74",
+    "matched_existing": true
+  },
+  {
+    "number": "08",
+    "source": "ImagesWithoutBackground/Artboard-61",
+    "matched_existing": true
+  },
+  {
+    "number": "09",
+    "source": "MajorSystem/09",
+    "matched_existing": false
+  },
+  {
+    "number": "10",
+    "source": "MajorSystem/10",
+    "matched_existing": false
+  },
+  {
+    "number": "11",
+    "source": "MajorSystem/11",
+    "matched_existing": false
+  },
+  {
+    "number": "12",
+    "source": "ImagesWithoutBackground/Artboard-67",
+    "matched_existing": true
+  },
+  {
+    "number": "13",
+    "source": "ImagesWithoutBackground/Artboard-30",
+    "matched_existing": true
+  },
+  {
+    "number": "14",
+    "source": "ImagesWithoutBackground/Artboard-78",
+    "matched_existing": true
+  },
+  {
+    "number": "15",
+    "source": "MajorSystem/15",
+    "matched_existing": false
+  },
+  {
+    "number": "16",
+    "source": "MajorSystem/16",
+    "matched_existing": false
+  },
+  {
+    "number": "17",
+    "source": "MajorSystem/17",
+    "matched_existing": false
+  },
+  {
+    "number": "18",
+    "source": "ImagesWithoutBackground/Artboard-14",
+    "matched_existing": true
+  },
+  {
+    "number": "19",
+    "source": "MajorSystem/19",
+    "matched_existing": false
+  },
+  {
+    "number": "20",
+    "source": "ImagesWithoutBackground/Artboard-82",
+    "matched_existing": true
+  },
+  {
+    "number": "21",
+    "source": "MajorSystem/21",
+    "matched_existing": false
+  },
+  {
+    "number": "22",
+    "source": "MajorSystem/22",
+    "matched_existing": false
+  },
+  {
+    "number": "23",
+    "source": "MajorSystem/23",
+    "matched_existing": false
+  },
+  {
+    "number": "24",
+    "source": "MajorSystem/24",
+    "matched_existing": false
+  },
+  {
+    "number": "25",
+    "source": "ImagesWithoutBackground/Artboard-66",
+    "matched_existing": true
+  },
+  {
+    "number": "26",
+    "source": "MajorSystem/26",
+    "matched_existing": false
+  },
+  {
+    "number": "27",
+    "source": "MajorSystem/27",
+    "matched_existing": false
+  },
+  {
+    "number": "28",
+    "source": "ImagesWithoutBackground/Artboard-25",
+    "matched_existing": true
+  },
+  {
+    "number": "29",
+    "source": "MajorSystem/29",
+    "matched_existing": false
+  },
+  {
+    "number": "30",
+    "source": "MajorSystem/30",
+    "matched_existing": false
+  },
+  {
+    "number": "31",
+    "source": "MajorSystem/31",
+    "matched_existing": false
+  },
+  {
+    "number": "32",
+    "source": "ImagesWithoutBackground/Artboard-27",
+    "matched_existing": true
+  },
+  {
+    "number": "33",
+    "source": "MajorSystem/33",
+    "matched_existing": false
+  },
+  {
+    "number": "34",
+    "source": "ImagesWithoutBackground/Artboard-8",
+    "matched_existing": true
+  },
+  {
+    "number": "35",
+    "source": "MajorSystem/35",
+    "matched_existing": false
+  },
+  {
+    "number": "36",
+    "source": "MajorSystem/36",
+    "matched_existing": false
+  },
+  {
+    "number": "37",
+    "source": "MajorSystem/37",
+    "matched_existing": false
+  },
+  {
+    "number": "38",
+    "source": "ImagesWithoutBackground/Artboard-57",
+    "matched_existing": true
+  },
+  {
+    "number": "39",
+    "source": "ImagesWithoutBackground/Artboard-29",
+    "matched_existing": true
+  },
+  {
+    "number": "40",
+    "source": "MajorSystem/40",
+    "matched_existing": false
+  },
+  {
+    "number": "41",
+    "source": "MajorSystem/41",
+    "matched_existing": false
+  },
+  {
+    "number": "42",
+    "source": "ImagesWithoutBackground/Artboard-50",
+    "matched_existing": true
+  },
+  {
+    "number": "43",
+    "source": "ImagesWithoutBackground/Artboard-52",
+    "matched_existing": true
+  },
+  {
+    "number": "44",
+    "source": "MajorSystem/44",
+    "matched_existing": false
+  },
+  {
+    "number": "45",
+    "source": "MajorSystem/45",
+    "matched_existing": false
+  },
+  {
+    "number": "46",
+    "source": "ImagesWithoutBackground/Artboard-32",
+    "matched_existing": true
+  },
+  {
+    "number": "47",
+    "source": "MajorSystemVariants/47-rock",
+    "matched_existing": false,
+    "note": "Generated solid stone replaces cave-like silhouette; original 47.png retained."
+  },
+  {
+    "number": "48",
+    "source": "ImagesWithoutBackground/Artboard-71",
+    "matched_existing": true
+  },
+  {
+    "number": "49",
+    "source": "ImagesWithoutBackground/Artboard-7",
+    "matched_existing": true
+  },
+  {
+    "number": "50",
+    "source": "MajorSystem/50",
+    "matched_existing": false
+  },
+  {
+    "number": "51",
+    "source": "ImagesWithoutBackground/Artboard-76",
+    "matched_existing": true
+  },
+  {
+    "number": "52",
+    "source": "MajorSystem/52",
+    "matched_existing": false
+  },
+  {
+    "number": "53",
+    "source": "MajorSystem/53",
+    "matched_existing": false
+  },
+  {
+    "number": "54",
+    "source": "ImagesWithoutBackground/Artboard-44",
+    "matched_existing": true
+  },
+  {
+    "number": "55",
+    "source": "ImagesWithoutBackground/Artboard-4",
+    "matched_existing": true
+  },
+  {
+    "number": "56",
+    "source": "MajorSystem/56",
+    "matched_existing": false
+  },
+  {
+    "number": "57",
+    "source": "ImagesWithoutBackground/Artboard-41",
+    "matched_existing": true
+  },
+  {
+    "number": "58",
+    "source": "ImagesWithoutBackground/Artboard-12",
+    "matched_existing": true
+  },
+  {
+    "number": "59",
+    "source": "ImagesWithoutBackground/Artboard-70",
+    "matched_existing": true
+  },
+  {
+    "number": "60",
+    "source": "ImagesWithoutBackground/Artboard-48",
+    "matched_existing": true
+  },
+  {
+    "number": "61",
+    "source": "MajorSystem/61",
+    "matched_existing": false
+  },
+  {
+    "number": "62",
+    "source": "ImagesWithoutBackground/Artboard-38",
+    "matched_existing": true
+  },
+  {
+    "number": "63",
+    "source": "ImagesWithoutBackground/Artboard-28",
+    "matched_existing": true
+  },
+  {
+    "number": "64",
+    "source": "ImagesWithoutBackground/Artboard-51",
+    "matched_existing": true
+  },
+  {
+    "number": "65",
+    "source": "ImagesWithoutBackground/Artboard-46",
+    "matched_existing": true
+  },
+  {
+    "number": "66",
+    "source": "MajorSystem/66",
+    "matched_existing": false
+  },
+  {
+    "number": "67",
+    "source": "MajorSystem/67",
+    "matched_existing": false
+  },
+  {
+    "number": "68",
+    "source": "ImagesWithoutBackground/Artboard-24",
+    "matched_existing": true
+  },
+  {
+    "number": "69",
+    "source": "ImagesWithoutBackground/Artboard-42",
+    "matched_existing": true
+  },
+  {
+    "number": "70",
+    "source": "MajorSystem/70",
+    "matched_existing": false
+  },
+  {
+    "number": "71",
+    "source": "ImagesWithoutBackground/Artboard-33",
+    "matched_existing": true
+  },
+  {
+    "number": "72",
+    "source": "MajorSystem/72",
+    "matched_existing": false
+  },
+  {
+    "number": "73",
+    "source": "MajorSystem/73",
+    "matched_existing": false
+  },
+  {
+    "number": "74",
+    "source": "ImagesWithoutBackground/Artboard-97",
+    "matched_existing": true
+  },
+  {
+    "number": "75",
+    "source": "MajorSystem/75",
+    "matched_existing": false
+  },
+  {
+    "number": "76",
+    "source": "MajorSystem/76",
+    "matched_existing": false
+  },
+  {
+    "number": "77",
+    "source": "MajorSystem/77",
+    "matched_existing": false
+  },
+  {
+    "number": "78",
+    "source": "MajorSystem/78",
+    "matched_existing": false
+  },
+  {
+    "number": "79",
+    "source": "ImagesWithoutBackground/Artboard-36",
+    "matched_existing": true
+  },
+  {
+    "number": "80",
+    "source": "ImagesWithoutBackground/Artboard-43",
+    "matched_existing": true
+  },
+  {
+    "number": "81",
+    "source": "ImagesWithoutBackground/Artboard-34",
+    "matched_existing": true
+  },
+  {
+    "number": "82",
+    "source": "ImagesWithoutBackground/Artboard-75",
+    "matched_existing": true
+  },
+  {
+    "number": "83",
+    "source": "MajorSystem/83",
+    "matched_existing": false
+  },
+  {
+    "number": "84",
+    "source": "ImagesWithoutBackground/Artboard-85",
+    "matched_existing": true
+  },
+  {
+    "number": "85",
+    "source": "ImagesWithoutBackground/Artboard-65",
+    "matched_existing": true
+  },
+  {
+    "number": "86",
+    "source": "MajorSystem/86",
+    "matched_existing": false
+  },
+  {
+    "number": "87",
+    "source": "MajorSystem/87",
+    "matched_existing": false
+  },
+  {
+    "number": "88",
+    "source": "MajorSystem/88",
+    "matched_existing": false
+  },
+  {
+    "number": "89",
+    "source": "ImagesWithoutBackground/Artboard-83",
+    "matched_existing": true
+  },
+  {
+    "number": "90",
+    "source": "ImagesWithoutBackground/Artboard-79",
+    "matched_existing": true
+  },
+  {
+    "number": "91",
+    "source": "ImagesWithoutBackground/Artboard-22",
+    "matched_existing": true
+  },
+  {
+    "number": "92",
+    "source": "ImagesWithoutBackground/Artboard-26",
+    "matched_existing": true
+  },
+  {
+    "number": "93",
+    "source": "MajorSystem/93",
+    "matched_existing": false
+  },
+  {
+    "number": "94",
+    "source": "ImagesWithoutBackground/Artboard-60",
+    "matched_existing": true
+  },
+  {
+    "number": "95",
+    "source": "ImagesWithoutBackground/Artboard-94",
+    "matched_existing": true
+  },
+  {
+    "number": "96",
+    "source": "MajorSystem/96",
+    "matched_existing": false
+  },
+  {
+    "number": "97",
+    "source": "ImagesWithoutBackground/Artboard-81",
+    "matched_existing": true
+  },
+  {
+    "number": "98",
+    "source": "ImagesWithoutBackground/Artboard-17",
+    "matched_existing": true
+  },
+  {
+    "number": "99",
+    "source": "ImagesWithoutBackground/Artboard-87",
+    "matched_existing": true
+  }
+]

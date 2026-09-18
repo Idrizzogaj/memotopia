@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: PairingUp
   m_EditorClassIdentifier: 
   icon: {fileID: 21300000, guid: ab5575fec9e3d4e478a3a1fbfea32095, type: 3}
-  title: Pairing up!
-  description: Playing game of pairs first time
+  title: Pairing Up!
+  description: Complete a level in Pairs.
   constantString: pairing-up

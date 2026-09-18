@@ -45,7 +45,7 @@ public class PairsManager : GamesScript, IGameable
     private int nextCount = 0;
     private bool cardFaceShown;
 
-    private string[] nameOfImages = new string[100];
+    private string[] nameOfImages = new string[MajorSystemImages.Count];
     private string[] currentCards;
 
     private Button firstBtn;
@@ -139,7 +139,7 @@ public class PairsManager : GamesScript, IGameable
     public void SetNames()
     {
         for (int i = 0; i < nameOfImages.Length; i++)
-            nameOfImages[i] = "Artboard-" + (i + 1);
+            nameOfImages[i] = MajorSystemImages.ResourcePath(i + 1);
         Shuffle(nameOfImages);
     }
 
@@ -170,10 +170,10 @@ public class PairsManager : GamesScript, IGameable
             return;
         }
 
-        img1.sprite = Resources.Load("ImagesWithoutBackground\\" + nameOfImages[nextCount], typeof(Sprite)) as Sprite;
-        img2.sprite = Resources.Load("ImagesWithoutBackground\\" + nameOfImages[nextCount + 1], typeof(Sprite)) as Sprite;
-        img1Ipad.sprite = Resources.Load("ImagesWithoutBackground\\" + nameOfImages[nextCount], typeof(Sprite)) as Sprite;
-        img2Ipad.sprite = Resources.Load("ImagesWithoutBackground\\" + nameOfImages[nextCount + 1], typeof(Sprite)) as Sprite;
+        img1.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount]);
+        img2.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount + 1]);
+        img1Ipad.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount]);
+        img2Ipad.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount + 1]);
 
         currentCards[nextCount] = nameOfImages[nextCount];
         currentCards[nextCount + 1] = nameOfImages[nextCount + 1];
@@ -194,9 +194,8 @@ public class PairsManager : GamesScript, IGameable
         {
             //Get selected gameObject and change its image based on the object name
             secondBtn = selectedGameObject.GetComponent<Button>();
-            secondBtn.image.overrideSprite = Resources.Load<Sprite>("ImagesWithBackground\\" + secondBtn.name) as Sprite;
+            secondBtn.image.overrideSprite = MajorSystemImages.LoadPath(secondBtn.name);
             MakeButtonsInteractable(false);
-            ChangeCardsColor(false);
             if (pairs[firstBtn.name] == secondBtn.name || pairs[secondBtn.name] == firstBtn.name)
             {
                 gameOverCount -= 2;
@@ -234,21 +233,9 @@ public class PairsManager : GamesScript, IGameable
         {
             //Get selected gameObject and change its image based on the object name
             firstBtn = selectedGameObject.GetComponent<Button>();
-            firstBtn.image.overrideSprite = Resources.Load<Sprite>("ImagesWithBackground\\" + firstBtn.name) as Sprite;
+            firstBtn.image.overrideSprite = MajorSystemImages.LoadPath(firstBtn.name);
         }
         cardFaceShown = !cardFaceShown;
-    }
-
-    private void ChangeCardsColor(bool on)
-    {
-        if (!on)
-        {
-            foreach (Transform item in cardContent.transform)
-                item.GetComponent<Image>().color = new Color32(240, 240, 240, 255);
-        }
-        else
-            foreach (var item in buttons)
-                item.image.color = new Color32(255, 255, 255, 255);
     }
 
     private IEnumerator Wait500MillisecondToReturn()
@@ -272,9 +259,13 @@ public class PairsManager : GamesScript, IGameable
     public void MakeButtonsInteractable(bool interactable)
     {
         for (int i = 0; i < buttons.Length; i++)
+        {
+            var colors = buttons[i].colors;
+            colors.disabledColor = colors.normalColor;
+            buttons[i].colors = colors;
             buttons[i].interactable = interactable;
-        if (interactable)
-            ChangeCardsColor(true);
+        }
+
     }
 
     /// <summary>

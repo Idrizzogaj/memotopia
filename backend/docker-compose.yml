@@ -4,7 +4,7 @@ services:
         container_name: 'memotopia-api-db'
         image: postgres
         volumes:
-            - dbdata:/var/lib/postgresql/data
+            - dbdata:/var/lib/postgresql
         ports:
             - '5432:5432'
         environment:

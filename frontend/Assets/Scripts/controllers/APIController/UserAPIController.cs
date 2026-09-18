@@ -37,18 +37,37 @@ namespace Assets.Script.Controllers
         {
             yield return request;
 
+            if (request == null)
+            {
+                if (onFailure != null) onFailure(ReturnAlertMessageType("Request was null", "CLIENT_ERROR"));
+                yield break;
+            }
+
             if (String.IsNullOrEmpty(request.error))
             {
+                if (String.IsNullOrEmpty(request.text))
+                {
+                    if (onFailure != null) onFailure(ReturnAlertMessageType("Empty response", "EMPTY_RESPONSE"));
+                    yield break;
+                }
+
                 var responseObject = JsonUtility.FromJson<User>(request.text);
                 UserConstants.s_user = responseObject;
-                onSuccess(responseObject);
+                if (onSuccess != null) onSuccess(responseObject);
+                yield break;
             }
-            else
+
+            ErrorResponsePayload errorPayload = null;
+            if (!String.IsNullOrEmpty(request.text))
             {
-                var responseObject = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
-                onFailure(ReturnAlertMessageType(responseObject.Message, responseObject.Code));
+                errorPayload = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
             }
+
+            var message = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Message)) ? errorPayload.Message : request.error;
+            var code = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Code)) ? errorPayload.Code : "HTTP_ERROR";
+            if (onFailure != null) onFailure(ReturnAlertMessageType(message, code));
         }
+
 
         public void GetRandomUser(Action<User> onSuccess, Action<AlertMessageContainer> onFailure)
         {

@@ -1,4 +1,4 @@
-﻿using Assets.Script.Constants;
+using Assets.Script.Constants;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -70,8 +70,15 @@ public class FlashManager : GamesScript, IGameable
     }
 
     #region Initializations
+    public void PositionHeader()
+    {
+        var panel = (RectTransform)topPanel.transform;
+        panel.anchoredPosition = ((RectTransform)topPanelNext.transform).anchoredPosition;
+    }
+
     void Start()
     {
+        PositionHeader();
         if (!ChallengeConstants.s_isChallenge && LevelScript._selectedLevel == 1 && GameLevelConstants.s_flashLevels.Length == 0)
             tutorialController.InitializeTutorial();
         else
@@ -125,7 +132,7 @@ public class FlashManager : GamesScript, IGameable
 
     void InitArrays()
     {
-        numbersOfImages = new int[100];
+        numbersOfImages = new int[MajorSystemImages.Count];
         imagesNumberForRecall = new int[imagesToShowNumber];
         imagesNumberForRecallNoShuffle = new int[imagesToShowNumber];
     }
@@ -325,7 +332,7 @@ public class FlashManager : GamesScript, IGameable
             newRecallImageCellBtn.name = imagesNumberForRecall[i].ToString();
 
             newRecallImageCellBtn.GetComponent<Button>().image.overrideSprite =
-                Resources.Load<Sprite>("ImagesWithBackground\\Artboard-" + imagesNumberForRecall[i].ToString()) as Sprite;
+                MajorSystemImages.Load(imagesNumberForRecall[i]);
 
             newRecallImageCellBtn.GetComponent<Button>().onClick.AddListener(() => CompareImages(newRecallImageCellBtn));
 
@@ -401,12 +408,7 @@ public class FlashManager : GamesScript, IGameable
 
     IEnumerator SetTopPanelToPlace()
     {
-        float t = (Time.time - sTime) / timeSpeed;
-        while (true)
-        {
-            topPanel.transform.position = Vector2.Lerp(topPanel.transform.position, topPanelNext.transform.position, t);
-            yield return null;
-        }
+        yield return MovePanel(topPanel.transform, topPanelNext.transform);
     }
 
     #endregion

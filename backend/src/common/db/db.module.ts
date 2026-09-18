@@ -1,7 +1,7 @@
 import { DynamicModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AppConfig, APP_CONFIG } from '~app.config';
+import { AppConfig, APP_CONFIG } from '../../app.config';
 
 export function dbModuleFactory(): DynamicModule {
     return TypeOrmModule.forRootAsync({

@@ -156,8 +156,9 @@ export class UserService {
     }
 
     async forgotPassword(forgotPasswordReqDto: ForgotPasswordReqDto, host: string): Promise<void> {
-        const { email } = forgotPasswordReqDto;
-        const user = await this.userRepository.findOne({ email });
+        const email = forgotPasswordReqDto.email.trim().toLowerCase();
+        const users = await this.userRepository.getByEmailCaseInsensitive(email);
+        const user = users[0];
 
         if (!user) {
             const error = new NotFoundException(`User with this email ${email} not found!`);

@@ -4,11 +4,11 @@ namespace Assets.Script.Constants
     public class APIConstants
     {
         #region BASE_URLs
-        //const string LOCAL_BASE_URL = "http://localhost:3001";
-        const string LOCAL_BASE_URL = "http://172.105.68.212";
-        //const string LOCAL_BASE_URL = "http://139.162.145.178"; // prod
-        const string DEV_BASE_URL = "http://li2024-212.members.linode.com";
-        const string BASE_URL = "";
+        //const string LOCAL_BASE_URL = "https://memotopia-eu-1.duckdns.org";
+        const string LOCAL_BASE_URL = "https://memotopia-eu-1.duckdns.org";
+        //const string LOCAL_BASE_URL = "https://memotopia-eu-1.duckdns.org"; // prod
+        const string DEV_BASE_URL = "https://memotopia-eu-1.duckdns.org";
+        const string BASE_URL = "https://memotopia-eu-1.duckdns.org";
 
 
         const string TERMS_URL = "http://memotopia.com/pp/privacy-and-policy.pdf?fbclid=IwAR09a-hC9bZbhZtb2gFGvOwAPs9jMDWenQ_wozqDADBhKW1qo2Us_jL7jBg";

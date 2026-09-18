@@ -6,7 +6,6 @@ using Assets.Script.Controllers;
 using Assets.Script.Models;
 using Assets.Script.Utilities;
 using UnityEngine.SceneManagement;
-using Facebook.Unity;
 using System.Collections.Generic;
 using UnityEngine.SignInWithApple;
 
@@ -44,16 +43,7 @@ public class AuthView : MonoBehaviour
 
     void Awake()
     {
-        if (!FB.IsInitialized)
-        {
-            // Initialize the Facebook SDK
-            FB.Init(InitCallback, OnHideUnity);
-        }
-        else
-        {
-            // Already initialized, signal an app activation App Event
-            FB.ActivateApp();
-        }
+        // Facebook SDK disabled for iOS/TestFlight stability.
 #if UNITY_IPHONE
         iOSSocialLogin.SetActive(true);
         AndroidSocialLogin.SetActive(false);
@@ -94,8 +84,8 @@ public class AuthView : MonoBehaviour
 
     public void loginWithFacebook()
     {
-        var perms = new List<string>() { "public_profile", "email" };
-        FB.LogInWithReadPermissions(perms, AuthCallback);
+        Debug.Log("FACEBOOK LOGIN DISABLED");
+        return;
     }
 
     public void loginWithApple()
@@ -108,6 +98,9 @@ public class AuthView : MonoBehaviour
 
     public void logIn()
     {
+        Debug.Log("LOGIN BUTTON PRESSED");
+        Debug.Log("LOGIN username=" + usernameLogIn.text);
+        Debug.Log("LOGIN password empty? " + string.IsNullOrEmpty(passwordLogIn.text));
         if (usernameLogIn.text.Trim() == String.Empty || passwordLogIn.text.Trim() == String.Empty)
         {
             HandleConditionWithAlertMessages();
@@ -346,106 +339,33 @@ public class AuthView : MonoBehaviour
 
     private void InitCallback()
     {
-        if (FB.IsInitialized)
-        {
-            // Signal an app activation App Event
-            FB.ActivateApp();
-            // Continue with Facebook SDK
-            // ...
-        }
-        else
-        {
-            Debug.Log("Failed to Initialize the Facebook SDK");
-        }
+        Debug.Log("Facebook SDK disabled");
     }
 
     private void OnHideUnity(bool isGameShown)
     {
-        if (!isGameShown)
-        {
-            // Pause the game - we will need to hide
-            Time.timeScale = 0;
-        }
-        else
-        {
-            // Resume the game - we're getting focus again
-            Time.timeScale = 1;
-        }
+        Time.timeScale = isGameShown ? 1 : 0;
     }
 
-    private void AuthCallback(ILoginResult result)
+    private void AuthCallback(object result)
     {
-        if (result.Error != null)
-        {
-            Debug.Log(result.Error);
-        }
-        else
-        {
-            if (FB.IsLoggedIn)
-            {
-                aToken = AccessToken.CurrentAccessToken.TokenString;
-                FB.API("/me?fields=id", HttpMethod.GET, GetFbUserIdAndLogin);
-            }
-            else
-            {
-                Debug.Log("FB is not loggedin");
-            }
-        }
+        Debug.Log("Facebook login disabled");
     }
 
-    private void GetFbUserIdAndLogin(IResult result)
+    private void GetFbUserIdAndLogin(object result)
     {
-        if (result.Error == null)
-        {
-            string id = (string)result.ResultDictionary["id"];
-
-            try
-            {
-                _authApiController.PerformSocialLogin(id, aToken, "FACEBOOK",
-                    (OnSuccess) =>
-                    {
-                        _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
-                    },
-                    (OnFailure) =>
-                    {
-                        _loadingScreen.EndLoading();
-                        HandleConditionWithAlertMessages(null, false, true);
-                    }
-                );
-            }
-            catch (UserException e)
-            {
-                Debug.Log(e.Message);
-            }
-
-            //FB.API("/"+id, HttpMethod.GET, DisplayFriends);
-        }
-        else
-        {
-            Debug.Log(result.Error);
-        }
+        Debug.Log("Facebook login disabled");
     }
 
-    private void DisplayFriends(IResult result)
+
+    private void DisplayFriends(object result)
     {
-        if (result.Error == null)
-        {
-            print(result);
-        }
-        else
-        {
-            Debug.Log(result.Error);
-        }
+        Debug.Log("Facebook disabled");
     }
 
-    private void DisplayProfilePic(IGraphResult result)
+    private void DisplayProfilePic(object result)
     {
-
-        if (result.Texture != null)
-        {
-            //Image ProfilePic = DialogProfilePic.GetComponent<Image>();
-            //ProfilePic.sprite = Sprite.Create(result.Texture, new Rect(0, 0, 200, 200), new Vector2());    
-        }
+        Debug.Log("Facebook disabled");
     }
 
     private void OnAppleLogin(SignInWithApple.CallbackArgs args)

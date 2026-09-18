@@ -14,3 +14,25 @@ UserSettings/
 
 backend/.env.local
 backend/.env.*
+
+# Local exports and transfer archives; keep source assets in Git.
+/ios-build/
+/windows-transfer/
+/backend_upload.tgz
+/*.log
+/frontend/_removed_facebook*/
+
+# Signing material is transferred separately, never through GitHub.
+*.p8
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
+
+# Local safety copies created during repair work.
+*.bak
+*.bak.*
+*.bak_*
+*.before_rollback_*
+*.bak*.meta
+*.before_rollback_*.meta

@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: ChallengeThem
   m_EditorClassIdentifier: 
   icon: {fileID: 21300000, guid: c5834ddc2c4ee724899d32d64ae2809f, type: 3}
-  title: Challenge them!
-  description: Unlock challenges
+  title: Challenge Them!
+  description: Earn 400 XP to unlock challenges.
   constantString: unlock-challenge

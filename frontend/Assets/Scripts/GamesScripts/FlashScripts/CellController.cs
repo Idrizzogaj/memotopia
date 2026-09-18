@@ -16,8 +16,16 @@ public class CellController : MonoBehaviour
             Debug.LogError("Empty Function Delegate on CellController.cs");
 
         transform.GetChild(0).transform.GetChild(0).transform.gameObject.SetActive(true);
-        transform.GetChild(0).transform.GetChild(0).GetComponent<Image>().sprite = Resources.Load<Sprite>(
-            "ImagesWithoutBackground\\Artboard-" + choosenArtboardNumber.ToString()) as Sprite;
+        Image picture = transform.GetChild(0).GetChild(0).GetComponent<Image>();
+        picture.sprite = MajorSystemImages.Load(choosenArtboardNumber);
+        picture.preserveAspect = true;
+        // The tile sprite includes a large shadow. Keep the entire opaque card
+        // inside its white diamond face, including the card's four corners.
+        RectTransform pictureRect = picture.rectTransform;
+        pictureRect.anchorMin = new Vector2(0.37f, 0.38f);
+        pictureRect.anchorMax = new Vector2(0.63f, 0.64f);
+        pictureRect.anchoredPosition = Vector2.zero;
+        pictureRect.sizeDelta = Vector2.zero;
         transform.GetComponent<Image>().color = new Color32(255, 255, 255, 255);
     }
 

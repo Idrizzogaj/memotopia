@@ -1,7 +1,7 @@
 import { DynamicModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 
-import { AppConfig, APP_CONFIG } from '~app.config';
+import { AppConfig, APP_CONFIG } from '../../app.config';
 
 export function jwtModuleFactory(): DynamicModule {
     return JwtModule.registerAsync({

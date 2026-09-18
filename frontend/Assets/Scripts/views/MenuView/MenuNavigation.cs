@@ -1,7 +1,6 @@
-﻿using System;
+using System;
 using Assets.Script.Constants;
 using Assets.Script.Controllers;
-using Facebook.Unity;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Purchasing;
@@ -128,6 +127,7 @@ public class MenuNavigation : MonoBehaviour
         gameApiController = gameObject.AddComponent<GameAPIController>();
         _updateDataInHomeScreen();
 
+        ProgressSync.Instance.RetryPending();
         GetCompleatedAchievements();
     }
 
@@ -170,6 +170,7 @@ public class MenuNavigation : MonoBehaviour
     {
         statisticsScreen.SetActive(false);
         achievementsScreen.SetActive(true);
+        GetCompleatedAchievements();
     }
     public void GoGlobalScore()
     {
@@ -457,41 +458,31 @@ public class MenuNavigation : MonoBehaviour
 
     public void Logout()
     {
-        if (FB.IsLoggedIn)
-        {
-            FB.LogOut();
-        }
+        // Facebook SDK disabled.
 
         dataController.Token = null;
+        GameLevelConstants.s_boxesLevels = null;
+        GameLevelConstants.s_pairsLevels = null;
+        GameLevelConstants.s_flashLevels = null;
         _loadingScreen.GoToSceneWithLoading(SceneName.s_loginScene);
     }
 
+    // Enable after the public listing is available; TestFlight alone does not create it.
+    public const bool PublicStoreListingAvailable = false;
+    public const string AppStoreReviewUrl = "https://apps.apple.com/app/id1442530846?action=write-review";
+
     public void RateBtnClick()
     {
-        try
-        {
-            switch (Application.platform)
-            {
-                case RuntimePlatform.IPhonePlayer:
-                    Application.OpenURL("https://apps.apple.com/us/app/memotopia/id1442530846");
-                    break;
-                case RuntimePlatform.Android:
-                    Application.OpenURL("http://play.google.com/store/apps/details?id=" + Application.identifier);
-                    break;
-            }
-        }
-        catch (Exception)
-        {
-            Application.Quit();
-        }
+        if (!PublicStoreListingAvailable) return;
+        if (Application.platform == RuntimePlatform.IPhonePlayer)
+            Application.OpenURL(AppStoreReviewUrl);
+        else if (Application.platform == RuntimePlatform.Android)
+            Application.OpenURL("https://play.google.com/store/apps/details?id=" + Application.identifier);
     }
 
     public void FacebookShare()
     {
-        FB.ShareLink(new System.Uri("https://www.memotopia.com/"), "Check it out!",
-            "Memotopia - mobile game to master your memory. Play, have fun, learn, challenge friends or embark on a memorable journey that will change the way you think. So get ready to expand your mind and perfect your memory!",
-            new System.Uri("https://www.memotopia.com/wp-content/themes/Memotopia/img/Asset_10.png")
-            );
+        // Facebook integration is unavailable. The menu entry remains visibly disabled.
     }
 
     private void setPaymentStatusToNone()
@@ -549,28 +540,37 @@ public class MenuNavigation : MonoBehaviour
         prefab.transform.SetAsLastSibling();
     }
 
+    private void ReconcileAchievements()
+    {
+        var view = achievementsScreen.GetComponentInChildren<AchievementsView>(true);
+        var stats = UserConstants.s_user == null ? null : UserConstants.s_user.userStatistics;
+        if (view == null || view.achievements == null) return;
+        foreach (string key in AchievementRules.Eligible(null, 0,
+            GameLevelConstants.s_boxesLevels, GameLevelConstants.s_pairsLevels, GameLevelConstants.s_flashLevels,
+            stats == null ? 0 : stats.xp, stats == null ? 0 : stats.numberOfWinChallenges))
+            if (view.achievements.Any(a => a != null && a.constantString == key)) GameManager.UnlockAchievement(key);
+    }
+
+    private bool fetchingAchievements;
     private void GetCompleatedAchievements()
     {
+        if (fetchingAchievements) return;
         achievementsAPIController = gameObject.GetComponent<AchievementsAPIController>();
-        try
+        if (achievementsAPIController == null) achievementsAPIController = gameObject.AddComponent<AchievementsAPIController>();
+        fetchingAchievements = true;
+        int owner = GameManager.AchievementUserId;
+        achievementsAPIController.GetAchievements(result =>
         {
-            achievementsAPIController.GetAchievements(
-                (OnSuccess) =>
-                {
-                    GameManager.completedAchievements = OnSuccess.achievements.ToList();
-                    string compleatedAchievements = GameManager.completedAchievements.Count.ToString();
-
-                    print("success");
-                },
-                (OnFailure) =>
-                {
-                    print("fail");
-                }
-            );
-        }
-        catch (UserException e)
+            fetchingAchievements = false;
+            if (GameManager.AchievementUserId != owner) return;
+            GameManager.completedAchievements = result.achievements.ToList();
+            ReconcileAchievements();
+            achievementsAPIController.FlushPending();
+        }, error =>
         {
-            Debug.Log(e.Message);
-        }
+            fetchingAchievements = false;
+            if (GameManager.AchievementUserId == owner) achievementsAPIController.FlushPending();
+            Debug.LogWarning(error.ErrorMessage);
+        });
     }
 }

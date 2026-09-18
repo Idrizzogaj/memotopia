@@ -57,6 +57,8 @@ public class MenuAnimations : MonoBehaviour
     public void OpenMenu()
     {
         sideMenuScreen.SetActive(true);
+        var availability = sideMenuScreen.GetComponent<SideMenuAvailability>() ?? sideMenuScreen.AddComponent<SideMenuAvailability>();
+        availability.Refresh();
         _isMenuClosed = true;
         _startTime = Time.time;
         openMenuBtn.SetActive(false);

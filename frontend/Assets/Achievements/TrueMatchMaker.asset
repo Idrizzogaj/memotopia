@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: TrueMatchMaker
   m_EditorClassIdentifier: 
   icon: {fileID: 21300000, guid: d549d8d61186cd544ad52b1ff6c7d3b1, type: 3}
-  title: True match maker!
-  description: finish all levels in pairs
+  title: True Matchmaker!
+  description: Complete all 20 levels in Pairs.
   constantString: pairs-all-levels
