@@ -2,6 +2,12 @@
 
 Read this file first when continuing on another computer or with another AI. It records the verified working state as of 2026-09-18. Detailed history remains in `CODEX_HANDOFF.md`; Windows setup is in `docs/WINDOWS_HANDOFF.md`.
 
+## Mandatory handoff routine
+
+At the start of every work session, read this entire file, then verify `git status`, the checked-out branch and the latest commit before making changes. Treat the repository as the source of truth when it differs from an old note.
+
+Before ending any session—whether for a day, week, year or permanent transfer—update this file in place. Record the current date, latest commit/branch, version and build number, completed work, tests and device/store verification, unresolved blockers, and the next concrete actions. Remove stale “next action” text instead of endlessly appending history. Never include passwords, tokens, private keys or signing material. Commit and push the product changes and this updated handoff together. A future AI should only need the instruction: **Read `AI_HANDOFF.md` and continue from there.**
+
 ## Repository and architecture
 
 - GitHub: `git@github.com:Idrizzogaj/memotopia.git`.
@@ -10,7 +16,7 @@ Read this file first when continuing on another computer or with another AI. It 
 - NestJS backend: `backend`, Yarn 1.22.x.
 - iOS bundle ID: `com.retention.memotopia`; Apple app ID `1442530846`; team `E838WX6KF8`.
 - Current client version/build in source: **1.0.39 (2026091707)**.
-- TestFlight 1.0.38 (2026091706, minimum iOS 15) was uploaded successfully on 2026-09-17. Build 1.0.39 has been built and installed locally but was not uploaded before this handoff.
+- TestFlight 1.0.39 (2026091707, minimum iOS 15) was uploaded on 2026-09-18. Apple finished processing it with state `VALID` and audience `APP_STORE_ELIGIBLE`; build resource/delivery ID is `95ff7b84-567d-499c-af50-0bdea436fbcf`.
 
 ## Current product state
 
@@ -25,8 +31,13 @@ Read this file first when continuing on another computer or with another AI. It 
 
 - Unity validation, ReviewAndBuild and Xcode device builds passed for 1.0.39.
 - 1.0.39 was installed on ZogajSon iPhone. Hanushe iPad has the previously verified 1.0.38 build; update it from TestFlight or a fresh device build when it is available.
+- The archived and exported 1.0.39 IPA passed Apple upload and processing. Local generated artifacts remain ignored under `ios-build/`.
 - Reviewed renderings and release notes live under `docs/game-flow/`, `docs/achievements/` and `docs/major-system/`.
 - Build with at most two jobs on this Mac to limit memory and heat.
+
+## Next concrete action
+
+- In App Store Connect, assign build 1.0.39 (2026091707) to the intended TestFlight tester group if it is not already assigned. Install it on Hanushe iPad and smoke-test login, Pairs, Flash, Boxes, achievements, progression and purchases. Public App Store submission and backend deployment are separate decisions.
 
 ## Important source and commands
 
