@@ -115,7 +115,8 @@ public class FlashManager : GamesScript, IGameable
         {
             float gameTimeSpent = gameTimeAllocation - countdownTime;
             IncreaseTime(gameTimeSpent);
-            GameOver(challengeLossPanel, losePanel, "FlashScene");
+            RoundFailed(challengeFirstPlayPanel, challengeLossPanel, challengeWinPanel, challengeDrawPanel, losePanel, "FlashScene", "Flash",
+                achievementsPrefab, achievementsList, achievementsController, correctSelected, countdownTime);
             runOnceCondition = false;
         }
     }
@@ -124,6 +125,7 @@ public class FlashManager : GamesScript, IGameable
     {
         InitializeGameScript();
         tutorialController.DisableTutorialObjects(true);
+        CardFaces.BeginSession(); // what the cards show: pictures, numbers or words
         LevelSelector();
         InitArrays();
         SetNumbersOnArray();
@@ -214,6 +216,10 @@ public class FlashManager : GamesScript, IGameable
                 break;
             case 20:
                 LevelAttributes(32, 5);
+                break;
+            case MemoryAthlete.Level:
+                LevelAttributes(MemoryAthlete.FlashImages, MemoryAthlete.FlashMistakes);
+                gameTimeAllocation = MemoryAthlete.FlashRecallSeconds;
                 break;
         }
     }
@@ -332,12 +338,38 @@ public class FlashManager : GamesScript, IGameable
             newRecallImageCellBtn.name = imagesNumberForRecall[i].ToString();
 
             newRecallImageCellBtn.GetComponent<Button>().image.overrideSprite =
-                MajorSystemImages.Load(imagesNumberForRecall[i]);
+                CardFaces.Face(imagesNumberForRecall[i]);
 
             newRecallImageCellBtn.GetComponent<Button>().onClick.AddListener(() => CompareImages(newRecallImageCellBtn));
 
         }
         recallImageCellBtn.SetActive(false);
+        if (MemoryAthlete.IsRound) ArrangeAthleteGrid();
+    }
+
+    // Memory Athlete shows 42 images: lay them out evenly (6 x 7 or 7 x 6), never a lone image on the last row.
+    void ArrangeAthleteGrid()
+    {
+        var grid = recallPanel.GetComponent<GridLayoutGroup>();
+        var rect = recallPanel.transform as RectTransform;
+        if (grid == null || rect == null) return;
+        Canvas.ForceUpdateCanvases();
+        float w = rect.rect.width - grid.padding.left - grid.padding.right;
+        float h = rect.rect.height - grid.padding.top - grid.padding.bottom;
+        if (w <= 0f || h <= 0f) return;
+        float gap = Mathf.Max(grid.spacing.x, grid.spacing.y);
+        int bestColumns = 6;
+        float best = 0f;
+        foreach (int columns in new[] { 6, 7 })
+        {
+            int rows = Mathf.CeilToInt(imagesToShowNumber / (float)columns);
+            float cell = Mathf.Min((w - gap * (columns - 1)) / columns, (h - gap * (rows - 1)) / rows);
+            if (cell > best) { best = cell; bestColumns = columns; }
+        }
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = bestColumns;
+        grid.cellSize = new Vector2(best, best);
+        grid.childAlignment = TextAnchor.UpperCenter;
     }
 
     /// <summary>
@@ -361,9 +393,12 @@ public class FlashManager : GamesScript, IGameable
             float gameTimeSpent = gameTimeAllocation - countdownTime;
             IncreaseTime(gameTimeSpent);
 
-            GameOver(challengeLossPanel, losePanel, "FlashScene");
-
+            // stop first: the result panel is shown by a coroutine that RoundFailed starts
+            shouldCountTime = false;
             StopAllCoroutines();
+
+            RoundFailed(challengeFirstPlayPanel, challengeLossPanel, challengeWinPanel, challengeDrawPanel, losePanel, "FlashScene", "Flash",
+                achievementsPrefab, achievementsList, achievementsController, correctSelected, countdownTime);
         }
         else if (correctSelected == imagesToShowNumber)
         {
@@ -371,7 +406,8 @@ public class FlashManager : GamesScript, IGameable
             if (ChallengeConstants.s_isChallenge)
             {
                 ChallangeFinished(countdownTime.ToString(), challengeFirstPlayPanel, challengeLossPanel,
-                    challengeWinPanel, challengeDrawPanel, "Flash", achievementsPrefab, achievementsList, achievementsController);
+                    challengeWinPanel, challengeDrawPanel, "Flash", achievementsPrefab, achievementsList, achievementsController,
+                    imagesToShowNumber, countdownTime);
             }
             else
             {

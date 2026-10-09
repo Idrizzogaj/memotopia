@@ -29,6 +29,10 @@ public class AccountView : MonoBehaviour
         newUsername.placeholder.GetComponent<Text>().text = UserConstants.s_user.username;
         mn = gameObject.GetComponent<MenuNavigation>();
         pickUserAvatar();
+        // Account deletion (App Store / Google Play requirement); UI is created in code.
+        var deletePanel = gameObject.GetComponent<DeleteAccountPanel>();
+        if (deletePanel == null) deletePanel = gameObject.AddComponent<DeleteAccountPanel>();
+        deletePanel.Build(mn, mn != null ? mn.accountScreen : null);
     }
 
     // Update is called once per frame

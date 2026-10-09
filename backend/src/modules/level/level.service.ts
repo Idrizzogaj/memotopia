@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ForbiddenException,
     Injectable,
     InternalServerErrorException,
@@ -17,6 +18,7 @@ import { StarsAvgDto } from './dto/stars-avg.dto';
 import { UpdateLevelReqDto } from './dto/update-level-req.dto';
 import { GameRepository } from './game.repository';
 import { LevelRepository } from './level.repository';
+import { bestResult, isValidResult, xpForImprovement } from './level-rules';
 
 @Injectable()
 export class LevelService {
@@ -29,9 +31,17 @@ export class LevelService {
 
     async create(levelReqDto: LevelReqDto, user: User): Promise<User> {
         const { score, level, stars, gameName } = levelReqDto;
+
+        if (!isValidResult(level, stars, score)) throw new BadRequestException('Invalid level result');
+
         const game = await this.gameRepository.findOne({ gameName });
 
         if (!game) throw new NotFoundException(`Game with name "${gameName}" not found!`);
+
+        // A result that was sent twice (for example after a bad connection) must never be paid twice:
+        // when this level already has a record, merge into it instead of adding a second one.
+        const existing = await this.levelRepository.findOne({ where: { user, game, level } });
+        if (existing) return await this.applyResult(existing, stars, score, user);
 
         const gameLevel = new GameLevel();
         gameLevel.score = score;
@@ -46,20 +56,17 @@ export class LevelService {
             throw new InternalServerErrorException('Game level failed to be created');
         }
 
+        await this.addXp(user, xpForImprovement(level, 0, stars));
+
+        return await this.userService.getUserEntityById(user.id);
+    }
+
+    /** Adds XP and recalculates the player level (no upper limit). */
+    private async addXp(user: User, xp: number): Promise<void> {
+        if (xp <= 0) return;
+
         let userStatistics: UserStatistics = await this.userStatisticsService.getByUser(user);
-
-        switch (stars) {
-            case 1:
-                userStatistics.xp += 10;
-                break;
-            case 2:
-                userStatistics.xp += 20;
-                break;
-            case 3:
-                userStatistics.xp += 30;
-                break;
-        }
-
+        userStatistics.xp += xp;
         userStatistics = await this.userStatisticsService.levelUp(userStatistics);
 
         try {
@@ -71,6 +78,25 @@ export class LevelService {
         } catch (error) {
             throw new InternalServerErrorException('User statistics failed to be updated');
         }
+    }
+
+    /** Stores the better of the old and the new result and pays XP for the improvement only. */
+    private async applyResult(gameLevel: GameLevel, stars: number, score: number, user: User): Promise<User> {
+        const oldStars = gameLevel.stars;
+        const best = bestResult(gameLevel, { stars, score });
+
+        if (best.stars !== gameLevel.stars || best.score !== gameLevel.score) {
+            gameLevel.stars = best.stars;
+            gameLevel.score = best.score;
+
+            try {
+                await this.levelRepository.save(gameLevel);
+            } catch (error) {
+                throw new InternalServerErrorException('Game level failed to be updated');
+            }
+        }
+
+        await this.addXp(user, xpForImprovement(gameLevel.level, oldStars, best.stars));
 
         return await this.userService.getUserEntityById(user.id);
     }
@@ -95,43 +121,9 @@ export class LevelService {
 
         const { score, stars } = updateLevel;
 
-        if (gameLevel.stars < stars) {
-            const starsDifference = stars - gameLevel.stars;
+        if (!isValidResult(gameLevel.level, stars, score)) throw new BadRequestException('Invalid level result');
 
-            let userStatistics: UserStatistics = await this.userStatisticsService.getByUser(user);
-
-            switch (starsDifference) {
-                case 1:
-                    userStatistics.xp += 10;
-                    break;
-                case 2:
-                    userStatistics.xp += 20;
-                    break;
-            }
-
-            userStatistics = await this.userStatisticsService.levelUp(userStatistics);
-
-            try {
-                await this.userStatisticsService.update({
-                    level: userStatistics.level,
-                    xp: userStatistics.xp,
-                    user,
-                });
-            } catch (error) {
-                throw new InternalServerErrorException('User statistics failed to be updated');
-            }
-        }
-
-        gameLevel.score = score;
-        gameLevel.stars = stars;
-
-        try {
-            await this.levelRepository.save(gameLevel);
-        } catch (error) {
-            throw new InternalServerErrorException('Game level failed to be updated');
-        }
-
-        return await this.userService.getUserEntityById(user.id);
+        return await this.applyResult(gameLevel, stars, score, user);
     }
 
     async getStarsAvg(user: User): Promise<StarsAvgDto> {

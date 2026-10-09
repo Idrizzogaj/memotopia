@@ -58,10 +58,17 @@ namespace Assets.Script.Controllers
 
         public void UpdateChallenge(float score, string status, int challengeId, Action<ChallengeResponsePayload> onSuccess, Action<AlertMessageContainer> onFailure)
         {
+            UpdateChallenge(score, status, challengeId, -1, onSuccess, onFailure);
+        }
+
+        /// <param name="progress">correct answers * 1000 + seconds left; -1 = not reported (old rule: higher score wins)</param>
+        public void UpdateChallenge(float score, string status, int challengeId, int progress, Action<ChallengeResponsePayload> onSuccess, Action<AlertMessageContainer> onFailure)
+        {
             var requestObject = new UpdateChallengelRequestPayload();
             requestObject.score = score;
             requestObject.status = status;
             requestObject.challengeId = challengeId;
+            requestObject.progress = progress;
             string jsonRequestObject = JsonUtility.ToJson(requestObject);
 
             WWWForm form = new WWWForm();

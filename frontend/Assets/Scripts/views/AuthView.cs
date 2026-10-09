@@ -117,6 +117,8 @@ public class AuthView : MonoBehaviour
                 (OnFailure) =>
                 {
                     _loadingScreen.EndLoading();
+                    if (OnFailure != null && OnFailure.ErrorMessage == ErrorMessages.s_emailNotVerifiedCode)
+                        _authApiController.ResendVerification(usernameLogIn.text.Trim());
                     HandleConditionWithAlertMessages(OnFailure);
                 }
             );
@@ -177,6 +179,16 @@ public class AuthView : MonoBehaviour
             _authApiController.PerformSignup(usernameSignUp.text, firstPasswordSignUp.text, emailSignUp.text,
                 (OnSuccess) =>
                 {
+                    if (OnSuccess != null && OnSuccess.verificationRequired)
+                    {
+                        // No session until the address is confirmed: send the user to the login screen with instructions.
+                        _loadingScreen.EndLoading();
+                        goToScreen("logIn");
+                        var note = errorLogin.GetComponent<Text>();
+                        note.text = OnSuccess.mailSent ? ErrorMessages.s_checkYourEmailMessage : ErrorMessages.s_mailNotSentMessage;
+                        errorLogin.SetActive(true);
+                        return;
+                    }
                     _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
                 },
                 (OnFailure) =>
@@ -311,6 +323,17 @@ public class AuthView : MonoBehaviour
                 errorSignUp.GetComponent<Text>().text = ErrorMessages.s_toggleNotClickedMessage;
                 errorSignUp.SetActive(true);
             }
+            else if (response.ErrorMessage == ErrorMessages.s_emailNotVerifiedCode)
+            {
+                errorLogin.GetComponent<Text>().text = ErrorMessages.s_emailNotVerifiedMessage;
+                errorLogin.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_tooManyRequestsCode)
+            {
+                var target = isLogin ? errorLogin : errorSignUp;
+                target.GetComponent<Text>().text = ErrorMessages.s_tooManyRequestsMessage;
+                target.SetActive(true);
+            }
             else if (response.ErrorMessage == ErrorMessages.s_invalidProviderCode)
             {
                 errorSignUp.GetComponent<Text>().text = ErrorMessages.s_invalidProviderMessage;
@@ -405,6 +428,6 @@ public class AuthView : MonoBehaviour
 
     public void linkBtn()
     {
-        Application.OpenURL("http://memotopia.com/pp/privacy-and-policy.pdf?fbclid=IwAR09a-hC9bZbhZtb2gFGvOwAPs9jMDWenQ_wozqDADBhKW1qo2Us_jL7jBg");
+        Application.OpenURL("https://memotopia.com/terms.html");
     }
 }

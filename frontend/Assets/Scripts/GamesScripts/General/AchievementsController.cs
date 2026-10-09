@@ -35,6 +35,7 @@ public class AchievementsController : MonoBehaviour
         achievementsPanelPrefab = prefab;
         // Never clear or mutate the game's serialized catalog.
         catalog = achievements == null ? new List<Achievement>() : achievements.Where(a => a != null).ToList();
+        ExtraAchievements.AppendTo(catalog);
     }
 
     public void LevelCompletedAchievements(string thisScore, int thisNrStars,
@@ -101,7 +102,7 @@ public class AchievementsController : MonoBehaviour
             {
                 if (!accepting || generation != run || GameManager.AchievementUserId != owner) return;
                 if (result != null && result.statistics != null && result.statistics.Length > 0 &&
-                    result.statistics[0] != null && result.statistics[0].user != null && result.statistics[0].user.ID == owner)
+                    result.statistics[0] != null && result.statistics[0].xp > 0 && result.statistics[0].user != null && result.statistics[0].user.ID == owner)
                     Award("first-global-score");
                 achievementsApi.FlushPending();
                 checkedLeaderboard = true;

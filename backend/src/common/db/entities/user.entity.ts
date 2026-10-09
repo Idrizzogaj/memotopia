@@ -62,6 +62,29 @@ export class User {
     @Exclude()
     resetPasswordExpiresAt: Date;
 
+    // true only for accounts registered with e-mail/password that have not yet proven they own the
+    // address. Defaults to false so every account that existed before this feature stays usable.
+    @Column({ type: 'boolean', default: false })
+    @ApiProperty({ default: false })
+    emailVerificationPending: boolean;
+
+    @Column({ type: 'timestamp', nullable: true })
+    @ApiPropertyOptional({ description: 'When the email address was verified', type: Date })
+    emailVerifiedAt: Date | null;
+
+    // Only the SHA-256 hash of the one-time verification token is stored.
+    @Exclude()
+    @Column('varchar', { nullable: true })
+    emailVerificationTokenHash: string | null;
+
+    @Exclude()
+    @Column({ type: 'timestamp', nullable: true })
+    emailVerificationExpiresAt: Date | null;
+
+    @Exclude()
+    @Column({ type: 'timestamp', nullable: true })
+    emailVerificationSentAt: Date | null;
+
     @CreateDateColumn()
     @ApiProperty()
     createdAt: Date;

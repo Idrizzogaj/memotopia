@@ -10,6 +10,12 @@ public static class MajorSystemImages
     private static string[] sourcePaths;
     private static readonly Dictionary<Sprite, Vector2> visibleSizes = new Dictionary<Sprite, Vector2>();
 
+    /// <summary>Lets generated faces (numbers, words, help overlays) report their visible size like the motifs do.</summary>
+    public static void SetVisibleSize(Sprite sprite, Vector2 size)
+    {
+        if (sprite != null) visibleSizes[sprite] = size;
+    }
+
     public static Vector2 VisibleSize(Sprite sprite)
     {
         Vector2 size;
@@ -110,7 +116,7 @@ public static class MajorSystemImages
         Texture2D result = new Texture2D(size, size, TextureFormat.RGBA32, false);
         result.name = "MajorSystem clean " + index.ToString("D2");
         result.SetPixels(normalized);
-        result.Apply(false, true);
+        result.Apply(false, false); // stays readable: the Help overlay reads these pixels
         Sprite sprite = Sprite.Create(result, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100);
         sprite.name = index.ToString("D2");
         visibleSizes[sprite] = new Vector2((right - left + 1) * scale / size, (top - bottom + 1) * scale / size);

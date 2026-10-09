@@ -23,6 +23,11 @@ export class Participant {
     @ApiProperty({ description: 'Score' })
     score: number;
 
+    // correct answers * 1000 + seconds left; -1 = reported by an app that does not send it (old rule).
+    @Column('int', { default: -1 })
+    @ApiProperty({ description: 'Progress (correct * 1000 + seconds left), -1 when unknown' })
+    progress: number;
+
     @Column({ type: 'enum', enum: ParticipantStatus, default: ParticipantStatus.PENDING })
     @ApiProperty({ description: 'Status', enum: ParticipantStatus })
     status: ParticipantStatus;

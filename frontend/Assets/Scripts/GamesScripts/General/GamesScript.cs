@@ -79,24 +79,8 @@ public class GamesScript : MonoBehaviour
 
     public int setStars(int score)
     {
-        float threeStar = 75f / 100f * 180f;
-        float twoStar = 50f / 100f * 180f;
-        int star = 0;
-
-        if (score >= threeStar)
-        {
-            star = 3;
-        }
-        else if (score >= twoStar)
-        {
-            star = 2;
-        }
-        else
-        {
-            star = 1;
-        }
-
-        return star;
+        // the time allowed for 3 and 2 stars grows with the level (see StarRules)
+        return StarRules.Stars(score, LevelScript._selectedLevel);
     }
 
     #region Instatiate Gameobjects from prefabs
@@ -157,7 +141,7 @@ public class GamesScript : MonoBehaviour
     {
         GameObject WinPanelCopy = Instantiate(WinPanel) as GameObject;
 
-        WinPanelCopy.transform.GetChild(0).transform.GetChild(0).transform.GetChild(0).GetComponent<Text>().text = "LEVEL " + LevelScript._selectedLevel;
+        WinPanelCopy.transform.GetChild(0).transform.GetChild(0).transform.GetChild(0).GetComponent<Text>().text = MemoryAthlete.IsRound ? "MEMORY ATHLETE" : "LEVEL " + LevelScript._selectedLevel;
         WinPanelCopy.transform.GetChild(0).transform.GetChild(10).transform.GetChild(0).GetComponent<Text>().text = score;
 
         var container = WinPanelCopy.transform.GetChild(0);
@@ -255,9 +239,15 @@ public class GamesScript : MonoBehaviour
 
     public void ChallangeFinished(string timeText, GameObject challengeFirstPlayPanel,
         GameObject challengeLossPanel, GameObject challengeWinPanel, GameObject challengeDrawPanel,
-        string thisGame, GameObject thisAchievementsPanelPrefab, List<Achievement> thisAchievementsList, AchievementsController achievementsController)
+        string thisGame, GameObject thisAchievementsPanelPrefab, List<Achievement> thisAchievementsList, AchievementsController achievementsController,
+        int correct = -1, float secondsLeft = 0f, bool completed = true)
     {
-        challengeAPIController.UpdateChallenge(float.Parse(timeText), "DONE", ChallengeConstants.s_challengeId,
+        MemoryAthlete.LastChallengeCompleted = completed && MemoryAthlete.IsRound;
+        float score = float.Parse(timeText);
+        // progress = correct * 1000 + seconds left: most correct first, then least time used.
+        // This also decides rounds that were lost, so a result is no longer a draw just because both failed.
+        int progress = correct >= 0 ? correct * 1000 + Mathf.Clamp(Mathf.RoundToInt(secondsLeft), 0, 999) : -1;
+        challengeAPIController.UpdateChallenge(score, "DONE", ChallengeConstants.s_challengeId, progress,
             (OnSuccess) => print("success"), (OnFailure) => print("fail"));
         UpdateRestrictions();
         ChallengeConstants.s_isChallenge = false;
@@ -266,21 +256,54 @@ public class GamesScript : MonoBehaviour
             ActivateChallengePanelDelayHalfSecond(challengeFirstPlayPanel, thisGame, thisAchievementsPanelPrefab, thisAchievementsList, achievementsController);
         else
         {
-            if (ChallengeConstants.s_challengerScore > float.Parse(timeText))
+            int order = ChallengeOrder(progress, score, ChallengeConstants.s_challengerProgress, ChallengeConstants.s_challengerScore);
+            if (order < 0)
                 ActivateChallengePanelDelayHalfSecond(challengeLossPanel, thisGame, thisAchievementsPanelPrefab, thisAchievementsList, achievementsController);
-            else if (ChallengeConstants.s_challengerScore < float.Parse(timeText))
+            else if (order > 0)
                 ActivateChallengePanelDelayHalfSecond(challengeWinPanel, thisGame, thisAchievementsPanelPrefab, thisAchievementsList, achievementsController);
-            else if (ChallengeConstants.s_challengerScore == float.Parse(timeText))
+            else
                 ActivateChallengePanelDelayHalfSecond(challengeDrawPanel, thisGame, thisAchievementsPanelPrefab, thisAchievementsList, achievementsController);
             ChallengeConstants.s_isAcceptor = false;
         }
+    }
+
+    /// <summary>Positive = I did better. Uses progress when both sides have it, otherwise the old score rule.</summary>
+    public static int ChallengeOrder(int myProgress, float myScore, int theirProgress, float theirScore)
+    {
+        if (myProgress >= 0 && theirProgress >= 0) return myProgress.CompareTo(theirProgress);
+        return myScore.CompareTo(theirScore);
+    }
+
+    /// <summary>
+    /// A round that was lost (hearts used up or time out). In a challenge the result is still reported, with
+    /// how far the player got, so the other player's result can be compared fairly.
+    /// </summary>
+    public void RoundFailed(GameObject challengeFirstPlayPanel, GameObject challengeLossPanel, GameObject challengeWinPanel,
+        GameObject challengeDrawPanel, GameObject losePanel, string scene, string thisGame,
+        GameObject thisAchievementsPanelPrefab, List<Achievement> thisAchievementsList, AchievementsController achievementsController,
+        int correct, float secondsLeft)
+    {
+        if (ChallengeConstants.s_isChallenge)
+            ChallangeFinished("0", challengeFirstPlayPanel, challengeLossPanel, challengeWinPanel, challengeDrawPanel,
+                thisGame, thisAchievementsPanelPrefab, thisAchievementsList, achievementsController, correct, secondsLeft, false);
+        else
+            ActivateLosePanel(losePanel, scene);
     }
 
     public void LevelCompleted(string timeText, GameLevel[] gameLevels, string game)
     {
         int score;
         if (!int.TryParse(timeText, out score)) return;
-        ProgressSync.Instance.Complete(game, LevelScript._selectedLevel, setStars(score), score);
+        if (MemoryAthlete.IsRound) return; // the open Memory Athlete level is outside the 20-level progress
+        int stars = setStars(score);
+        int level = LevelScript._selectedLevel;
+        // The FIRST time level 20 of a game is cleared, every lower level counts as cleared with the same number of
+        // stars (all levels unlock and their XP is paid). Replaying only counts for the level itself.
+        var known = LevelProgress.Get(game);
+        if (level == 20 && known != null && StarRules.StarsOf(known, 20) == 0)
+            for (int lower = 1; lower < 20; lower++)
+                if (StarRules.StarsOf(known, lower) < stars) ProgressSync.Instance.Complete(game, lower, stars, 0);
+        ProgressSync.Instance.Complete(game, level, stars, score);
     }
 
     public void GameOver(GameObject challengeLossPanel, GameObject losePanel, string scene)

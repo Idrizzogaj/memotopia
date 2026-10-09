@@ -6,25 +6,28 @@ import { Module } from '@nestjs/common';
 
 import { MailService } from './mail.service';
 
+// SMTP credentials come from the environment, never from source control.
+const mailUser = process.env.MAIL_USER || '';
+const mailFrom = process.env.MAIL_FROM || `"Memotopia" <${mailUser}>`;
+
 @Module({
     imports: [
         MailerModule.forRoot({
-            // transport: 'smtps://user@example.com:topsecret@smtp.example.com',
-            // or
             transport: {
-                host: 'send.one.com',
+                host: process.env.MAIL_HOST || 'send.one.com',
+                port: parseInt(process.env.MAIL_PORT || '587', 10),
                 secure: false,
                 auth: {
-                    user: 'rese-pw@memotopia.com', // TODO: add to .env
-                    pass: 'Arber_135', // TODO: add to .env
+                    user: mailUser,
+                    pass: process.env.MAIL_PASS || '',
                 },
             },
             defaults: {
-                from: '"No Reply" <rese-pw@memotopia.com>',
+                from: mailFrom,
             },
             template: {
                 dir: join(__dirname, '..', '..', '..', '..', 'templates'),
-                adapter: new HandlebarsAdapter(), // or new PugAdapter() or new EjsAdapter()
+                adapter: new HandlebarsAdapter(),
                 options: {
                     strict: true,
                 },

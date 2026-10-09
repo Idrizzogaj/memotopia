@@ -46,6 +46,12 @@ namespace Assets.Script.Controllers
             if (String.IsNullOrEmpty(request.error))
             {
                 var responseObject = JsonUtility.FromJson<SignUpResponsePayload>(request.text);
+                // New accounts must confirm their email first: no token, no session yet.
+                if (responseObject.verificationRequired)
+                {
+                    onSuccess(responseObject);
+                    yield break;
+                }
                 UserConstants.s_user = responseObject.user;
                 _dataController.Token = "Bearer " + responseObject.Token;
                 onSuccess(responseObject);
@@ -136,6 +142,30 @@ namespace Assets.Script.Controllers
         {
             Debug.LogError($"Unhandled: [{message}], code: [{code}]");
             return new AlertMessageContainer() { ErrorMessage = message, StatusCode = code };
+        }
+        #endregion
+
+        #region ResendVerification
+        // The server answers the same way whether or not the account exists, and rate-limits this call.
+        public void ResendVerification(string identifier)
+        {
+            var requestObject = new ResendVerificationRequestPayload();
+            requestObject.identifier = identifier;
+            string jsonRequestObject = JsonUtility.ToJson(requestObject);
+
+            WWWForm form = new WWWForm();
+            Dictionary<string, string> headers = form.headers;
+            headers["Content-Type"] = "application/json";
+            byte[] formData = Encoding.UTF8.GetBytes(jsonRequestObject);
+            WWW request = new WWW(_apiConstants.ResendVerification, formData, headers);
+
+            StartCoroutine(ResendVerificationRequest(request));
+        }
+
+        private IEnumerator ResendVerificationRequest(WWW request)
+        {
+            yield return request;
+            if (!String.IsNullOrEmpty(request.error)) Debug.LogWarning("Could not request a new confirmation email.");
         }
         #endregion
 

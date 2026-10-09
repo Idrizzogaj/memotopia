@@ -19,7 +19,8 @@ public class GameManager : MonoBehaviour
     private static int achievementOwner = -1;
     private static AchievementSave achievementSave = new AchievementSave();
     public static int AchievementUserId { get { return UserConstants.s_user == null ? 0 : UserConstants.s_user.ID; } }
-    private static string SaveKey { get { return "achievements.v1." + achievementOwner; } }
+    // v1 trusted remote badge flags. Start a separate, evidence-earned cache without deleting history.
+    private static string SaveKey { get { return "achievements.verified.v2." + achievementOwner; } }
 
     private static void LoadAchievements()
     {
@@ -61,9 +62,19 @@ public class GameManager : MonoBehaviour
         set
         {
             LoadAchievements();
-            // Achievements are permanent. A GET started before a POST must not erase a new award.
-            achievementSave.completed = Normalize(achievementSave.completed.Concat(value ?? new List<string>()));
-            achievementSave.pending.RemoveAll(achievementSave.completed.Contains);
+            // Only Kickstarter is an administrative award; gameplay badges need performance evidence.
+            // The old server flags cannot reintroduce the erroneous unlocks this migration repairs.
+            var remote = Normalize(value);
+            // "I have read this tip" badges cannot be re-derived from play, so the server's record is trusted.
+            foreach (var key in remote.Where(k => k.StartsWith("tip-")))
+                if (!achievementSave.completed.Contains(key)) achievementSave.completed.Add(key);
+            if (remote.Contains("kickstarter") && !achievementSave.completed.Contains("kickstarter"))
+                achievementSave.completed.Add("kickstarter");
+            foreach (var key in achievementSave.pending.Where(remote.Contains).ToArray())
+            {
+                if (!achievementSave.completed.Contains(key)) achievementSave.completed.Add(key);
+                achievementSave.pending.Remove(key);
+            }
             SaveAchievements();
         }
     }
@@ -84,6 +95,7 @@ public class GameManager : MonoBehaviour
     public static void ConfirmAchievement(string key)
     {
         LoadAchievements();
+        if (!achievementSave.pending.Contains(key)) return;
         if (!achievementSave.completed.Contains(key)) achievementSave.completed.Add(key);
         achievementSave.pending.Remove(key);
         SaveAchievements();

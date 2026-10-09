@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using Assets.Script.Constants;
 using Assets.Script.Controllers;
@@ -93,6 +93,7 @@ public class ChallengeNavigation : MonoBehaviour
         }
 
         _loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
+        EnsureBellHitArea();
         userAPIController = gameObject.AddComponent<UserAPIController>();
         challengeAPIController = gameObject.AddComponent<ChallengeAPIController>();
         userStatisticsAPIController = gameObject.AddComponent<UserStatisticsAPIController>();
@@ -104,7 +105,8 @@ public class ChallengeNavigation : MonoBehaviour
             },
             (OnFailure) =>
             {
-                print("fail");
+                _loadingScreen.EndLoading();
+                    print("fail");
             }
         );
         userStatisticsAPIController.GetUserStatisticsChallengeGames(
@@ -125,7 +127,8 @@ public class ChallengeNavigation : MonoBehaviour
             },
             (OnFailure) =>
             {
-                print("fail");
+                _loadingScreen.EndLoading();
+                    print("fail");
             }
         );
         GetFavoriteUsers();
@@ -179,6 +182,7 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
             );
@@ -206,6 +210,7 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
             );
@@ -228,6 +233,7 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
             );
@@ -251,6 +257,7 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
             );
@@ -279,6 +286,7 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
             );
@@ -306,6 +314,7 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
             );
@@ -316,7 +325,8 @@ public class ChallengeNavigation : MonoBehaviour
         }
     }
 
-    public void StartChallenge(int challengeId, int level, string gameName, float score) {
+    public void StartChallenge(int challengeId, int level, string gameName, float score, int progress = -1) {
+        ChallengeConstants.s_challengerProgress = progress;
         ChallengeConstants.s_isChallenge = true;
         ChallengeConstants.s_isAcceptor = true;
         ChallengeConstants.s_challengerScore = score;
@@ -326,6 +336,7 @@ public class ChallengeNavigation : MonoBehaviour
 
     public void GoToChallengeHome()
     {
+        HideAthleteToastNow();
         waitCondition = false;
         challengeNotificationScreen.SetActive(false);
         challengeRandomScreen.SetActive(false);
@@ -342,6 +353,7 @@ public class ChallengeNavigation : MonoBehaviour
 
     public void GoToChallengeRandom()
     {
+        HideAthleteToastNow();
         myImage.sprite = Resources.Load<Sprite>("Memotopia_UI/AccountAndSettings/" + UserConstants.s_user.Avatar);
 
         challengeNotificationScreen.SetActive(false);
@@ -353,6 +365,7 @@ public class ChallengeNavigation : MonoBehaviour
 
     public void GoToChallengeGame()
     {
+        HideAthleteToastNow();
         challengeNotificationScreen.SetActive(false);
         challengeHomeScreen.SetActive(false);
         challengeRandomScreen.SetActive(false);
@@ -362,8 +375,108 @@ public class ChallengeNavigation : MonoBehaviour
         challengeGameScreen.SetActive(true);
     }
 
+    // ---- Memory Athlete: a fourth tier under Easy / Medium / Hard, unlocked by clearing all 20 levels of one game.
+    private Image athleteImage;
+    private GameObject athleteToast;
+
+    private void EnsureAthleteButton()
+    {
+        if (challengeLevelScreen == null) return;
+        var root = challengeLevelScreen.transform;
+        var easy = root.Find("Easy") as RectTransform;
+        var medium = root.Find("Medium") as RectTransform;
+        var hard = root.Find("Hard") as RectTransform;
+        if (easy == null || medium == null || hard == null) return;
+
+        var existing = root.Find("MemoryAthlete") as RectTransform;
+        RectTransform athlete = existing;
+        if (athlete == null)
+        {
+            var clone = Instantiate(hard.gameObject, root, false);
+            clone.name = "MemoryAthlete";
+            athlete = (RectTransform)clone.transform;
+            var sprite = Resources.Load<Sprite>("GamesResources/Challenge/MemoryAthlete");
+            athleteImage = clone.GetComponent<Image>();
+            if (sprite != null) athleteImage.sprite = sprite;
+            var button = clone.GetComponent<Button>();
+            button.onClick = new Button.ButtonClickedEvent(); // drop the copied "Hard" action
+            button.onClick.AddListener(OnAthletePressed);
+        }
+        else athleteImage = athlete.GetComponent<Image>();
+
+        // four rows instead of three; the artwork keeps its proportions
+        float[] top = { 0.865f, 0.655f, 0.445f, 0.235f };
+        var rows = new[] { easy, medium, hard, athlete };
+        for (int i = 0; i < rows.Length; i++)
+        {
+            rows[i].anchorMin = new Vector2(0.02f, top[i] - 0.20f);
+            rows[i].anchorMax = new Vector2(0.98f, top[i]);
+            rows[i].offsetMin = rows[i].offsetMax = Vector2.zero;
+            var image = rows[i].GetComponent<Image>();
+            if (image != null) image.preserveAspect = true;
+        }
+        athleteImage.color = MemoryAthlete.Unlocked ? Color.white : new Color(0.6f, 0.6f, 0.6f, 0.8f);
+    }
+
+    private void OnAthletePressed()
+    {
+        if (!MemoryAthlete.Unlocked) { ShowAthleteToast(MemoryAthlete.LockedHint); return; }
+        SetLevel(MemoryAthlete.Level);
+    }
+
+    private void ShowAthleteToast(string message)
+    {
+        var root = challengeLevelScreen.transform;
+        if (athleteToast == null)
+        {
+            athleteToast = new GameObject("AthleteToast", typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)athleteToast.transform;
+            rect.SetParent(root, false);
+            rect.anchorMin = new Vector2(0.06f, 0.44f);
+            rect.anchorMax = new Vector2(0.94f, 0.56f);
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            athleteToast.GetComponent<Image>().color = new Color(0.1f, 0.05f, 0.25f, 0.92f);
+            var textObject = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            var textRect = (RectTransform)textObject.transform;
+            textRect.SetParent(rect, false);
+            textRect.anchorMin = Vector2.zero; textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(24f, 8f); textRect.offsetMax = new Vector2(-24f, -8f);
+            var text = textObject.GetComponent<Text>();
+#if UNITY_2022_2_OR_NEWER
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+#else
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+#endif
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 16;
+            text.resizeTextMaxSize = 40;
+            text.raycastTarget = false;
+        }
+        athleteToast.GetComponentInChildren<Text>().text = message;
+        athleteToast.transform.SetAsLastSibling();
+        athleteToast.SetActive(true);
+        StopCoroutine("HideAthleteToast");
+        StartCoroutine("HideAthleteToast");
+    }
+
+    private void HideAthleteToastNow()
+    {
+        StopCoroutine("HideAthleteToast");
+        if (athleteToast != null) athleteToast.SetActive(false);
+    }
+
+    private IEnumerator HideAthleteToast()
+    {
+        yield return new WaitForSecondsRealtime(4f);
+        if (athleteToast != null) athleteToast.SetActive(false);
+    }
+
     public void GoToChallengeLevel()
     {
+        HideAthleteToastNow();
+        EnsureAthleteButton();
         challengeNotificationScreen.SetActive(false);
         challengeHomeScreen.SetActive(false);
         challengeRandomScreen.SetActive(false);
@@ -372,6 +485,7 @@ public class ChallengeNavigation : MonoBehaviour
     }
 
     public void GoToNotification() {
+        HideAthleteToastNow();
         DeleteNotification();
         challengeHomeScreen.SetActive(false);
         challengeRandomScreen.SetActive(false);
@@ -387,12 +501,14 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
         );
     }
     
     public void GoToHistory() {
+        HideAthleteToastNow();
         DeleteHistory();
         challengeHomeScreen.SetActive(false);
         challengeRandomScreen.SetActive(false);
@@ -409,6 +525,7 @@ public class ChallengeNavigation : MonoBehaviour
                 },
                 (OnFailure) =>
                 {
+                    _loadingScreen.EndLoading();
                     print("fail");
                 }
         );
@@ -463,8 +580,46 @@ public class ChallengeNavigation : MonoBehaviour
 
     //TODO: list win loss notification - talk to flamur
 
+    // The bell at the top right of the Arena screen is a small button that other layers can end up
+    // covering. Give it a generous invisible tap area that is the LAST (topmost) child of the screen
+    // and opens the same notification list.
+    private void EnsureBellHitArea()
+    {
+        if (challengeHomeScreen == null || challengeHomeScreen.transform.Find("BellHitArea") != null) return;
+        var bell = challengeHomeScreen.transform.Find("ChallengesNotification") as RectTransform;
+        if (bell == null) return;
+        var go = new GameObject("BellHitArea", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        var rt = (RectTransform)go.transform;
+        rt.SetParent(challengeHomeScreen.transform, false);
+        rt.anchorMin = bell.anchorMin;
+        rt.anchorMax = bell.anchorMax;
+        rt.pivot = bell.pivot;
+        rt.anchoredPosition = bell.anchoredPosition;
+        // At least ~56 points on each side, centred on the bell.
+        float scale = Mathf.Max(1f, Screen.dpi > 0 ? Screen.dpi / 163f : 2f);
+        rt.sizeDelta = new Vector2(Mathf.Max(bell.sizeDelta.x, 0f) + 14f * scale, Mathf.Max(bell.sizeDelta.y, 0f) + 14f * scale);
+        var image = go.GetComponent<Image>();
+        image.color = new Color(1f, 1f, 1f, 0f);
+        image.raycastTarget = true;
+        var button = go.GetComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(GoToNotification);
+        rt.SetAsLastSibling();
+    }
+
+    // The red count badge sits on the corner of the bell/challenge button. It must never swallow
+    // the tap that belongs to the button underneath.
+    private static void LetTapsPassThrough(GameObject badge)
+    {
+        if (badge == null) return;
+        foreach (var graphic in badge.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+            graphic.raycastTarget = false;
+    }
+
     public void SetNotificationNumber(GetChallengeResponsePayload obj)
     {
+        LetTapsPassThrough(notificationNumber);
+        LetTapsPassThrough(notificationNumberOnMainScreen);
         if (obj.results.Length == 0)
         {
             notificationNumber.SetActive(false);
@@ -491,6 +646,7 @@ public class ChallengeNavigation : MonoBehaviour
             string userName = obj.results[i].participants[0].user.username;
             string imageName = obj.results[i].participants[0].user.avatar;
             float score = obj.results[i].participants[0].score;
+            int challengerProgress = obj.results[i].participants[0].progress;
             GameObject item = Instantiate(challengeCart) as GameObject;
             item.SetActive(true);
             Text[] texts = item.GetComponentsInChildren<Text>();
@@ -501,7 +657,7 @@ public class ChallengeNavigation : MonoBehaviour
             texts[1].text = "Level " + obj.results[i].participants[0].user.userStatistics.level.ToString() + " / " + obj.results[i].participants[0].user.userStatistics.xp.ToString() + "xp";
             texts[1].color = Color.grey;
             texts[2].text = gameName;
-            buttons[0].onClick.AddListener(() => StartChallenge(challengeId, challengeLevel, gameName, score));
+            buttons[0].onClick.AddListener(() => StartChallenge(challengeId, challengeLevel, gameName, score, challengerProgress));
             buttons[1].onClick.AddListener(() => {
                 challengeAPIController.UpdateChallenge(0, "CANCELED", challengeId,
                     (OnSuccess) =>
@@ -517,13 +673,15 @@ public class ChallengeNavigation : MonoBehaviour
                             },
                             (OnFailure) =>
                             {
-                                print("fail");
+                                _loadingScreen.EndLoading();
+                    print("fail");
                             }
                         );
                     },
                     (OnFailure) =>
                     {
-                        print("fail");
+                        _loadingScreen.EndLoading();
+                    print("fail");
                     }
                 );
             });

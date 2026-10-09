@@ -33,6 +33,31 @@ export class UserRepository extends Repository<User> {
             .execute();
     }
 
+    async findByUsernameOrEmailCaseInsensitive(username: string, email: string): Promise<User[]> {
+        return await this.createQueryBuilder('user')
+            .where('lower(user.username) = :username OR lower(user.email) = :email', {
+                username: username.toLowerCase(),
+                email: email.toLowerCase(),
+            })
+            .getMany();
+    }
+
+    async findByEmailCaseInsensitive(email: string): Promise<User | undefined> {
+        return await this.createQueryBuilder('user')
+            .where('lower(user.email) = :email', { email: email.toLowerCase() })
+            .getOne();
+    }
+
+    async searchByUsernamePrefix(prefix: string, excludeId: number): Promise<User[]> {
+        // Escape LIKE wildcards and pass the value as a bound parameter (no string interpolation).
+        const escaped = prefix.toLowerCase().replace(/[\\%_]/g, c => `\\${c}`);
+        return await this.createQueryBuilder('user')
+            .leftJoinAndSelect('user.userStatistics', 'userStatistics')
+            .where('user.id != :excludeId', { excludeId })
+            .andWhere(`lower(user.username) LIKE :prefix ESCAPE '\\'`, { prefix: `${escaped}%` })
+            .getMany();
+    }
+
     async getByEmailCaseInsensitive(email: string): Promise<User[]> {
         return await this.createQueryBuilder('user')
             .where('lower(email) = :email', { email: `${email.toLowerCase()}` })

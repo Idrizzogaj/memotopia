@@ -19,32 +19,36 @@ public static class AchievementValidation
 
     public static void Validate()
     {
-        var first19 = Enumerable.Range(1, 19).Select(n => new GameLevel { level = n }).ToArray();
+        var first19 = Enumerable.Range(1, 19).Select(n => new GameLevel { level = n, stars = 1 }).ToArray();
         Require(AchievementRules.Eligible("Boxes", 20, first19, null, null, 399, 0).Contains("boxes-all-levels"), "20th level before server refresh");
-        Require(AchievementRules.Eligible("Boxes", 20, first19.Concat(new[] { new GameLevel { level = 20 } }).ToArray(), null, null, 0, 0).Contains("boxes-all-levels"), "20th level after server refresh");
-        Require(!AchievementRules.Eligible("Boxes", 20, first19.Where(x => x.level != 4).Concat(new[] { new GameLevel { level = 1 } }).ToArray(), null, null, 0, 0).Contains("boxes-all-levels"), "duplicates must not replace a missing level");
-        var one = new[] { new GameLevel { level = 1 } };
+        Require(AchievementRules.Eligible("Boxes", 20, first19.Concat(new[] { new GameLevel { level = 20, stars = 1 } }).ToArray(), null, null, 0, 0).Contains("boxes-all-levels"), "20th level after server refresh");
+        Require(!AchievementRules.Eligible("Boxes", 20, first19.Where(x => x.level != 4).Concat(new[] { new GameLevel { level = 1, stars = 1 } }).ToArray(), null, null, 0, 0).Contains("boxes-all-levels"), "duplicates must not replace a missing level");
+        Require(AchievementRules.Eligible("Flash", 1, null, null, null, 30, 0).SequenceEqual(new[] { "with-the-flash" }), "new account with one Flash win must earn only With the Flash");
+        var one = new[] { new GameLevel { level = 1, stars = 1 } };
         var keys = AchievementRules.Eligible("Flash", 1, one, one, null, 400, 11);
         Require(keys.Count(k => k == "looking-around") == 1 && keys.Contains("unlock-challenge") && keys.Contains("first-challenge") && keys.Contains("win-ten-challenge"), "thresholds and unique awards");
         Require(!AchievementRules.Eligible(null, 0, null, null, null, 399, 0).Any(), "empty progress must not unlock anything");
         Require(AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset") != null, "essential font must exist");
+        AchievementEvidenceValidation.Validate();
         Debug.Log("Achievement rules and font validation passed.");
     }
 
+#if UNITY_IOS
     public static void ReviewAndBuild()
     {
         Review();
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         MemotopiaBuild.BuildIOS();
     }
+#endif
 
     public static void Review()
     {
         Validate();
         var originalUser = UserConstants.s_user;
         const int testUser = 2147483600;
-        PlayerPrefs.DeleteKey("achievements.v1." + testUser);
-        PlayerPrefs.DeleteKey("achievements.v1." + (testUser - 1));
+        PlayerPrefs.DeleteKey("achievements.verified.v2." + testUser);
+        PlayerPrefs.DeleteKey("achievements.verified.v2." + (testUser - 1));
         try
         {
             UserConstants.s_user = new User { id = testUser };
@@ -67,9 +71,10 @@ public static class AchievementValidation
             view.achievementPopupView.SetActive(false);
             view.Refresh();
             Require(view.content.transform.Cast<Transform>().Count(t => t.gameObject.activeSelf) == 12, "12 visible rows");
-            GameManager.completedAchievements = new List<string> { "in-the-box", "unknown-legacy-award" };
+            GameManager.UnlockAchievement("in-the-box");
+            GameManager.completedAchievements = new List<string> { "unknown-legacy-award" };
             view.Refresh();
-            Require(view.content.transform.Cast<Transform>().Count(t => t.gameObject.activeSelf) == 13, "refresh with unknown legacy award");
+            Require(view.content.transform.Cast<Transform>().Count(t => t.gameObject.activeSelf) == 12, "unverified unknown legacy award must stay hidden");
             var scaler = canvas.GetComponent<CanvasScaler>();
             if (scaler != null) scaler.enabled = false;
             canvas.renderMode = RenderMode.WorldSpace;
@@ -88,11 +93,11 @@ public static class AchievementValidation
             Save(canvas, camera, target, "list");
             var longest = view.achievements.First(a => a.constantString == "boxes-all-levels");
             view.OnAchievementClick(longest);
-            Require(view.popupDescription.text == longest.description && view.popupIcon.material != view.popupIcon.defaultMaterial, "locked details");
+            Require(view.popupDescription.text == "Locked\n" + longest.description && view.popupIcon.material != view.popupIcon.defaultMaterial, "locked details");
             Save(canvas, camera, target, "details-locked");
-            GameManager.completedAchievements = new List<string> { "boxes-all-levels" };
+            GameManager.UnlockAchievement("boxes-all-levels");
             view.Refresh();
-            Require(view.popupDescription.text == longest.description && view.popupIcon.material == view.popupIcon.defaultMaterial, "details refresh");
+            Require(view.popupDescription.text == "Unlocked\n" + longest.description && view.popupIcon.material == view.popupIcon.defaultMaterial, "details refresh");
             Save(canvas, camera, target, "details-unlocked");
             var gestures = view.achievementPopupView.GetComponent<AchievementDetailGestures>();
             var pointer = new UnityEngine.EventSystems.PointerEventData(null);
@@ -117,8 +122,8 @@ public static class AchievementValidation
         finally
         {
             UserConstants.s_user = originalUser;
-            PlayerPrefs.DeleteKey("achievements.v1." + testUser);
-            PlayerPrefs.DeleteKey("achievements.v1." + (testUser - 1));
+            PlayerPrefs.DeleteKey("achievements.verified.v2." + testUser);
+            PlayerPrefs.DeleteKey("achievements.verified.v2." + (testUser - 1));
             PlayerPrefs.Save();
         }
     }

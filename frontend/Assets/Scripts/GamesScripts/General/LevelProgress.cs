@@ -72,6 +72,7 @@ public static class LevelProgress
         foreach (var level in levels)
         {
             if (level == null || level.level < 1 || level.level > 20) continue;
+            if (level.user != null && level.user.ID > 0 && level.user.ID != owner) continue;
             var entry = data.entries.Find(e => e.game == game && e.level == level.level);
             if (entry == null) { entry = new Entry { game = game, level = level.level }; data.entries.Add(entry); }
             entry.id = level.id;

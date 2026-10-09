@@ -106,6 +106,6 @@ public class PurchaseButton : MonoBehaviour
 
     public void linkBtn()
     {
-        Application.OpenURL("http://memotopia.com/pp/privacy-and-policy.pdf?fbclid=IwAR09a-hC9bZbhZtb2gFGvOwAPs9jMDWenQ_wozqDADBhKW1qo2Us_jL7jBg");
+        Application.OpenURL("https://memotopia.com/terms.html");
     }
 }

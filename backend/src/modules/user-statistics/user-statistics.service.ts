@@ -3,6 +3,7 @@ import { Injectable, InternalServerErrorException, NotFoundException } from '@ne
 import { ChallengeStatus } from '~common/constants/enums/challenge-status.enum';
 import { UserStatistics } from '~common/db/entities/user-statistics.entity';
 import { User } from '~common/db/entities/user.entity';
+import { levelFromXp } from '~modules/level/level-rules';
 
 import { TimePlayedDto } from './dto/time-played.dto';
 import { UserStatisticsDto } from './dto/user-statistics.dto';
@@ -61,25 +62,8 @@ export class UserStatisticsService {
     }
 
     async levelUp(userStatistics: UserStatistics): Promise<UserStatistics> {
-        if (userStatistics.xp >= 100 && userStatistics.xp < 200) {
-            userStatistics.level = 2;
-        } else if (userStatistics.xp >= 200 && userStatistics.xp < 300) {
-            userStatistics.level = 3;
-        } else if (userStatistics.xp >= 300 && userStatistics.xp < 400) {
-            userStatistics.level = 4;
-        } else if (userStatistics.xp >= 400 && userStatistics.xp < 500) {
-            userStatistics.level = 5;
-        } else if (userStatistics.xp >= 500 && userStatistics.xp < 600) {
-            userStatistics.level = 6;
-        } else if (userStatistics.xp >= 600 && userStatistics.xp < 700) {
-            userStatistics.level = 7;
-        } else if (userStatistics.xp >= 700 && userStatistics.xp < 800) {
-            userStatistics.level = 8;
-        } else if (userStatistics.xp >= 800 && userStatistics.xp < 900) {
-            userStatistics.level = 9;
-        } else if (userStatistics.xp >= 900 && userStatistics.xp < 1000) {
-            userStatistics.level = 10;
-        }
+        // a new player level every 100 XP, no upper limit (XP is the world ranking)
+        userStatistics.level = levelFromXp(userStatistics.xp, userStatistics.level);
 
         return userStatistics;
     }

@@ -10,5 +10,6 @@ namespace Assets.Script.Constants
         public static int s_challengeId;
         public static bool s_isAcceptor = false;
         public static float s_challengerScore;
+        public static int s_challengerProgress = -1;
     }
 }

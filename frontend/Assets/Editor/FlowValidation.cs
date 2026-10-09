@@ -51,7 +51,7 @@ public static class FlowValidation
         Debug.Log("Flow validation passed: score outbox/restart/account isolation, level ordering, stale-response protection and safe-area bounds.");
         Require(SideMenuAvailability.IsAvailable("GoToAccount", false, false), "account remains active");
         Require(SideMenuAvailability.IsAvailable("Logout", false, false), "logout remains active");
-        Require(!SideMenuAvailability.IsAvailable("FacebookShare", true, false), "missing Facebook integration disabled");
+        Require(SideMenuAvailability.IsAvailable("FacebookShare", true, false), "invite friends (formerly Facebook share) enabled");
         Require(!SideMenuAvailability.IsAvailable("RateBtnClick", true, false), "unpublished review page disabled");
         Require(!SideMenuAvailability.IsAvailable("GoToPayment", false, false), "purchases wait for store initialization");
         Require(SideMenuAvailability.IsAvailable("GoToPayment", true, false), "available subscriptions enabled");
@@ -205,6 +205,7 @@ public static class FlowValidation
         UnityEngine.Object.DestroyImmediate(image); UnityEngine.Object.DestroyImmediate(cameraObject); UnityEngine.Object.DestroyImmediate(target);
     }
 
+#if UNITY_IOS
     public static void ReviewAndBuild()
     {
         AchievementValidation.Review();
@@ -212,4 +213,5 @@ public static class FlowValidation
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
         MemotopiaBuild.BuildIOS();
     }
+#endif
 }

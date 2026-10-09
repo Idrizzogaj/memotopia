@@ -11,6 +11,9 @@ namespace Assets.Script.Models.ResponseModels
     {
         public string accessToken;
         public User user;
+        public bool verificationRequired;
+        public string email;
+        public bool mailSent;
 
         public string Token
         {

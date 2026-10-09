@@ -17,6 +17,7 @@ backend/.env.*
 
 # Local exports and transfer archives; keep source assets in Git.
 /ios-build/
+/android-build/
 /windows-transfer/
 /backend_upload.tgz
 /*.log

@@ -76,7 +76,7 @@ public class LevelScript : MonoBehaviour
             var levels = LevelProgress.Get(StaticVar.s_game) ?? new Assets.Script.Models.GameLevel[0];
             int levelNumber = i + 1;
             var completed = System.Array.Find(levels, entry => entry.level == levelNumber);
-            bool unlocked = levelNumber == 1 || completed != null || System.Array.Exists(levels, entry => entry.level == levelNumber - 1);
+            bool unlocked = levelNumber == 1 || levelNumber == 20 || completed != null || System.Array.Exists(levels, entry => entry.level == levelNumber - 1); // level 20 is open from the start
             var levelButton = LevelsCell[i].transform.GetChild(1).GetComponent<Button>();
             levelButton.interactable = unlocked;
             LevelsCell[i].sprite = unlocked ? OpenCellImage : CellImage;

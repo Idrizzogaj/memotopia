@@ -28,8 +28,8 @@ public class StarFillScript : MonoBehaviour
     [SerializeField] private float rCurrentScore;
     [SerializeField] private float rSpeed;
 
-    float threeStar = 75f / 100f * 180f;
-    float twoStar = 50f / 100f * 180f;
+    float threeStar = 135f;
+    float twoStar = 90f;
     float mtime = 0.2f;
     float rtime = 0.2f;
     int ScoreInt = 0;
@@ -38,6 +38,9 @@ public class StarFillScript : MonoBehaviour
     void Start()
     {
         ScoreInt = Int16.Parse(Score.text);
+        // the same level-based limits as GamesScript.setStars
+        threeStar = StarRules.ThreeStarSecondsLeft(LevelScript._selectedLevel);
+        twoStar = StarRules.TwoStarSecondsLeft(LevelScript._selectedLevel);
     }
 
     // Update is called once per frame

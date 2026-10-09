@@ -48,8 +48,7 @@ namespace Assets.Script.Controllers
             }
             else
             {
-                var responseObject = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
-                onFailure(ReturnAlertMessageType(responseObject.Message, responseObject.Code));
+                onFailure(FailureFrom(request));
             }
         }
 
@@ -77,9 +76,20 @@ namespace Assets.Script.Controllers
             }
             else
             {
-                var responseObject = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
-                onFailure(ReturnAlertMessageType(responseObject.Message, responseObject.Code));
+                onFailure(FailureFrom(request));
             }
+        }
+
+        // A network failure has no response body; parsing "" throws, so onFailure would never run and the
+        // caller (for example the Challenge button) would look dead.
+        AlertMessageContainer FailureFrom(WWW request)
+        {
+            ErrorResponsePayload payload = null;
+            try { if (!String.IsNullOrEmpty(request.text)) payload = JsonUtility.FromJson<ErrorResponsePayload>(request.text); }
+            catch (Exception) { }
+            var message = (payload != null && !String.IsNullOrEmpty(payload.Message)) ? payload.Message : (request.error ?? "NETWORK_ERROR");
+            var code = (payload != null && !String.IsNullOrEmpty(payload.Code)) ? payload.Code : "NETWORK_ERROR";
+            return ReturnAlertMessageType(message, code);
         }
 
         #region AlertMessage

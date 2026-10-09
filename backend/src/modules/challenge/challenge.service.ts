@@ -18,6 +18,7 @@ import { GameRepository } from '~modules/level/game.repository';
 import { UserStatisticsService } from '~modules/user-statistics/user-statistics.service';
 import { UserService } from '~modules/user/user.service';
 
+import { compareParticipants } from './challenge-result';
 import { ChallengeRepository } from './challenge.repository';
 import { ChallengeResDto } from './dto/challenge-res.dto';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
@@ -80,7 +81,7 @@ export class ChallengeService {
     }
 
     async update(updateChallengeDto: UpdateChallengeDto, user: User): Promise<ChallengeResDto> {
-        const { score, challengeId, status } = updateChallengeDto;
+        const { score, challengeId, status, progress } = updateChallengeDto;
 
         const challenge = await this.challengeRepository.findOne({ id: challengeId });
 
@@ -99,6 +100,7 @@ export class ChallengeService {
             participant.status = ParticipantStatus.CANCELED;
         } else {
             participant.score = score;
+            if (typeof progress === 'number' && progress >= 0) participant.progress = progress;
             participant.status = ParticipantStatus.DONE;
         }
 
@@ -126,8 +128,10 @@ export class ChallengeService {
             let mostXp: Participant;
             const difference: number = Math.abs(participantStatistics.xp - challengerStatistics.xp);
 
-            if (participant.score > challenger.score) winner = participant;
-            else if (participant.score < challenger.score) winner = challenger;
+            // Most correct first, then least time; older apps without progress: higher score wins.
+            const order = compareParticipants(participant, challenger);
+            if (order > 0) winner = participant;
+            else if (order < 0) winner = challenger;
 
             if (participantStatistics.xp > challengerStatistics.xp) mostXp = participant;
             else if (participantStatistics.xp < challengerStatistics.xp) mostXp = challenger;
@@ -406,8 +410,9 @@ export class ChallengeService {
                 if (challenger.status == ParticipantStatus.PENDING) {
                     winOrLose = 'Pending';
                 } else {
-                    if (me.score == challenger.score) winOrLose = 'Draw';
-                    else if (me.score > challenger.score) winOrLose = 'Win';
+                    const order = compareParticipants(me, challenger);
+                    if (order === 0) winOrLose = 'Draw';
+                    else if (order > 0) winOrLose = 'Win';
                     else winOrLose = 'Loss';
                 }
 

@@ -15,6 +15,10 @@ namespace Assets.Script.Constants
         public static readonly string s_somethingWentWrong = "Something went wrong";
         public static readonly string s_usernameExistsMessage = "Username already exist, try another one.";
         public static readonly string s_invalidProviderMessage = "Please use facebook or iOS login";
+        public static readonly string s_emailNotVerifiedMessage = "Please confirm your email first. We have sent you a new link - check your inbox and spam folder, then log in again.";
+        public static readonly string s_tooManyRequestsMessage = "Too many attempts. Please wait a while and try again.";
+        public static readonly string s_checkYourEmailMessage = "Almost done! We sent a confirmation link to your email. Open it, then log in here.";
+        public static readonly string s_mailNotSentMessage = "Your account was created, but we could not send the confirmation email. Try logging in to get a new link.";
         #endregion
 
         #region ErrorMessage
@@ -27,6 +31,8 @@ namespace Assets.Script.Constants
         public static readonly string s_shortUsernameCode = "SHORT_USERNAME";
         public static readonly string s_usernameExistsCode = "USERNAME_EXISTS";
         public static readonly string s_invalidProviderCode = "INVALID_PROVIDER";
+        public static readonly string s_emailNotVerifiedCode = "EMAIL_NOT_VERIFIED";
+        public static readonly string s_tooManyRequestsCode = "TOO_MANY_REQUESTS";
         #endregion
     }
 }

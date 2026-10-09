@@ -123,7 +123,9 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
             }
             catch (Exception)
             {
-                Application.Quit();
+                var manager = FindObjectOfType<LoadingManager>();
+                if (manager != null) manager.EndLoading();
+                Debug.LogWarning("Subscription change could not start. Please try again.");
             }
         }
         else
@@ -218,8 +220,8 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
             }
         }
 
-        if (i == 0 && UserConstants.s_user.paymentStatus != PaymentStatus.s_lifetime)
-            PaymentStatusToNone();
+        // A missing device receipt is not proof that the subscription ended (new device, receipt not loaded yet),
+        // so the account status is kept; only a receipt that is present and expired or cancelled lowers it above.
     }
 
     public void OnPurchaseDeferred(Product product)
@@ -271,19 +273,44 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
 
         MyDebug(string.Format("ProcessPurchase: " + args.purchasedProduct.definition.id));
 
-        loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
-        loadingScreen.EndLoading();
+        // The store itself confirmed this transaction (ProcessPurchase is only called for those). The local receipt
+        // check above failed or found nothing, for example because the Google Play licence key in GooglePlayTangle
+        // belongs to another app, or because of a sandbox receipt. Unlock from the store confirmation so a paid
+        // purchase is never lost. Proper receipt validation belongs on the server (later).
+        string boughtId = args.purchasedProduct.definition.id;
+        bool boughtMonthly = String.Equals(boughtId, monthlySubscription, StringComparison.Ordinal);
+        bool boughtYearly = String.Equals(boughtId, yearlySubscription, StringComparison.Ordinal);
+        if (boughtMonthly || boughtYearly)
+        {
+            MyDebug("Receipt check inconclusive; unlocking from the store confirmation for " + boughtId);
+            StopSpinner();
+            UpdatePaymentStatus(boughtMonthly ? PaymentStatus.s_monthly : PaymentStatus.s_yearly);
+            return PurchaseProcessingResult.Complete;
+        }
+
+        StopSpinner();
 
         return PurchaseProcessingResult.Complete;
+    }
+
+    /// <summary>Stops the loading spinner; never throws, so a missing canvas cannot leave a purchase half done.</summary>
+    private void StopSpinner()
+    {
+        try
+        {
+            var manager = FindObjectOfType<LoadingManager>();
+            if (manager != null) manager.EndLoading();
+        }
+        catch (Exception) { }
     }
 
     public void OnPurchaseFailed(UnityEngine.Purchasing.Product product, PurchaseFailureReason failureReason)
     {
         MyDebug(string.Format("OnPurchaseFailed: FAIL. Product: '{0}', PurchaseFailureReason: {1}", product.definition.storeSpecificId, failureReason));
 
-        SceneManager.LoadScene(SceneName.s_loginScene);
-        loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
-        loadingScreen.EndLoading();
+        // A cancelled or failed purchase must not log the user out; just stop the spinner.
+        var manager = FindObjectOfType<LoadingManager>();
+        if (manager != null) manager.EndLoading();
     }
 
     private void MyDebug(string debug)

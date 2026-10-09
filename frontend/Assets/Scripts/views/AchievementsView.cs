@@ -23,7 +23,7 @@ public class AchievementsView : MonoBehaviour
         if (!unlocked && lockedMaterial == null)
             lockedMaterial = new Material(Resources.Load<Shader>("Shaders/UIGrayscale"));
         badge.material = unlocked ? null : lockedMaterial;
-        badge.color = Color.white;
+        badge.color = unlocked ? Color.white : new Color(.65f, .65f, .65f, .65f);
     }
 
     private readonly List<GameObject> rows = new List<GameObject>();
@@ -56,6 +56,8 @@ public class AchievementsView : MonoBehaviour
         foreach (var row in rows) { row.SetActive(false); if (Application.isPlaying) Destroy(row); else DestroyImmediate(row); }
         rows.Clear();
         detailKeys.Clear();
+        if (achievements == null) achievements = new List<Achievement>();
+        ExtraAchievements.AppendTo(achievements); // Memory Athlete and the tip badges
         var known = new HashSet<string>();
         var completed = new HashSet<string>(GameManager.completedAchievements);
         if (achievements != null)
@@ -65,6 +67,15 @@ public class AchievementsView : MonoBehaviour
         foreach (var key in completed)
             if (known.Add(key)) AddRow(null, key, true);
         achievementTemplate.SetActive(false);
+        // The list has a fixed height in the scene (it fitted the original 12 badges). Follow the real number of
+        // badges, otherwise the lower ones cannot be scrolled to.
+        var contentRect = content.GetComponent<RectTransform>();
+        var fitter = content.GetComponent<ContentSizeFitter>();
+        if (fitter == null) fitter = content.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        contentRect.pivot = new Vector2(contentRect.pivot.x, 1f);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+        contentRect.anchoredPosition = new Vector2(contentRect.anchoredPosition.x, 0f);
         if (selectedKey != null && achievementPopupView.activeSelf) ShowDetails(selectedAchievement, selectedKey);
     }
 
@@ -78,7 +89,7 @@ public class AchievementsView : MonoBehaviour
         title.enableWordWrapping = true;
         FitRowText(title, 64);
         FitRowText(description, 80);
-        description.text = (achievement == null ? "Achievement earned." : achievement.description);
+        description.text = (unlocked ? "Unlocked\n" : "Locked\n") + (achievement == null ? "Achievement earned." : achievement.description);
         var row = Instantiate(achievementTemplate, content.transform);
         row.name = key;
         row.SetActive(true);
@@ -131,7 +142,7 @@ public class AchievementsView : MonoBehaviour
         popupDescription.fontSizeMax = 30;
         popupDescription.color = new Color(0.3f, 0.3f, 0.3f);
         popupTitle.text = DisplayTitle(achievement, key);
-        popupDescription.text = (achievement == null ? "Achievement earned." : achievement.description);
+        popupDescription.text = (GameManager.completedAchievements.Contains(key) ? "Unlocked\n" : "Locked\n") + (achievement == null ? "Achievement earned." : achievement.description);
     }
 
     public void OnClosePopupClick() { selectedKey = null; achievementPopupView.SetActive(false); }

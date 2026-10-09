@@ -8,5 +8,6 @@ namespace Assets.Script.Models.RequestModels
         public float score;
         public int challengeId;
         public string status;
+        public int progress = -1;
     }
 }

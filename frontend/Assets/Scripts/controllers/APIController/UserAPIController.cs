@@ -171,6 +171,44 @@ namespace Assets.Script.Controllers
         }
         #endregion
 
+        #region Delete Account
+        // Permanently deletes the signed-in account on the server. Password is only checked for e-mail accounts.
+        public void DeleteAccount(string password, Action onSuccess, Action<AlertMessageContainer> onFailure)
+        {
+            var requestObject = new DeleteAccountRequestPayload();
+            requestObject.password = password;
+            requestObject.confirm = "DELETE";
+            string jsonRequestObject = JsonUtility.ToJson(requestObject);
+
+            WWWForm form = new WWWForm();
+            Dictionary<string, string> headers = form.headers;
+            headers["Content-Type"] = "application/json";
+            headers["Authorization"] = _dataController.Token;
+            byte[] formData = Encoding.UTF8.GetBytes(jsonRequestObject);
+            WWW request = new WWW(_apiConstants.DeleteAccount, formData, headers);
+
+            StartCoroutine(ReturnDeleteAccountRequest(request, onSuccess, onFailure));
+        }
+
+        private IEnumerator ReturnDeleteAccountRequest(WWW request, Action onSuccess, Action<AlertMessageContainer> onFailure)
+        {
+            yield return request;
+
+            if (String.IsNullOrEmpty(request.error))
+            {
+                if (onSuccess != null) onSuccess();
+                yield break;
+            }
+
+            ErrorResponsePayload errorPayload = null;
+            if (!String.IsNullOrEmpty(request.text))
+                errorPayload = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
+            var message = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Message)) ? errorPayload.Message : request.error;
+            var code = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Code)) ? errorPayload.Code : "HTTP_ERROR";
+            if (onFailure != null) onFailure(new AlertMessageContainer() { ErrorMessage = message, StatusCode = code });
+        }
+        #endregion
+
         #region AlertMessage
         AlertMessageContainer ReturnAlertMessageType(string message, string code)
         {

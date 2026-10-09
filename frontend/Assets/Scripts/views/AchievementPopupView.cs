@@ -37,6 +37,9 @@ public class AchievementPopupView : MonoBehaviour
         if (catalog != null)
             foreach (var entry in catalog)
                 if (entry != null && !string.IsNullOrEmpty(entry.constantString)) known.Add(entry.constantString);
+        // The list in a game scene is only a subset; always count against all achievements.
+        foreach (string key in AchievementRules.AllKeys) known.Add(key);
+        foreach (string key in ExtraAchievements.Keys) known.Add(key);
         int unlocked = 0;
         foreach (string key in GameManager.completedAchievements) if (known.Contains(key)) unlocked++;
         foreach (var label in panel.GetComponentsInChildren<TextMeshProUGUI>(true))
@@ -94,6 +97,22 @@ public class AchievementPopupView : MonoBehaviour
         {
             close.gameObject.SetActive(true);
             Place(close, new Vector2(.80f, .88f), new Vector2(.87f, .925f));
+            // The visible X is small; give it an invisible tap area three times its size. Taps on the
+            // child bubble up to the button, so the close action is unchanged.
+            var bigHit = close.Find("BigHit") as RectTransform;
+            if (bigHit == null)
+            {
+                var hitObject = new GameObject("BigHit", typeof(RectTransform), typeof(Image));
+                hitObject.transform.SetParent(close, false);
+                bigHit = (RectTransform)hitObject.transform;
+                var hitImage = hitObject.GetComponent<Image>();
+                hitImage.color = Color.clear;
+                hitImage.raycastTarget = true;
+            }
+            bigHit.anchorMin = new Vector2(-1f, -1f);
+            bigHit.anchorMax = new Vector2(2f, 2f);
+            bigHit.offsetMin = bigHit.offsetMax = Vector2.zero;
+            bigHit.SetAsLastSibling();
         }
         foreach (Transform child in container)
             if (child.name.StartsWith("Stars")) child.gameObject.SetActive(false);

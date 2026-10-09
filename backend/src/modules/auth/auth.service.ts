@@ -4,6 +4,7 @@ import {
     UnauthorizedException,
     HttpService,
     BadRequestException,
+    ForbiddenException,
     InternalServerErrorException,
     ConflictException,
 } from '@nestjs/common';
@@ -41,6 +42,9 @@ export class AuthService {
 
         if (!user) throw new UnauthorizedException('INVALID_CREDENTIALS');
 
+        // Checked after the password so the status of an address is not revealed without it.
+        if (user.emailVerificationPending) throw new ForbiddenException('EMAIL_NOT_VERIFIED');
+
         const accessToken: string = this.generateAccessToken(user);
         return { accessToken, user };
     }
@@ -74,6 +78,8 @@ export class AuthService {
         const user = await this.userRepository.findOne({
             where: { id: payload.userId },
         });
+        // An account that has not confirmed its address has no valid session.
+        if (user && user.emailVerificationPending) return null;
         return user;
     }
 
@@ -129,6 +135,8 @@ export class AuthService {
             user.username = username;
             user.email = email;
             user.provider = provider;
+            // The identity provider has already verified the address.
+            user.emailVerifiedAt = new Date();
 
             try {
                 const userCreated = await this.userRepository.save(user);

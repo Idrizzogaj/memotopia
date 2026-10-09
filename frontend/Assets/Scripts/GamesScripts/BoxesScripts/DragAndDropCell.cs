@@ -161,6 +161,9 @@ public class DragAndDropCell : MonoBehaviour, IDropHandler
             DragAndDropItem item = DragAndDropItem.draggedItem;
             DragAndDropCell sourceCell = DragAndDropItem.sourceCell;
 
+            // The tray cannot be re-ordered: a picture dropped on another tray picture jumps back to its own place.
+            if (sourceCell != null && this.name.Contains("Prefabe") && sourceCell.name.Contains("Prefabe")) return;
+
             if (!this.name.Contains(item.name) && !this.name.Contains("Prefabe"))
             {
                 Handheld.Vibrate();

@@ -8,6 +8,8 @@ namespace Assets.Script.Models
 		#region Properties
 		public int id;
 		public float score;
+		// correct * 1000 + seconds left; -1 when the server (or the other app) did not record it
+		public int progress = -1;
 
         public string status;
 

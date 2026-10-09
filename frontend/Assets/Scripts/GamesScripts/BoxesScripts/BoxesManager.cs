@@ -2,6 +2,7 @@ using Assets.Script.Constants;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -97,6 +98,7 @@ public class BoxesManager : GamesScript, IGameable
     {
         InitializeGameScript();
         tutorialController.DisableTutorialObjects(true);
+        CardFaces.BeginSession(); // what the cards show: pictures, numbers or words
         LevelSelector();
         inGame = false;
         InitArrays();
@@ -184,6 +186,11 @@ public class BoxesManager : GamesScript, IGameable
             case 20:
                 LevelAttributes(22, 5, 19);
                 break;
+            case MemoryAthlete.Level:
+                LevelAttributes(MemoryAthlete.BoxesBoxes, MemoryAthlete.BoxesMistakes, 19);
+                AddExtraBoxes(MemoryAthlete.BoxesBoxes - 22);
+                gameTimeAllocation = MemoryAthlete.BoxesRecallSeconds;
+                break;
         }
     }
 
@@ -201,6 +208,31 @@ public class BoxesManager : GamesScript, IGameable
         panelLvl = levelPanels[panel];
     }
 
+    // The level-20 panel has 22 boxes in a honeycomb of four columns. Memory Athlete needs 24, so two more are
+    // cloned at the top of the two inner columns (there is room above them).
+    void AddExtraBoxes(int extra)
+    {
+        var cells = panelLvl.GetComponentsInChildren<DragAndDropCell>(true).Select(c => (RectTransform)c.transform).ToList();
+        if (cells.Count == 0 || extra <= 0) return;
+        float innerX = cells.Min(c => Mathf.Abs(c.anchoredPosition.x));
+        var inner = cells.Where(c => Mathf.Abs(Mathf.Abs(c.anchoredPosition.x) - innerX) < 30f).ToList();
+        var columns = new List<List<RectTransform>>
+        {
+            inner.Where(c => c.anchoredPosition.x < 0f).OrderByDescending(c => c.anchoredPosition.y).ToList(),
+            inner.Where(c => c.anchoredPosition.x >= 0f).OrderByDescending(c => c.anchoredPosition.y).ToList(),
+        };
+        int added = 0;
+        foreach (var column in columns)
+        {
+            if (added >= extra || column.Count < 2) continue;
+            float step = column[0].anchoredPosition.y - column[1].anchoredPosition.y;
+            var clone = Instantiate(column[0].gameObject, column[0].parent);
+            clone.name = "BoxesCell (" + (200 + added) + ")";
+            ((RectTransform)clone.transform).anchoredPosition = column[0].anchoredPosition + new Vector2(0f, step);
+            added++;
+        }
+    }
+
     void SpawnImages()
     {
         imageNumbers = new int[spawnNumber];
@@ -214,14 +246,14 @@ public class BoxesManager : GamesScript, IGameable
             {
                 imagesArray[i - 1].GetComponentsInChildren<Image>()[0].name = imageNumbers[j].ToString() + " Number";
 
-                imagesArray[i].GetComponentsInChildren<Image>()[0].sprite = MajorSystemImages.Load(imageNumbers[j]);
+                imagesArray[i].GetComponentsInChildren<Image>()[0].sprite = CardFaces.Face(imageNumbers[j]);
                 BoxesPicturePerspective.Attach(imagesArray[i].GetComponentsInChildren<Image>()[0]);
                 imagesArray[i - 1].GetComponent<DragAndDropCell>().enabled = false;
                 imagesArray[i].GetComponent<DragAndDropItem>().enabled = false;
 
                 GameObject g = Instantiate(imagePrefab) as GameObject;
                 g.GetComponentsInChildren<Image>()[1].name = imageNumbers[j].ToString();
-                g.GetComponentsInChildren<Image>()[1].sprite = MajorSystemImages.Load(imageNumbers[j]);
+                g.GetComponentsInChildren<Image>()[1].sprite = CardFaces.Face(imageNumbers[j]);
                 BoxesPicturePerspective.Attach(g.GetComponentsInChildren<Image>()[1]);
                 g.transform.SetParent(scrollViewContent, false);
                 g.SetActive(true);
@@ -296,9 +328,14 @@ public class BoxesManager : GamesScript, IGameable
         float gameTimeSpent = gameTimeAllocation - countdownTime;
         IncreaseTime(gameTimeSpent);
 
-        GameOver(challengeLossPanel, losePanel, boxesScene);
-
+        // Stop timers and animations FIRST: in a challenge the result panel is shown by a coroutine that
+        // RoundFailed starts, and stopping afterwards kills it (the round then seemed to go on at 0:00).
+        shouldCountTime = false;
+        inGame = false;
         StopAllCoroutines();
+
+        RoundFailed(challengeFirstPlayPanel, challengeLossPanel, challengeWinPanel, challengeDrawPanel, losePanel, boxesScene, "Boxes",
+            achievementsPrefab, achievementsList, achievementsController, countForWin, countdownTime);
     }
 
     // Use case of You Won is handled in the DragAndDropCell script
@@ -312,7 +349,8 @@ public class BoxesManager : GamesScript, IGameable
         if (ChallengeConstants.s_isChallenge)
         {
             ChallangeFinished(countdownTime.ToString(), challengeFirstPlayPanel, challengeLossPanel, challengeWinPanel,
-                challengeDrawPanel, "Boxes", achievementsPrefab, achievementsList, achievementsController);
+                challengeDrawPanel, "Boxes", achievementsPrefab, achievementsList, achievementsController,
+                spawnNumber, countdownTime);
         }
         else
         {

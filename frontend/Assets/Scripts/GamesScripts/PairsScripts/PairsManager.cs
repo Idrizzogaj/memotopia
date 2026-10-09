@@ -113,13 +113,15 @@ public class PairsManager : GamesScript, IGameable
         float gameTimeSpent = gameTimeAllocation - countdownTime;
         IncreaseTime(gameTimeSpent);
 
-        GameOver(challengeLossPanel, losePanel, "PairsScene");
+        RoundFailed(challengeFirstPlayPanel, challengeLossPanel, challengeWinPanel, challengeDrawPanel, losePanel, "PairsScene", "Pairs",
+            achievementsPrefab, achievementsList, achievementsController, (numberOfPairs - gameOverCount) / 2, 0f);
     }
 
     public void InitializeGame()
     {
         InitializeGameScript();
         tutorialController.DisableTutorialObjects(true);
+        CardFaces.BeginSession(); // what the cards show: pictures, numbers or words
         LevelSelector();
         SetNames();
         NextPair();
@@ -170,10 +172,10 @@ public class PairsManager : GamesScript, IGameable
             return;
         }
 
-        img1.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount]);
-        img2.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount + 1]);
-        img1Ipad.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount]);
-        img2Ipad.sprite = MajorSystemImages.LoadPath(nameOfImages[nextCount + 1]);
+        img1.sprite = CardFaces.FaceForPath(nameOfImages[nextCount]);
+        img2.sprite = CardFaces.FaceForPath(nameOfImages[nextCount + 1]);
+        img1Ipad.sprite = CardFaces.FaceForPath(nameOfImages[nextCount]);
+        img2Ipad.sprite = CardFaces.FaceForPath(nameOfImages[nextCount + 1]);
 
         currentCards[nextCount] = nameOfImages[nextCount];
         currentCards[nextCount + 1] = nameOfImages[nextCount + 1];
@@ -194,7 +196,7 @@ public class PairsManager : GamesScript, IGameable
         {
             //Get selected gameObject and change its image based on the object name
             secondBtn = selectedGameObject.GetComponent<Button>();
-            secondBtn.image.overrideSprite = MajorSystemImages.LoadPath(secondBtn.name);
+            secondBtn.image.overrideSprite = CardFaces.FaceForPath(secondBtn.name);
             MakeButtonsInteractable(false);
             if (pairs[firstBtn.name] == secondBtn.name || pairs[secondBtn.name] == firstBtn.name)
             {
@@ -207,7 +209,8 @@ public class PairsManager : GamesScript, IGameable
                     if (ChallengeConstants.s_isChallenge)
                     {
                         ChallangeFinished(countdownTime.ToString(), challengeFirstPlayPanel, challengeLossPanel,
-                            challengeWinPanel, challengeDrawPanel, "Pairs", achievementsPrefab, achievementsList, achievementsController);
+                            challengeWinPanel, challengeDrawPanel, "Pairs", achievementsPrefab, achievementsList, achievementsController,
+                            numberOfPairs / 2, countdownTime);
                     }
                     else
                     {
@@ -233,7 +236,7 @@ public class PairsManager : GamesScript, IGameable
         {
             //Get selected gameObject and change its image based on the object name
             firstBtn = selectedGameObject.GetComponent<Button>();
-            firstBtn.image.overrideSprite = MajorSystemImages.LoadPath(firstBtn.name);
+            firstBtn.image.overrideSprite = CardFaces.FaceForPath(firstBtn.name);
         }
         cardFaceShown = !cardFaceShown;
     }
@@ -334,6 +337,11 @@ public class PairsManager : GamesScript, IGameable
                 break;
             case 20:
                 LevelAttributes(48);
+                break;
+            case MemoryAthlete.Level:
+                LevelAttributes(MemoryAthlete.PairsCards);
+                preGameTimeAllocation = MemoryAthlete.PairsMemorizeSeconds;
+                gameTimeAllocation = MemoryAthlete.PairsFindSeconds;
                 break;
         }
     }

@@ -22,6 +22,10 @@ async function bootstrap() {
 
     const appConfig = app.get<AppConfig>(APP_CONFIG);
 
+    // Exactly one reverse proxy (Caddy) sits in front; trust only its X-Forwarded-For hop so that
+    // rate limits see the real client address and callers cannot forge it.
+    app.set('trust proxy', 1);
+
     app.enableCors({
         maxAge: 3600,
         credentials: true,

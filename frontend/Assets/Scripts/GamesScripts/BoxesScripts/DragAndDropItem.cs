@@ -7,8 +7,15 @@ using System.Collections;
 /// <summary>
 /// Drag and Drop item.
 /// </summary>
-public class DragAndDropItem : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class DragAndDropItem : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
+    // A picture in the tray is only picked up after a short hold. A quick swipe along the tray scrolls it instead,
+    // so the pictures never get dragged out of order by accident.
+    private const float HoldSeconds = 0.25f;
+    private float pressTime;
+    private bool forwardingToScroll;
+    private ScrollRect forwardScroll;
+
     public static bool dragDisabled = false;                                        // Drag start global disable
 
     public static DragAndDropItem draggedItem;                                      // Item that is dragged now
@@ -57,8 +64,28 @@ public class DragAndDropItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     /// This item started to drag.
     /// </summary>
     /// <param name="eventData"></param>
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        pressTime = Time.unscaledTime;
+    }
+
     public void OnBeginDrag(PointerEventData eventData)
     {
+        var scroll = GetComponentInParent<ScrollRect>();
+        if (scroll != null)
+        {
+            Vector2 moved = eventData.position - eventData.pressPosition;
+            bool alongScroll = scroll.horizontal ? Mathf.Abs(moved.x) > Mathf.Abs(moved.y) : Mathf.Abs(moved.y) > Mathf.Abs(moved.x);
+            if (alongScroll && Time.unscaledTime - pressTime < HoldSeconds)
+            {
+                forwardingToScroll = true;
+                forwardScroll = scroll;
+                ExecuteEvents.Execute(scroll.gameObject, eventData, ExecuteEvents.beginDragHandler);
+                return;
+            }
+        }
+        forwardingToScroll = false;
+
         if (dragDisabled == false)
         {
             sourceCell = GetCell();                                                 // Remember source cell
@@ -96,6 +123,11 @@ public class DragAndDropItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     /// <param name="data"></param>
     public void OnDrag(PointerEventData data)
     {
+        if (forwardingToScroll && forwardScroll != null)
+        {
+            ExecuteEvents.Execute(forwardScroll.gameObject, data, ExecuteEvents.dragHandler);
+            return;
+        }
         if (icon != null)
         {
             icon.transform.position = Input.mousePosition; // Item's icon follows to cursor in screen pixels
@@ -110,6 +142,13 @@ public class DragAndDropItem : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     /// <param name="eventData"></param>
     public void OnEndDrag(PointerEventData eventData)
     {
+        if (forwardingToScroll)
+        {
+            if (forwardScroll != null) ExecuteEvents.Execute(forwardScroll.gameObject, eventData, ExecuteEvents.endDragHandler);
+            forwardingToScroll = false;
+            forwardScroll = null;
+            return;
+        }
         try
         {
             draggedItem.GetComponent<Image>().fillAmount = 1;

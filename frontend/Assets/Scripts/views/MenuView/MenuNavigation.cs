@@ -156,6 +156,8 @@ public class MenuNavigation : MonoBehaviour
     {
         homeScreen.SetActive(false);
         trainingScreen.SetActive(true);
+        // what the cards show (Images / Help / Words / Numbers / Random): one choice for all games
+        ContentSelectorBar.AttachToTraining(this);
     }
 
     public void GoToStatistics()
@@ -185,11 +187,40 @@ public class MenuNavigation : MonoBehaviour
         statisticsScreen.SetActive(true);
     }
 
+    private bool challengeCheckRunning;
+
+    private void FinishChallengeCheck()
+    {
+        challengeCheckRunning = false;
+        if (_loadingScreen != null) _loadingScreen.EndLoading();
+    }
+
+    private System.Collections.IEnumerator ReleaseChallengeCheck(float seconds)
+    {
+        yield return new WaitForSecondsRealtime(seconds);
+        if (challengeCheckRunning) FinishChallengeCheck();
+    }
+
+    private void OpenChallengeScreen()
+    {
+        homeScreen.SetActive(false);
+        trainingScreen.SetActive(false);
+        challengeNotificationScreen.SetActive(false);
+        challengeScreen.SetActive(true);
+    }
+
     public void GoToChallenge()
     {
+        // The screen only opens after the daily-limit check. Ignore repeat taps while it runs, show the
+        // spinner if it is slow, and never leave the button dead when the request fails.
+        if (challengeCheckRunning) return;
+        challengeCheckRunning = true;
+        if (_loadingScreen != null) _loadingScreen.StartLoading();
+        StartCoroutine(ReleaseChallengeCheck(15f));
         restrictionsAPIController.GetRestriction(
             (OnSuccess) =>
             {
+                FinishChallengeCheck();
                 if (UserConstants.s_user.paymentStatus == PaymentStatus.s_none && OnSuccess.numberOfChallengeGames == 0)
                 {
                     DateTime now = DateTime.Now;
@@ -200,19 +231,17 @@ public class MenuNavigation : MonoBehaviour
                 }
                 else
                 {
-                    homeScreen.SetActive(false);
-                    trainingScreen.SetActive(false);
-                    challengeNotificationScreen.SetActive(false);
-                    challengeScreen.SetActive(true);
+                    OpenChallengeScreen();
                 }
             },
             (OnFailure) =>
             {
-                print(OnFailure);
+                FinishChallengeCheck();
+                if (UserConstants.s_user.paymentStatus != PaymentStatus.s_none) OpenChallengeScreen();
+                else ActivateRestrictionsPopup("Can't reach the server", "Check your connection and try again.");
             }
         );
     }
-
     public void GoToPayment()
     {
         homeScreen.SetActive(false);
@@ -295,6 +324,9 @@ public class MenuNavigation : MonoBehaviour
         focusScreen.SetActive(false);
         bornScreen.SetActive(false);
         dreamScreen.SetActive(false);
+
+        // free Major System tip + "I have read this" boxes (earns the tip badges)
+        TipsEnhancer.Ensure(this);
     }
 
     public void GoToLinkMethodScreen()
@@ -381,6 +413,7 @@ public class MenuNavigation : MonoBehaviour
 
     public void GoToVideosScreen()
     {
+        VideosEnhancer.Ensure(this); // the YouTube "how to play" rows
         if (UserConstants.s_user.paymentStatus == PaymentStatus.s_none)
         {
             Color c = memoryPalaceBtn.GetComponent<Image>().color;
@@ -404,7 +437,8 @@ public class MenuNavigation : MonoBehaviour
     public void GoToVideo1()
     {
         Screen.orientation = ScreenOrientation.LandscapeLeft;
-        videoPlayer.url = "http://www.memotopia.com/video/1_Introduction.mp4";
+        HookVideoEnd("video-intro");
+        videoPlayer.url = "https://www.memotopia.com/video/1_Introduction.mp4";
         video.SetActive(true);
     }
 
@@ -414,7 +448,8 @@ public class MenuNavigation : MonoBehaviour
         {
             Screen.orientation = ScreenOrientation.LandscapeLeft;
 
-            videoPlayer.url = "http://www.memotopia.com/video/2_Link_Method.mp4";
+            HookVideoEnd("video-link");
+            videoPlayer.url = "https://www.memotopia.com/video/2_Link_Method.mp4";
             video.SetActive(true);
         }
         else
@@ -427,7 +462,8 @@ public class MenuNavigation : MonoBehaviour
         {
             Screen.orientation = ScreenOrientation.LandscapeLeft;
 
-            videoPlayer.url = "http://www.memotopia.com/video/3_Associations.mp4";
+            HookVideoEnd("video-associations");
+            videoPlayer.url = "https://www.memotopia.com/video/3_Associations.mp4";
             video.SetActive(true);
         }
         else
@@ -440,11 +476,38 @@ public class MenuNavigation : MonoBehaviour
         {
             Screen.orientation = ScreenOrientation.LandscapeLeft;
 
-            videoPlayer.url = "http://www.memotopia.com/video/4_MemoryPalace.mp4";
+            HookVideoEnd("video-palace");
+            videoPlayer.url = "https://www.memotopia.com/video/4_MemoryPalace.mp4";
             video.SetActive(true);
         }
         else
             ActivateRestrictionsPopup("This content is not available for you current payment plan", "Upgrade so you can have access");
+    }
+
+    // A video earns its badge when it has been watched to the end.
+    private string currentVideoKey;
+    private bool videoEndHooked;
+
+    private void HookVideoEnd(string key)
+    {
+        currentVideoKey = key;
+        if (videoEndHooked || videoPlayer == null) return;
+        videoPlayer.loopPointReached += OnVideoFinished;
+        videoEndHooked = true;
+    }
+
+    private void OnVideoFinished(VideoPlayer source)
+    {
+        string key = currentVideoKey;
+        currentVideoKey = null;
+        if (string.IsNullOrEmpty(key)) return;
+        try
+        {
+            if (!GameManager.UnlockAchievement(key)) return;
+            ProgressSync.Instance.GetApi<AchievementsAPIController>().FlushPending();
+            BadgePopup.ShowFor(this, key);
+        }
+        catch (Exception) { /* the badge is saved either way */ }
     }
 
     private void _updateDataInHomeScreen()
@@ -482,7 +545,18 @@ public class MenuNavigation : MonoBehaviour
 
     public void FacebookShare()
     {
-        // Facebook integration is unavailable. The menu entry remains visibly disabled.
+        // The menu entry keeps its old method name (the scene refers to it) but now invites friends
+        // through the phone's share sheet instead of Facebook.
+        InviteFriends();
+    }
+
+    public void InviteFriends()
+    {
+        string me = (UserConstants.s_user != null && !string.IsNullOrEmpty(UserConstants.s_user.username)) ? UserConstants.s_user.username : "";
+        // The store listings are not public yet, so the invitation points to the website.
+        string text = "Train your memory with me on Memotopia and challenge me!" +
+                      (me.Length > 0 ? " My username is " + me + "." : "") + " https://memotopia.com";
+        NativeShare.Share(text, "Invite friends");
     }
 
     private void setPaymentStatusToNone()
@@ -542,6 +616,7 @@ public class MenuNavigation : MonoBehaviour
 
     private void ReconcileAchievements()
     {
+        LevelProgress.EnsureUser();
         var view = achievementsScreen.GetComponentInChildren<AchievementsView>(true);
         var stats = UserConstants.s_user == null ? null : UserConstants.s_user.userStatistics;
         if (view == null || view.achievements == null) return;
@@ -559,6 +634,31 @@ public class MenuNavigation : MonoBehaviour
         if (achievementsAPIController == null) achievementsAPIController = gameObject.AddComponent<AchievementsAPIController>();
         fetchingAchievements = true;
         int owner = GameManager.AchievementUserId;
+        // Fetch actual performance even when the old achievement list is empty, wrong or unavailable.
+        foreach (var game in new[] { "Boxes", "Pairs", "Flash" })
+            ProgressSync.Instance.GetLevels(game, ok =>
+            {
+                if (!ok || this == null || GameManager.AchievementUserId != owner) return;
+                ReconcileAchievements();
+                achievementsAPIController.FlushPending();
+            });
+        var statsApi = ProgressSync.Instance.GetApi<UserStatisticsAPIController>();
+        statsApi.GetUserStatisticsChallengeGames(stats =>
+        {
+            if (this == null || GameManager.AchievementUserId != owner || stats == null) return;
+            if (stats.user != null && stats.user.ID > 0 && stats.user.ID != owner) return;
+            UserConstants.s_user.userStatistics = stats;
+            ReconcileAchievements();
+            achievementsAPIController.FlushPending();
+        }, error => Debug.LogWarning("Achievement statistics could not refresh. Keeping verified progress."));
+        statsApi.GetGlobalScore(result =>
+        {
+            if (this == null || GameManager.AchievementUserId != owner || result == null || result.statistics == null || result.statistics.Length == 0) return;
+            var leader = result.statistics[0];
+            if (leader != null && leader.xp > 0 && leader.user != null && leader.user.ID == owner)
+                GameManager.UnlockAchievement("first-global-score");
+            achievementsAPIController.FlushPending();
+        }, error => Debug.LogWarning("Achievement leaderboard could not refresh."));
         achievementsAPIController.GetAchievements(result =>
         {
             fetchingAchievements = false;

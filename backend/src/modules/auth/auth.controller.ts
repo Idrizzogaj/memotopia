@@ -1,5 +1,8 @@
-import { Body, Controller, Post, UseInterceptors, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Post, Req, UseInterceptors, ValidationPipe } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
+
+import { rateLimit } from '~common/rate-limit';
 
 import { User } from '~common/db/entities/user.entity';
 import { ExcludeInterceptor } from '~common/interceptors/exclude.interceptor';
@@ -21,7 +24,10 @@ export class AuthController {
     @Post('/signin')
     signIn(
         @Body(ValidationPipe) authCredentialsDto: AuthCredentialsDto,
+        @Req() req: Request,
     ): Promise<{ accessToken: string }> {
+        rateLimit(`signin:ip:${req.ip}`, 30, 60 * 1000);
+        rateLimit(`signin:user:${String(authCredentialsDto.username).toLowerCase()}`, 10, 15 * 60 * 1000);
         return this.authService.signIn(authCredentialsDto);
     }
 

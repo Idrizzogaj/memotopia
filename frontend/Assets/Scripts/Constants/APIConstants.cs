@@ -11,7 +11,7 @@ namespace Assets.Script.Constants
         const string BASE_URL = "https://memotopia-eu-1.duckdns.org";
 
 
-        const string TERMS_URL = "http://memotopia.com/pp/privacy-and-policy.pdf?fbclid=IwAR09a-hC9bZbhZtb2gFGvOwAPs9jMDWenQ_wozqDADBhKW1qo2Us_jL7jBg";
+        const string TERMS_URL = "https://memotopia.com/terms.html";
 
         const string LOGIN_ROUTE = "/auth/signin";
         const string SIGN_UP_ROUTE = "/users";
@@ -23,6 +23,8 @@ namespace Assets.Script.Constants
         const string UPDATE_ACCOUNT = "/users/update-account";
         const string GET_RANDOM_USER_ROUTE = "/users/random";
         const string FORGOT_PASSWORD = "/users/forgot";
+        const string RESEND_VERIFICATION = "/users/resend-verification";
+        const string DELETE_ACCOUNT = "/users/delete-account";
         const string CREATE_CHALLENGE_ROUTE = "/challenges";
         const string UPDATE_CHALLENGE_ROUTE = "/challenges/update";
         const string GET_CHALLENGES = "/challenges";
@@ -58,6 +60,8 @@ namespace Assets.Script.Constants
         public string UpdateRestrictions { get { return ReturnUrl(UPDATE_RESTRICTIONS); } }
         public string GetRestrictions { get { return ReturnUrl(GET_RESTRICTIONS); } }
         public string ForgotPassword { get { return ReturnUrl(FORGOT_PASSWORD); } }
+        public string ResendVerification { get { return ReturnUrl(RESEND_VERIFICATION); } }
+        public string DeleteAccount { get { return ReturnUrl(DELETE_ACCOUNT); } }
         public string GlobalScore { get { return ReturnUrl(GLOBAL_SCORE); } }
         public string Achievements { get { return ReturnUrl(ACHIEVEMENTS); } }
         public string TimePlayed { get { return ReturnUrl(TIME_PLAYED); } }
