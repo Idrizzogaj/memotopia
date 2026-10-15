@@ -293,6 +293,16 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
         return PurchaseProcessingResult.Complete;
     }
 
+    /// <summary>Stops the spinner and updates every screen that shows the subscription status.</summary>
+    private void RefreshPurchaseViews()
+    {
+        StopSpinner();
+        foreach (var view in Resources.FindObjectsOfTypeAll<PurchaseButton>())
+            if (view.gameObject.scene.IsValid()) view.CheckView();
+        foreach (var menu in FindObjectsOfType<MenuNavigation>()) menu.PaymentRestrictions();
+        foreach (var menu in FindObjectsOfType<SideMenuAvailability>()) menu.Refresh();
+    }
+
     /// <summary>Stops the loading spinner; never throws, so a missing canvas cannot leave a purchase half done.</summary>
     private void StopSpinner()
     {
@@ -328,13 +338,13 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
                 paymentStatus,
                 (OnSuccess) =>
                 {
-                    print(OnSuccess);
-                    SceneManager.LoadScene(SceneName.s_loginScene);
+                    // UserAPIController has applied the new account status: refresh the screens, no logout and no reload.
+                    RefreshPurchaseViews();
                 },
                 (OnFailure) =>
                 {
-                    print(OnFailure);
-                    SceneManager.LoadScene(SceneName.s_loginScene);
+                    Debug.LogWarning("Purchase status could not sync. Please try again.");
+                    RefreshPurchaseViews();
                 }
             );
         }
