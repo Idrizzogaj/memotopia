@@ -142,15 +142,28 @@ public static class TipsEnhancer
         bar.GetComponent<TipReadBar>().Setup(key, font);
         rect.SetAsLastSibling();
 
-        // leave room under the text so the bar never hides the last lines
+        // Reserve viewport space on both fixed-height and layout-driven pages.
         var scroll = page.GetComponentInChildren<ScrollRect>(true);
-        if (scroll != null && scroll.content != null && scroll.content.GetComponent<LayoutGroup>() != null
-            && scroll.content.Find("ReadSpacer") == null)
+        // Senses and Dream were static pages with an unbound ScrollRect.
+        if (scroll != null && scroll.content == null)
         {
-            var spacer = new GameObject("ReadSpacer", typeof(RectTransform), typeof(LayoutElement));
-            spacer.transform.SetParent(scroll.content, false);
-            spacer.GetComponent<LayoutElement>().minHeight = 220f;
-            spacer.GetComponent<LayoutElement>().preferredHeight = 220f;
+            var children = new List<RectTransform>();
+            foreach (RectTransform child in scroll.transform)
+                if (child != rect && child.GetComponent<Button>() == null) children.Add(child);
+            var textContent = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
+            textContent.SetParent(scroll.transform, false);
+            textContent.anchorMin = new Vector2(0f, 1f);
+            textContent.anchorMax = Vector2.one;
+            textContent.pivot = new Vector2(0.5f, 1f);
+            textContent.sizeDelta = new Vector2(0f, Mathf.Max(1422f, ((RectTransform)page).rect.height));
+            textContent.anchoredPosition = Vector2.zero;
+            foreach (var child in children) child.SetParent(textContent, false);
+            scroll.content = textContent;
+        }
+        if (scroll != null && scroll.content != null)
+        {
+            var clearance = scroll.gameObject.AddComponent<ScrollAboveFooter>();
+            clearance.Configure(scroll, rect);
         }
     }
 

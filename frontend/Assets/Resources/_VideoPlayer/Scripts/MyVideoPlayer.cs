@@ -24,7 +24,7 @@ public class MyVideoPlayer : MonoBehaviour
         Screen.orientation = ScreenOrientation.LandscapeLeft;
     }
 
-    private void Start()
+    private void OnEnable()
     {
         videoPlayer = GetComponent<VideoPlayer>();
         btnPause.SetActive(true);

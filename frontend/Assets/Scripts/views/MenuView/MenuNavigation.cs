@@ -413,7 +413,7 @@ public class MenuNavigation : MonoBehaviour
 
     public void GoToVideosScreen()
     {
-        VideosEnhancer.Ensure(this); // the YouTube "how to play" rows
+        VideosEnhancer.Ensure(this);
         if (UserConstants.s_user.paymentStatus == PaymentStatus.s_none)
         {
             Color c = memoryPalaceBtn.GetComponent<Image>().color;
@@ -429,9 +429,24 @@ public class MenuNavigation : MonoBehaviour
             video4Image.transform.GetChild(1).GetComponent<Image>().color = c;
         }
 
+        currentVideoKey = null;
+        if (videoPlayer != null) videoPlayer.Stop();
         video.SetActive(false);
         Screen.orientation = ScreenOrientation.Portrait;
         videoScreen.SetActive(true);
+    }
+
+    public void PlayTutorialVideo(string url)
+    {
+        if (videoPlayer == null || video == null) return;
+        videoPlayer.Stop();
+        // A game guide must not award the badge for the previous memory lesson.
+        HookVideoEnd(null);
+        Screen.orientation = ScreenOrientation.LandscapeLeft;
+        videoPlayer.source = VideoSource.Url;
+        videoPlayer.url = url;
+        video.SetActive(true);
+        videoPlayer.Play();
     }
 
     public void GoToVideo1()
