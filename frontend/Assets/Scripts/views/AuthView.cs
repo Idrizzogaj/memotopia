@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Assets.Script.Constants;
@@ -40,6 +40,7 @@ public class AuthView : MonoBehaviour
     ValidationUtilities _validationUtilities;
     UserAPIController _userAPIController;
     string aToken;
+    private bool _appleLoginPending;
 
     void Awake()
     {
@@ -91,8 +92,23 @@ public class AuthView : MonoBehaviour
     public void loginWithApple()
     {
     #if UNITY_IOS
-        var siwa = gameObject.GetComponent<SignInWithApple>();
-        siwa.Login(OnAppleLogin);
+        if (_appleLoginPending) return;
+        _appleLoginPending = true;
+        errorLogin.GetComponent<Text>().text = "Opening Sign in with Apple...";
+        errorLogin.SetActive(true);
+        Debug.Log("Apple sign-in: button pressed");
+        try
+        {
+            var siwa = gameObject.GetComponent<SignInWithApple>();
+            if (siwa == null) throw new InvalidOperationException("Apple sign-in component is missing.");
+            siwa.Login(OnAppleLogin);
+        }
+        catch (Exception exception)
+        {
+            _appleLoginPending = false;
+            ShowAppleLoginError("Apple sign-in could not start. Please try again.");
+            Debug.LogWarning("Apple sign-in start failed: " + exception.GetType().Name);
+        }
     #endif
     }
 
@@ -391,39 +407,41 @@ public class AuthView : MonoBehaviour
         Debug.Log("Facebook disabled");
     }
 
+    private void ShowAppleLoginError(string message)
+    {
+        if (_loadingScreen != null) _loadingScreen.EndLoading();
+        errorLogin.GetComponent<Text>().text = message;
+        errorLogin.SetActive(true);
+    }
+
     private void OnAppleLogin(SignInWithApple.CallbackArgs args)
     {
-        if (args.error != null)
+        _appleLoginPending = false;
+        if (!String.IsNullOrEmpty(args.error))
         {
-            Debug.Log("Errors occurred: " + args.error);
+            ShowAppleLoginError(args.error);
+            Debug.LogWarning("Apple sign-in: native authorization did not complete.");
             return;
         }
-
         UserInfo userInfo = args.userInfo;
-
+        if (String.IsNullOrEmpty(userInfo.userId) || String.IsNullOrEmpty(userInfo.idToken))
+        {
+            ShowAppleLoginError("Apple did not return valid sign-in details. Please try again.");
+            return;
+        }
+        errorLogin.GetComponent<Text>().text = "Signing in...";
+        errorLogin.SetActive(true);
         try
         {
             _authApiController.PerformSocialLogin(userInfo.userId, userInfo.idToken, "APPLE",
-                (OnSuccess) =>
-                {
-                    _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
-                },
-                (OnFailure) =>
-                {
-                    _loadingScreen.EndLoading();
-                    HandleConditionWithAlertMessages(null, false, true);
-                }
-            );
+                (OnSuccess) => { _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu); },
+                (OnFailure) => { ShowAppleLoginError("Unable to sign in to Memotopia. Please try again."); });
         }
-        catch (UserException e)
+        catch (Exception exception)
         {
-            Debug.Log(e.Message);
+            ShowAppleLoginError("Unable to sign in to Memotopia. Please try again.");
+            Debug.LogWarning("Apple sign-in completion failed: " + exception.GetType().Name);
         }
-
-        // Print out information about the user who logged in.
-        Debug.Log(
-            string.Format("Display Name: {0}\nEmail: {1}\nUser ID: {2}\nID Token: {3}", userInfo.displayName ?? "",
-                userInfo.email ?? "", userInfo.userId ?? "", userInfo.idToken ?? ""));
     }
 
     public void linkBtn()

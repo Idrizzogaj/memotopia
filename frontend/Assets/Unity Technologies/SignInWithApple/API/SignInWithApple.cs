@@ -86,8 +86,10 @@ namespace UnityEngine.SignInWithApple
                 args.error = info.error;
             }
 
-            s_LoginCompletedCallback(args);
+            // Release the request before invoking client code; exceptions must not block retries.
+            var callback = s_LoginCompletedCallback;
             s_LoginCompletedCallback = null;
+            s_EventQueue.Enqueue(() => { if (callback != null) callback(args); });
         }
 
         private delegate void GetCredentialStateCompleted(UserCredentialState state);
@@ -173,7 +175,8 @@ namespace UnityEngine.SignInWithApple
                 throw new InvalidOperationException("Login called while another login is in progress");
             s_LoginCompletedCallback = callback;
 
-            LoginInternal();
+            try { LoginInternal(); }
+            catch { s_LoginCompletedCallback = null; throw; }
         }
 
         private void LoginInternal()

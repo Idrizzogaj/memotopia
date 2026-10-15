@@ -23,6 +23,7 @@ typedef void (*CredentialStateCallback)(ASAuthorizationAppleIDProviderCredential
 @interface UnitySignInWithApple : NSObject<ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding>
 
 @property (nonatomic) SignInWithAppleCallback loginCallback;
+@property (nonatomic, strong) ASAuthorizationController* activeController;
 @property (nonatomic) CredentialStateCallback credentialStateCallback;
 
 @end
@@ -48,7 +49,8 @@ static UnitySignInWithApple* _unitySignInWithAppleInstance;
         request = [provider createRequest];
         [request setRequestedScopes: @[ASAuthorizationScopeEmail, ASAuthorizationScopeFullName]];
 
-        ASAuthorizationController* controller = [[ASAuthorizationController alloc] initWithAuthorizationRequests:@[request]];
+        self.activeController = [[ASAuthorizationController alloc] initWithAuthorizationRequests:@[request]];
+        ASAuthorizationController* controller = self.activeController;
         controller.delegate = self;
         controller.presentationContextProvider = self;
         [controller performRequests];
@@ -71,7 +73,15 @@ static UnitySignInWithApple* _unitySignInWithAppleInstance;
 -(ASPresentationAnchor)presentationAnchorForAuthorizationController:(ASAuthorizationController *)controller
 {
 #if TARGET_OS_TV || TARGET_OS_IOS
-    return _UnityAppController.window;
+    UIWindow* window = _UnityAppController.window;
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (scene.activationState == UISceneActivationStateForegroundActive && [scene isKindOfClass:[UIWindowScene class]]) {
+            for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+                if (candidate.isKeyWindow) return candidate;
+            }
+        }
+    }
+    return window;
 #else
     return [[NSApplication sharedApplication] mainWindow];
 #endif
@@ -81,7 +91,7 @@ static UnitySignInWithApple* _unitySignInWithAppleInstance;
 {
     if (self.loginCallback)
     {
-        struct UserInfo data;
+        struct UserInfo data = {0};
 
         if (@available(iOS 13.0, tvOS 13.0, macOS 10.15, *)) {
             ASAuthorizationAppleIDCredential* credential = (ASAuthorizationAppleIDCredential*)authorization.credential;
@@ -90,7 +100,7 @@ static UnitySignInWithApple* _unitySignInWithAppleInstance;
 
             data.idToken = [idToken UTF8String];
 
-            data.displayName = [[NSPersonNameComponentsFormatter localizedStringFromPersonNameComponents:name
+            data.displayName = name == nil ? "" : [[NSPersonNameComponentsFormatter localizedStringFromPersonNameComponents:name
                                                                                                    style:NSPersonNameComponentsFormatterStyleDefault
                                                                                                  options:0] UTF8String];
             // Email gets treated a little differently. Rather than an empty string it will return nil for no value.
@@ -99,6 +109,8 @@ static UnitySignInWithApple* _unitySignInWithAppleInstance;
             data.userDetectionStatus = credential.realUserStatus;
             data.error = "";
             self.loginCallback(1, data);
+            self.loginCallback = NULL;
+            self.activeController = nil;
         } else {
             // Fallback on earlier versions
         }
@@ -110,14 +122,17 @@ static UnitySignInWithApple* _unitySignInWithAppleInstance;
     if (self.loginCallback)
     {
         // All members need to be set to a non-null value.
-        struct UserInfo data;
+        struct UserInfo data = {0};
         data.idToken = "";
         data.displayName = "";
         data.email = "";
         data.userId = "";
         data.userDetectionStatus = 1;
-        data.error = [error.localizedDescription UTF8String];
+        NSString* message = [NSString stringWithFormat:@"%@ (Apple error %ld)", error.localizedDescription, (long)error.code];
+        data.error = [message UTF8String];
         self.loginCallback(0, data);
+        self.loginCallback = NULL;
+        self.activeController = nil;
     }
 }
 
@@ -128,7 +143,7 @@ void UnitySignInWithApple_Login(SignInWithAppleCallback callback)
     if (@available(iOS 13.0, tvOS 13.0, macOS 10.15, *)) {
         UnitySignInWithApple* login = [UnitySignInWithApple instance];
         login.loginCallback = callback;
-        [login startRequest];
+        dispatch_async(dispatch_get_main_queue(), ^{ [login startRequest]; });
     } else {
         // Fallback on earlier versions
     }
