@@ -14,7 +14,7 @@
     "start:tsnode:dev": "cross-env API_ENVIRONMENT=local ts-node-dev -r ./preload.cjs -r tsconfig-paths/register src/main.ts",
     "start:dev": "cross-env API_ENVIRONMENT=local tsc-watch -p tsconfig.build.json --onSuccess \"node -r ./tsconfig-paths-bootstrap.js dist/src/main.js\"",
     "start:debug": "cross-env API_ENVIRONMENT=local tsc-watch -p tsconfig.json --onSuccess \"node -r ./tsconfig-paths-bootstrap.js --inspect-brk dist/main.js\"",
-    "start:prod": "cross-env API_ENVIRONMENT=local NODE_ENV=dev node -r ./tsconfig-paths-bootstrap.js  dist/src/main.js",
+    "start:prod": "cross-env API_ENVIRONMENT=production NODE_ENV=production node -r ./tsconfig-paths-bootstrap.js dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "cross-env API_ENVIRONMENT=test NODE_ENV=test jest --runInBand --testTimeout 99999999",
     "test:watch": "jest --watch",

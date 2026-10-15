@@ -63,6 +63,14 @@ public class MemotopiaBuild
         project.AddFileToBuild(project.GetUnityFrameworkTargetGuid(), privacyGuid);
         project.WriteToFile(projectPath);
 
+        // The app only uses standard (exempt) encryption: HTTPS and receipt signature checks. This key answers the
+        // export compliance question for every upload, so App Store Connect does not ask each time.
+        string plistPath = Path.Combine(path, "Info.plist");
+        var plist = new PlistDocument();
+        plist.ReadFromFile(plistPath);
+        plist.root.SetBoolean("ITSAppUsesNonExemptEncryption", false);
+        plist.WriteToFile(plistPath);
+
         string symbolsPath = Path.Combine(path, "process_symbols.sh");
         // The Unity 2019 uploader crashes under Xcode 26. Xcode still produces dSYMs.
         File.WriteAllText(symbolsPath, "#!/bin/sh\necho 'Skipping legacy Unity symbol uploader; Xcode dSYMs retained.'\nexit 0\n");
