@@ -1,4 +1,4 @@
-> **Newest handoff: `docs/SESSION_HANDOFF_2026-10-10.md` (video/tips update); then read `docs/SESSION_HANDOFF_2026-10-09.md` for the full release context.**
+> **Newest handoff: `docs/SESSION_HANDOFF_2026-10-16.md` (current status and next steps, read it first); background in `docs/SESSION_HANDOFF_2026-10-09.md` and `docs/SESSION_HANDOFF_2026-10-10.md`.**
 
 # AI handoff: Memotopia
 

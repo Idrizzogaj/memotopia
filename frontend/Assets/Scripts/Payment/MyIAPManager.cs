@@ -224,6 +224,50 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
         // so the account status is kept; only a receipt that is present and expired or cancelled lowers it above.
     }
 
+    // ---- Family sharing and restored purchases: an active subscription on this device (bought here, shared through
+    // Apple Family Sharing / Google Play Family Library, or restored) unlocks Premium for the signed-in account.
+    private int entitlementCheckedForUser = -1;
+
+    private void Update()
+    {
+        if (!IsInitialized() || UserConstants.s_user == null) return;
+        if (entitlementCheckedForUser == UserConstants.s_user.ID) return;
+        entitlementCheckedForUser = UserConstants.s_user.ID;
+        SyncEntitlementFromReceipts();
+    }
+
+    /// <summary>Raises the account from free to Monthly or Yearly when the store shows an active subscription. Never lowers it.</summary>
+    private void SyncEntitlementFromReceipts()
+    {
+        try
+        {
+            var user = UserConstants.s_user;
+            if (user == null || user.paymentStatus != PaymentStatus.s_none) return;
+            string found = null;
+            foreach (UnityEngine.Purchasing.Product item in m_StoreController.products.all)
+            {
+                if (item.definition.type != ProductType.Subscription || !item.hasReceipt) continue;
+                try
+                {
+                    var info = new SubscriptionManager(item, null).getSubscriptionInfo();
+                    if (info.isSubscribed() != Result.True) continue;
+                }
+                catch (Exception) { continue; }
+                if (item.definition.id == yearlySubscription) found = PaymentStatus.s_yearly;
+                else if (found == null && item.definition.id == monthlySubscription) found = PaymentStatus.s_monthly;
+            }
+            if (found != null)
+            {
+                MyDebug("Active subscription found on this device; unlocking " + found);
+                UpdatePaymentStatus(found);
+            }
+        }
+        catch (Exception e)
+        {
+            MyDebug("Subscription check failed: " + e.GetType().Name);
+        }
+    }
+
     public void OnPurchaseDeferred(Product product)
     {
         MyDebug("Deferred product " + product.definition.id.ToString());
