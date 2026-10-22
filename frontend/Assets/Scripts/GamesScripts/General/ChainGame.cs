@@ -13,7 +13,9 @@ public sealed class ChainState
     public int Hearts {get;private set;}
     public readonly int MaxHearts;
     public bool Won { get {return Position==Sequence.Length;} }
-    public bool Finished { get {return Won || Hearts==0;} }
+    public bool TimedOut {get;private set;}
+    public bool Finished { get {return Won || Hearts==0 || TimedOut;} }
+    public void Expire(){if(!Finished)TimedOut=true;}
     public ChainState(int[] sequence,int hearts=5) {
         if(hearts<1 || hearts>5)throw new ArgumentOutOfRangeException("hearts");
         Hearts=MaxHearts=hearts;
@@ -96,6 +98,7 @@ public sealed class ChainGame : GamesScript
     private ChainState state;
     private int level,studyIndex,owner;
     private bool recall;
+    private float recallSeconds;
     private Button next;
     private Image studyCard;
     private readonly List<Button> tiles=new List<Button>();
@@ -136,6 +139,12 @@ public sealed class ChainGame : GamesScript
     private void Update() {
         if(overlay!=null && GameManager.AchievementUserId!=owner){Close();return;}
         if(overlay!=null && Input.GetKeyDown(KeyCode.Escape))Back();
+        TickTrainingClock(Time.deltaTime);
+    }
+    private void TickTrainingClock(float elapsed){
+        if(SprintRuntime.Active || !recall || state==null || state.Finished || originalGame==null || quitDialog!=null)return;
+        recallSeconds=Mathf.Max(0,recallSeconds-elapsed);originalGame.ShowRecallClock(Mathf.CeilToInt(recallSeconds));
+        if(recallSeconds<=0){state.Expire();EndRound();}
     }
     private void Back() {
         if(SprintRuntime.Active){SprintRuntime.Current.Quit();return;}
@@ -247,6 +256,7 @@ public sealed class ChainGame : GamesScript
     private void ShowRecall() {
         recall=true;ClearBody();ClearOriginalGame();safe.gameObject.SetActive(false);
         originalGame=new ChainOriginalPresentation(overlay,false,Back,NextCard,exactTheme);
+        if(!SprintRuntime.Active){recallSeconds=180;originalGame.ShowRecallClock(180);}
         int[] shuffled=(int[])state.Sequence.Clone();Shuffle(shuffled);
         foreach(int id in shuffled){int captured=id;
             var tile=UnityEngine.Object.Instantiate(originalGame.Cell,originalGame.Grid,false);tile.name="Recall "+id;

@@ -4,6 +4,7 @@ using UnityEngine.UI;
 
 // Uses exported original scene hierarchies. No replacement buttons, card frames or grids.
 public sealed class ChainOriginalPresentation {
+ private Text recallClock,timerCaption;
  public GameObject Root;public Image Study;public Button Next;public RectTransform Grid;public Button Cell;
  Transform Find(string name){return Root.GetComponentsInChildren<Transform>(true).First(t=>t.name==name);}
  void Active(string name,bool value){foreach(var t in Root.GetComponentsInChildren<Transform>(true).Where(t=>t.name==name))t.gameObject.SetActive(value);}
@@ -24,7 +25,11 @@ public sealed class ChainOriginalPresentation {
    // not that edge, while preserving the original frame and image dimensions.
    card.anchorMin=card.anchorMax=card.pivot=new Vector2(.5f,.5f);card.sizeDelta=originalCardSize;card.anchoredPosition=Vector2.zero;
    Active("BackgroundImage",false);
-   var background=Find(tablet?"Unused tablet study":"Exact study screen").GetComponent<Image>();if(background!=null)background.material=theme;
+   // The full-screen Chain overlay already supplies the purple background. The copied Pairs
+   // background has its own inset/texture and can expose turquoise bands on device aspect ratios.
+   // Hide only that Graphic; its original card and NEXT children keep their exact layout.
+   var background=Find(tablet?"Unused tablet study":"Exact study screen").GetComponent<Image>();if(background!=null)background.enabled=false;
+   var canvasBackground=Root.GetComponent<Image>();if(canvasBackground!=null)canvasBackground.enabled=false;
    Next=Root.GetComponentsInChildren<Button>(true).First(b=>b.name=="Exact Next" && b.gameObject.activeInHierarchy);Next.onClick.AddListener(next);
    foreach(var label in Next.GetComponentsInChildren<Text>(true))label.text="NEXT";
    foreach(var text in Root.GetComponentsInChildren<Text>(true))if(text.name=="Exact study timer")text.text="";
@@ -32,11 +37,15 @@ public sealed class ChainOriginalPresentation {
    Active("Unused active cells",false);Active("Unused inactive cells",false);Active("Exact recall grid",true);
    var header=(RectTransform)Find("Exact recall header");header.anchoredPosition=((RectTransform)Find("Exact recall header target")).anchoredPosition;
    Grid=(RectTransform)Find("Exact recall grid");Cell=Grid.GetChild(0).GetComponent<Button>();Cell.gameObject.SetActive(false);
-   Find("Exact recall timer").GetComponent<Text>().text="";
-   foreach(var text in header.GetComponentsInChildren<Text>(true))if(text.text=="Timer")text.gameObject.SetActive(false);
+   recallClock=Find("Exact recall timer").GetComponent<Text>();recallClock.text="";
+   foreach(var text in header.GetComponentsInChildren<Text>(true))if(text.text=="Timer"){timerCaption=text;text.gameObject.SetActive(false);}
   }
   foreach(var button in Root.GetComponentsInChildren<Button>(true).Where(b=>b.name=="Exact Quit"))foreach(var image in button.GetComponentsInChildren<Image>(true))image.material=theme;
   foreach(var image in Root.GetComponentsInChildren<Image>(true).Where(i=>i.name.StartsWith("Exact heart "))){image.color=Color.white;image.material=theme;}
+ }
+ public void ShowRecallClock(int seconds){
+  if(recallClock==null)return;recallClock.color=ChainGame.Purple;recallClock.text=Mathf.Max(0,seconds).ToString();
+  if(timerCaption!=null)timerCaption.gameObject.SetActive(true);
  }
  public void Hearts(int remaining){for(int i=0;i<5;i++){var t=Root.GetComponentsInChildren<Transform>(true).FirstOrDefault(x=>x.name=="Exact heart "+i);if(t!=null)t.gameObject.SetActive(i<remaining);}}
  public void FitOverflow(int count){

@@ -61,6 +61,20 @@ public static class ChainReuseValidation {
    Capture(root,cam,"chain-original-tablet-study",1200,1600);
    CheckStudyCentre(root,rect,"Exact tablet study image");
    next=root.GetComponentsInChildren<Button>(true).First(b=>b.name=="Exact Next" && b.gameObject.activeInHierarchy);for(int i=0;i<6;i++)next.onClick.Invoke();Capture(root,cam,"chain-original-tablet-recall",1200,1600);
+   var clock=root.GetComponentsInChildren<Text>(true).First(t=>t.name=="Exact recall timer" && t.gameObject.activeInHierarchy);
+   Check(clock.text=="180","Training Chain must start original recall clock at180");
+   var tick=typeof(ChainGame).GetMethod("TickTrainingClock",BindingFlags.NonPublic|BindingFlags.Instance);
+   tick.Invoke(game,new object[]{1.1f});Check(clock.text=="179","Chain clock must count down");
+   var timerState=State(game);int timerMask=ChainProgress.Mask;
+   quit=root.GetComponentsInChildren<Button>(true).First(b=>b.name=="Exact Quit" && b.gameObject.activeInHierarchy);quit.onClick.Invoke();
+   tick.Invoke(game,new object[]{200f});Check(clock.text=="179" && !timerState.Finished,"Quit dialog must pause training clock");
+   dialog=root.GetComponentsInChildren<Transform>(true).First(t=>t.name=="MidGameQuitPanel(Clone)");dialog.GetChild(0).GetChild(2).GetComponent<Button>().onClick.Invoke();
+   tick.Invoke(game,new object[]{200f});Check(timerState.TimedOut && timerState.Finished && !timerState.Won && ChainProgress.Mask==timerMask,"Timeout must lose without clearing level");
+   game.Choose(timerState.Sequence[0]);Check(timerState.Position==0,"No answers after timeout");
+   lose=root.GetComponentsInChildren<Transform>(true).First(t=>t.name=="LosePanel(Clone)");lose.GetChild(0).GetChild(2).GetComponent<Button>().onClick.Invoke();
+   next=root.GetComponentsInChildren<Button>(true).First(b=>b.name=="Exact Next" && b.gameObject.activeInHierarchy);for(int i=0;i<6;i++)next.onClick.Invoke();
+   Check(root.GetComponentsInChildren<Text>(true).Any(t=>t.name=="Exact recall timer" && t.gameObject.activeInHierarchy && t.text=="180"),"Replay must reset timer");
+   Debug.Log("CHAIN_TRAINING_CLOCK_PASSED: original Flash180second recall timer, decrement, quit pause, timeout loss, replay reset");
    Debug.Log("CHAIN_ORIGINAL_REUSE_PASSED: originalNext/Flashgrid/sprites, no extra text, quitNo preserves state, quitYes leaves.");
   }finally{CardFaces.EndSession();UnityEngine.Object.DestroyImmediate(root);UnityEngine.Object.DestroyImmediate(camera);UserConstants.s_user=old;}
  }
