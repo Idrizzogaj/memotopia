@@ -162,7 +162,7 @@ export class AuthService {
         };
 
         const JWT_SECRET = this.configService.get<string>('app.jwt.secret');
-        const JWT_EXPIRES_IN = this.configService.get<string>('app.jwt.expiresIn');
+        const JWT_EXPIRES_IN = '365d';
         const accessToken: string = sign(payload, JWT_SECRET, {
             expiresIn: JWT_EXPIRES_IN,
         });

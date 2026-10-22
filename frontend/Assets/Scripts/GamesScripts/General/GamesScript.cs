@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using System.Linq;
 
 public class GamesScript : MonoBehaviour
 {
@@ -30,6 +31,7 @@ public class GamesScript : MonoBehaviour
 
     public IEnumerator ShowRSG(GameObject rsg)
     {
+        if(SprintRuntime.Active){rsg.SetActive(false);yield return SprintRuntime.ReadyIntro();yield break;}
         rsg.SetActive(true);
         var animator = rsg.GetComponentInChildren<Animator>();
         float originalSpeed = animator == null ? 1f : animator.speed;
@@ -55,10 +57,11 @@ public class GamesScript : MonoBehaviour
 
     public void Shuffle(int[] array)
     {
+        if(SprintRuntime.Active){SprintRuntime.Current.Random.Shuffle(array);return;}
         int p = array.Length;
         for (int n = p - 1; n > 0; n--)
         {
-            int r = _random.Next(0, n);
+            int r = _random.Next(0, n + 1);
             int q = array[r];
             array[r] = array[n];
             array[n] = q;
@@ -67,10 +70,11 @@ public class GamesScript : MonoBehaviour
 
     public void Shuffle(string[] array)
     {
+        if(SprintRuntime.Active){var indices=System.Linq.Enumerable.Range(0,array.Length).ToArray();SprintRuntime.Current.Random.Shuffle(indices);var copy=(string[])array.Clone();for(int i=0;i<array.Length;i++)array[i]=copy[indices[i]];return;}
         int p = array.Length;
         for (int n = p - 1; n > 0; n--)
         {
-            int r = _random.Next(0, n);
+            int r = _random.Next(0, n + 1);
             string q = array[r];
             array[r] = array[n];
             array[n] = q;
@@ -79,6 +83,7 @@ public class GamesScript : MonoBehaviour
 
     public int setStars(int score)
     {
+        if(TrainingAthleteTile.IsRound)return 0;
         // the time allowed for 3 and 2 stars grows with the level (see StarRules)
         return StarRules.Stars(score, LevelScript._selectedLevel);
     }
@@ -87,6 +92,7 @@ public class GamesScript : MonoBehaviour
 
     public void MidGameQuit(GameObject midGameQuitPanel)
     {
+        if(SprintRuntime.Active){SprintRuntime.Current.Quit();return;}
         GameObject QuitPanel = Instantiate(midGameQuitPanel) as GameObject;
 
         QuitPanel.transform.GetChild(0).transform.GetChild(2).GetComponent<Button>().onClick.AddListener(() => {
@@ -143,33 +149,47 @@ public class GamesScript : MonoBehaviour
 
         WinPanelCopy.transform.GetChild(0).transform.GetChild(0).transform.GetChild(0).GetComponent<Text>().text = MemoryAthlete.IsRound ? "MEMORY ATHLETE" : "LEVEL " + LevelScript._selectedLevel;
         WinPanelCopy.transform.GetChild(0).transform.GetChild(10).transform.GetChild(0).GetComponent<Text>().text = score;
+        if(TrainingAthleteTile.IsRound) {
+            foreach(var animation in WinPanelCopy.GetComponentsInChildren<StarFillScript>(true))animation.enabled=false;
+            foreach(var image in WinPanelCopy.GetComponentsInChildren<Image>(true))if(image.name.IndexOf("Star",System.StringComparison.OrdinalIgnoreCase)>=0)image.gameObject.SetActive(false);
+            var reward=WinPanelCopy.transform.GetChild(0).transform.GetChild(10).GetChild(0).GetComponent<Text>();
+            reward.text=TrainingAthleteTile.RewardText(game);reward.fontSize=28;reward.resizeTextForBestFit=true;reward.resizeTextMinSize=14;reward.resizeTextMaxSize=28;
+        }
 
-        var container = WinPanelCopy.transform.GetChild(0);
+        int completedLevel = LevelScript._selectedLevel;
+        ConfigureWinButtons(WinPanelCopy, completedLevel,
+            () => LoadingManager.Navigate(gameScene),
+            () => { LevelScript._selectedLevel = completedLevel + 1; LoadingManager.Navigate(gameScene); },
+            () => LoadingManager.Navigate(SceneName.s_levelsScene));
+
+        WinPanelCopy.transform.SetParent(GameObject.Find("Canvas").transform, false);
+        WinPanelCopy.transform.SetAsLastSibling();
+    }
+
+    // Shared by all training results, including Chain: preserve the original buttons and layout.
+    public static void ConfigureWinButtons(GameObject panel, int completedLevel,
+        UnityEngine.Events.UnityAction replayAction, UnityEngine.Events.UnityAction nextAction,
+        UnityEngine.Events.UnityAction levelsAction)
+    {
+        var container = panel.transform.GetChild(0);
         var replay = container.GetChild(11).GetComponent<Button>();
         var next = container.GetChild(12).GetComponent<Button>();
-        int completedLevel = LevelScript._selectedLevel;
         var replayRect = replay.GetComponent<RectTransform>();
         var nextRect = next.GetComponent<RectTransform>();
         replayRect.anchoredPosition = new Vector2(replayRect.anchoredPosition.x, -215);
         nextRect.anchoredPosition = new Vector2(nextRect.anchoredPosition.x, -215);
-        replay.onClick.AddListener(() => LoadingManager.Navigate(gameScene));
+        replay.onClick = new Button.ButtonClickedEvent();
+        replay.onClick.AddListener(replayAction);
+        next.onClick = new Button.ButtonClickedEvent();
         next.GetComponentInChildren<Text>().text = completedLevel < 20 ? "NEXT LEVEL" : "LEVELS";
-        next.onClick.AddListener(() =>
-        {
-            if (completedLevel < 20)
-            {
-                LevelScript._selectedLevel = completedLevel + 1;
-                LoadingManager.Navigate(gameScene);
-            }
-            else LoadingManager.Navigate(SceneName.s_levelsScene);
-        });
+        next.onClick.AddListener(completedLevel < 20 ? nextAction : levelsAction);
         if (completedLevel < 20)
         {
             var levels = Instantiate(next.gameObject, container);
             levels.name = "LevelsButton";
             var button = levels.GetComponent<Button>();
             button.onClick = new Button.ButtonClickedEvent();
-            button.onClick.AddListener(() => LoadingManager.Navigate(SceneName.s_levelsScene));
+            button.onClick.AddListener(levelsAction);
             levels.GetComponentInChildren<Text>().text = "LEVELS";
             levels.GetComponentInChildren<Text>().color = new Color(0, .65f, .78f);
             levels.GetComponent<Image>().color = new Color(1, 1, 1, 0);
@@ -178,8 +198,6 @@ public class GamesScript : MonoBehaviour
             rect.sizeDelta = new Vector2(300, 80);
         }
 
-        WinPanelCopy.transform.SetParent(GameObject.Find("Canvas").transform, false);
-        WinPanelCopy.transform.SetAsLastSibling();
     }
 
     public void ActivateChallengePanel(GameObject panel)
@@ -294,7 +312,7 @@ public class GamesScript : MonoBehaviour
     {
         int score;
         if (!int.TryParse(timeText, out score)) return;
-        if (MemoryAthlete.IsRound) return; // the open Memory Athlete level is outside the 20-level progress
+        if (MemoryAthlete.IsRound) {if(TrainingAthleteTile.IsRound)TrainingAthleteTile.Complete(game);return;} // Separate completion; never send21 as an ordinary level.
         int stars = setStars(score);
         int level = LevelScript._selectedLevel;
         // The FIRST time level 20 of a game is cleared, every lower level counts as cleared with the same number of
@@ -323,6 +341,7 @@ public class GamesScript : MonoBehaviour
 
     public void IncreaseTime(float timeToIncrease)
     {
+        if(SprintRuntime.Active)return;
         userStatisticsAPIController.IncreaseTimePlayed(timeToIncrease,
             (OnSuccess) =>
             {

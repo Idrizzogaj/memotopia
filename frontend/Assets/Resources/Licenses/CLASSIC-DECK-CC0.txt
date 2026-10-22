@@ -1,0 +1,8 @@
+Classic English playing card faces — CC0 1.0
+Source: https://commons.wikimedia.org/wiki/File:English_pattern_playing_cards_deck_PLUS_CC0.svg
+Original: https://upload.wikimedia.org/wikipedia/commons/b/b0/English_pattern_playing_cards_deck_PLUS_CC0.svg
+Authors: Linux_dr (Loren Osborn), Dmitry Fomin, Guy vandegrift.
+CC0: https://creativecommons.org/publicdomain/zero/1.0/
+Downloaded 20 October 2026. Only the 52 face cards used; no jokers, backs or commercial artwork.
+Memotopia derivatives: single-border full faces and transparent rank/suit crops for Flash and Boxes.
+Source SVG and extraction script retained with the feature handoff. No Offason branding or imagery used.

@@ -15,6 +15,7 @@ public static class MajorSystemImages
     {
         if (sprite != null) visibleSizes[sprite] = size;
     }
+    public static void ForgetVisibleSize(Sprite sprite) { if (sprite != null) visibleSizes.Remove(sprite); }
 
     public static Vector2 VisibleSize(Sprite sprite)
     {

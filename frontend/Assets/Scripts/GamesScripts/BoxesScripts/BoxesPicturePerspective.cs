@@ -31,11 +31,13 @@ public class BoxesPicturePerspective : BaseMeshEffect
             float x = (vertex.position.x - source.center.x) / source.width;
             float y = (vertex.position.y - source.center.y) / source.height;
             // The platform supplies perspective. Never shear the actual motif.
-            float size = Mathf.Min(width * 0.46f, height * 0.82f);
+            Sprite motif=((Image)graphic).sprite;
+            float motifAspect=motif==null ? 1f : motif.rect.width / Mathf.Max(1f,motif.rect.height);
+            float size = motifAspect>2f ? Mathf.Min(width*.72f,height*1.3f) : Mathf.Min(width * 0.46f, height * 0.82f);
             float visibleHeight = MajorSystemImages.VisibleSize(((Image)graphic).sprite).y;
-            float baseline = -height * 0.18f + visibleHeight * size * 0.5f;
+            float baseline = -height * 0.18f + visibleHeight * size / motifAspect * 0.5f;
             Vector3 point = new Vector3(face.center.x + x * size,
-                face.center.y + baseline + y * size, 0);
+                face.center.y + baseline + y * size / motifAspect, 0);
             vertex.position = pictureRect.InverseTransformPoint(cell.rectTransform.TransformPoint(point));
             mesh.SetUIVertex(vertex, i);
         }
@@ -52,7 +54,8 @@ public class BoxesPicturePerspective : BaseMeshEffect
     public static void Attach(Image picture)
     {
         // Board geometry is set by the projection; avoid letterboxing the source quad.
-        picture.preserveAspect = false;
+        var cell=picture.transform.parent==null ? null : picture.transform.parent.GetComponent<Image>();
+        picture.preserveAspect = cell==null || cell.sprite==null || !cell.sprite.name.StartsWith("boxes-ring");
         if (picture.GetComponent<BoxesPicturePerspective>() == null)
             picture.gameObject.AddComponent<BoxesPicturePerspective>();
         picture.GetComponent<BoxesPicturePerspective>().EnsurePlatform();

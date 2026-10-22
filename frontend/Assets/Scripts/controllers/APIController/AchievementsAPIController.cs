@@ -13,6 +13,14 @@ namespace Assets.Script.Controllers
     public class AchievementsAPIController : MonoBehaviour
     {
         private readonly HashSet<string> sending = new HashSet<string>();
+        [Serializable] private class ProfileCount { public int count; }
+        public void GetProfileCount(int userId, Action<int> success, Action<AlertMessageContainer> failure)
+        {
+            StartCoroutine(Request(null, text => {
+                try { var value=JsonUtility.FromJson<ProfileCount>(text);if(value==null || !text.Contains("\"count\""))throw new ArgumentException();success(value.count); }
+                catch(Exception) { failure(new AlertMessageContainer { ErrorMessage="Could not read achievement count." }); }
+            }, failure, "/users/"+userId+"/count"));
+        }
 
         public void GetAchievements(Action<Achievements> onSuccess, Action<AlertMessageContainer> onFailure)
         {
@@ -38,9 +46,9 @@ namespace Assets.Script.Controllers
             StartCoroutine(Request(JsonUtility.ToJson(new Achievements { achievements = achievements }), onSuccess, onFailure));
         }
 
-        private IEnumerator Request(string body, Action<string> onSuccess, Action<AlertMessageContainer> onFailure)
+        private IEnumerator Request(string body, Action<string> onSuccess, Action<AlertMessageContainer> onFailure, string suffix="")
         {
-            using (var request = new UnityWebRequest(new APIConstants().Achievements, body == null ? "GET" : "POST"))
+            using (var request = new UnityWebRequest(new APIConstants().Achievements.TrimEnd('/')+suffix, body == null ? "GET" : "POST"))
             {
                 request.downloadHandler = new DownloadHandlerBuffer();
                 if (body != null) request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
@@ -63,7 +71,10 @@ namespace Assets.Script.Controllers
                 AddAchievements(new[] { key }, result =>
                 {
                     sending.Remove(requestKey);
-                    if (GameManager.AchievementUserId == owner) GameManager.ConfirmAchievement(key);
+                    if (GameManager.AchievementUserId == owner) {
+                        GameManager.ConfirmAchievement(key);
+                        if(key.StartsWith("athlete-one-heart-"))ProgressSync.Instance.GetApi<UserStatisticsAPIController>().GetUserStatisticsChallengeGames(stats=>{if(GameManager.AchievementUserId==owner && UserConstants.s_user!=null)UserConstants.s_user.userStatistics=stats;},error=>Debug.LogWarning(error.ErrorMessage));
+                    }
                 }, error =>
                 {
                     sending.Remove(requestKey);

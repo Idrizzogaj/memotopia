@@ -6,6 +6,8 @@ using UnityEngine.UI;
 
 public class StarFillScript : MonoBehaviour
 {
+    // Untimed games supply earned stars while reusing this same reveal animation.
+    public int EarnedStarsOverride { get; set; } = -1;
     public Text Score;
 
     public Transform leftStar;
@@ -37,6 +39,7 @@ public class StarFillScript : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        if (EarnedStarsOverride >= 0) return;
         ScoreInt = Int16.Parse(Score.text);
         // the same level-based limits as GamesScript.setStars
         threeStar = StarRules.ThreeStarSecondsLeft(LevelScript._selectedLevel);
@@ -56,7 +59,7 @@ public class StarFillScript : MonoBehaviour
 
         leftStar.GetComponent<Image>().fillAmount = lCurrentAmount / 100;
 
-        if(ScoreInt >= twoStar)
+        if(EarnedStarsOverride >= 0 ? EarnedStarsOverride >= 2 : ScoreInt >= twoStar)
         {
             if (mtime >= 0)
             {
@@ -78,7 +81,7 @@ public class StarFillScript : MonoBehaviour
         }
         
 
-        if(ScoreInt >= threeStar)
+        if(EarnedStarsOverride >= 0 ? EarnedStarsOverride >= 3 : ScoreInt >= threeStar)
         {
             if (rtime >= 0)
             {

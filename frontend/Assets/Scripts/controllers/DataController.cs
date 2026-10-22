@@ -38,6 +38,7 @@ namespace Assets.Script.Controllers
         private void SaveString(string _data, string _value)
         {
             PlayerPrefs.SetString(_data, _value);
+            PlayerPrefs.Save();
         }
 
         private string GetString(string _data)

@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Purchasing;
 using UnityEngine.Purchasing.Security;
 using Assets.Script.Constants;
 using Assets.Script.Controllers;
-using UnityEngine.SceneManagement;
+
 
 public class MyIAPManager : MonoBehaviour, IStoreListener
 {
@@ -58,6 +58,9 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
             return;
 
         var builder = ConfigurationBuilder.Instance(StandardPurchasingModule.Instance());
+#if UNITY_ANDROID && UNITY_2020_1_OR_NEWER
+        builder.Configure<IGooglePlayConfiguration>().SetDeferredPurchaseListener(OnPurchaseDeferred);
+#endif
 
         builder.AddProduct(monthlySubscription, ProductType.Subscription);
         builder.AddProduct(yearlySubscription, ProductType.Subscription);
@@ -123,8 +126,7 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
             }
             catch (Exception)
             {
-                var manager = FindObjectOfType<LoadingManager>();
-                if (manager != null) manager.EndLoading();
+                EndPurchaseLoading();
                 Debug.LogWarning("Subscription change could not start. Please try again.");
             }
         }
@@ -147,31 +149,37 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
             }
             else
             {
-                MyDebug("BuyProductID: FAIL. Not purchasing product, either is not found or is not available for purchase");
+                EndPurchaseLoading();
+                MyDebug("Product is not available for purchase.");
             }
         }
         else
         {
-            MyDebug("BuyProductID FAIL. Not initialized.");
+            EndPurchaseLoading();
+            MyDebug("Store is not ready. Please try again.");
         }
     }
 
     public void RestorePurchases()
     {
-        m_StoreExtensionProvider.GetExtension<IAppleExtensions>().RestoreTransactions(result =>
+        if (!IsInitialized()) { EndPurchaseLoading(); return; }
+        Action<bool> restored = ok =>
         {
-            if (result)
-            {
-                MyDebug("Restore purchases succeeded.");
-            }
-            else
-                MyDebug("Restore purchases failed.");
-        });
-
-        if (!IsInitialized())
-        {
-            Debug.Log("RestorePurchases FAIL. Not initialized.");
-            return;
+            RefreshPurchaseViews();
+            if (!ok) Debug.LogWarning("Purchases could not be restored. Please try again.");
+        };
+        if (Application.platform == RuntimePlatform.Android) {
+#if UNITY_2020_1_OR_NEWER
+            m_GoogleExtensions.RestoreTransactions((ok, message) => restored(ok));
+#else
+            m_GoogleExtensions.RestoreTransactions(restored);
+#endif
+        } else if (Application.platform == RuntimePlatform.IPhonePlayer) {
+#if UNITY_2020_1_OR_NEWER
+            m_AppleExtensions.RestoreTransactions((ok, message) => restored(ok));
+#else
+            m_AppleExtensions.RestoreTransactions(restored);
+#endif
         }
     }
 
@@ -190,38 +198,15 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
 
         m_StoreController = controller;
         m_StoreExtensionProvider = extensions;
-        m_AppleExtensions = extensions.GetExtension<IAppleExtensions>();
+        if (Application.platform == RuntimePlatform.IPhonePlayer)
+            m_AppleExtensions = extensions.GetExtension<IAppleExtensions>();
         m_GoogleExtensions = extensions.GetExtension<IGooglePlayStoreExtensions>();
 
-        m_GoogleExtensions?.SetDeferredPurchaseListener(OnPurchaseDeferred);
 
-        Dictionary<string, string> dict = m_AppleExtensions.GetIntroductoryPriceDictionary();
-        
-        int i = 0;
-        foreach (UnityEngine.Purchasing.Product item in controller.products.all)
-        {
-            if (item.receipt != null)
-            {
-                string intro_json = (dict == null || !dict.ContainsKey(item.definition.storeSpecificId)) ? null : dict[item.definition.storeSpecificId];
-                if (item.definition.type == ProductType.Subscription)
-                {
-                    i++;
-                    SubscriptionManager p = new SubscriptionManager(item, intro_json);
-                    SubscriptionInfo info = p.getSubscriptionInfo();
-                    MyDebug("SubInfo: " + info.getProductId().ToString());
-                    MyDebug("isSubscribed: " + info.isSubscribed().ToString());
-                    MyDebug("isFreeTrial: " + info.isFreeTrial().ToString());
-                    MyDebug("expireDate: " + info.getExpireDate().ToString());
-                    MyDebug("purchaseDate: " + info.getPurchaseDate().ToString());
 
-                    if ((info.isExpired().Equals(true) || info.isCancelled().Equals(true)) && UserConstants.s_user.paymentStatus != PaymentStatus.s_lifetime)
-                        PaymentStatusToNone();
-                }
-            }
-        }
-
-        // A missing device receipt is not proof that the subscription ended (new device, receipt not loaded yet),
-        // so the account status is kept; only a receipt that is present and expired or cancelled lowers it above.
+        // A missing device receipt is not proof that an account entitlement expired.
+        // Keep the server status; do not revoke premium or reload a scene here.
+        RefreshPurchaseViews();
     }
 
     // ---- Family sharing and restored purchases: an active subscription on this device (bought here, shared through
@@ -270,13 +255,19 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
 
     public void OnPurchaseDeferred(Product product)
     {
-        MyDebug("Deferred product " + product.definition.id.ToString());
+        EndPurchaseLoading();
+        MyDebug("Purchase is pending store approval.");
     }
 
     public void OnInitializeFailed(InitializationFailureReason error)
     {
         // Purchasing set-up has not succeeded. Check error for reason. Consider sharing this reason with the user.
         MyDebug("OnInitializeFailed InitializationFailureReason:" + error);
+    }
+
+    public void OnInitializeFailed(InitializationFailureReason error, string message)
+    {
+        MyDebug("OnInitializeFailed: " + error + "; " + message);
     }
 
     public PurchaseProcessingResult ProcessPurchase(PurchaseEventArgs args)
@@ -293,15 +284,13 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
                 if (String.Equals(args.purchasedProduct.definition.id, monthlySubscription, StringComparison.Ordinal))
                 {
                     UpdatePaymentStatus(PaymentStatus.s_monthly);
-                    loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
-                    loadingScreen.EndLoading();
+                    EndPurchaseLoading();
                     return PurchaseProcessingResult.Complete;
                 }
                 else if (String.Equals(args.purchasedProduct.definition.id, yearlySubscription, StringComparison.Ordinal))
                 {
                     UpdatePaymentStatus(PaymentStatus.s_yearly);
-                    loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
-                    loadingScreen.EndLoading();
+                    EndPurchaseLoading();
                     return PurchaseProcessingResult.Complete;
                 }
                 else
@@ -327,44 +316,21 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
         if (boughtMonthly || boughtYearly)
         {
             MyDebug("Receipt check inconclusive; unlocking from the store confirmation for " + boughtId);
-            StopSpinner();
             UpdatePaymentStatus(boughtMonthly ? PaymentStatus.s_monthly : PaymentStatus.s_yearly);
+            EndPurchaseLoading();
             return PurchaseProcessingResult.Complete;
         }
 
-        StopSpinner();
+        EndPurchaseLoading();
 
         return PurchaseProcessingResult.Complete;
     }
 
-    /// <summary>Stops the spinner and updates every screen that shows the subscription status.</summary>
-    private void RefreshPurchaseViews()
-    {
-        StopSpinner();
-        foreach (var view in Resources.FindObjectsOfTypeAll<PurchaseButton>())
-            if (view.gameObject.scene.IsValid()) view.CheckView();
-        foreach (var menu in FindObjectsOfType<MenuNavigation>()) menu.PaymentRestrictions();
-        foreach (var menu in FindObjectsOfType<SideMenuAvailability>()) menu.Refresh();
-    }
-
-    /// <summary>Stops the loading spinner; never throws, so a missing canvas cannot leave a purchase half done.</summary>
-    private void StopSpinner()
-    {
-        try
-        {
-            var manager = FindObjectOfType<LoadingManager>();
-            if (manager != null) manager.EndLoading();
-        }
-        catch (Exception) { }
-    }
-
     public void OnPurchaseFailed(UnityEngine.Purchasing.Product product, PurchaseFailureReason failureReason)
     {
-        MyDebug(string.Format("OnPurchaseFailed: FAIL. Product: '{0}', PurchaseFailureReason: {1}", product.definition.storeSpecificId, failureReason));
+        MyDebug("Purchase ended without completion: " + failureReason);
 
-        // A cancelled or failed purchase must not log the user out; just stop the spinner.
-        var manager = FindObjectOfType<LoadingManager>();
-        if (manager != null) manager.EndLoading();
+        RefreshPurchaseViews();
     }
 
     private void MyDebug(string debug)
@@ -382,7 +348,7 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
                 paymentStatus,
                 (OnSuccess) =>
                 {
-                    // UserAPIController has applied the new account status: refresh the screens, no logout and no reload.
+                    // UserAPIController has applied the account status.
                     RefreshPurchaseViews();
                 },
                 (OnFailure) =>
@@ -398,35 +364,17 @@ public class MyIAPManager : MonoBehaviour, IStoreListener
         }
     }
 
-    private void PaymentStatusToNone()
+    private void EndPurchaseLoading()
     {
-        try
-        {
-            if (userAPIController == null)
-                userAPIController = GetComponent<UserAPIController>();
+        var manager = FindObjectOfType<LoadingManager>();
+        if (manager != null) manager.EndLoading();
+    }
 
-            userAPIController.UpdatePaymentStatus(
-                PaymentStatus.s_none,
-                (OnSuccess) =>
-                {
-                    loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
-                    loadingScreen.EndLoadingWithDelay();
-                    SceneManager.LoadScene(SceneName.s_gameMenu);
-                    
-                },
-                (OnFailure) =>
-                {
-                    loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
-                    loadingScreen.EndLoadingWithDelay();
-                }
-            );
-        }
-        catch (UserException e)
-        {
-            Debug.Log(e.Message);
-        }
+    private void RefreshPurchaseViews()
+    {
+        EndPurchaseLoading();
+        foreach (var view in Resources.FindObjectsOfTypeAll<PurchaseButton>()) if(view.gameObject.scene.IsValid()) view.CheckView();
+        foreach (var menu in FindObjectsOfType<MenuNavigation>()) menu.PaymentRestrictions();
+        foreach (var menu in FindObjectsOfType<SideMenuAvailability>()) menu.Refresh();
     }
 }
-
-//https://forum.unity.com/threads/google-play-subscription-upgrade-downgrade.528434/
-//https://forum.unity.com/threads/ios-subscription-upgrade-downgrade.804687/#post-7809135

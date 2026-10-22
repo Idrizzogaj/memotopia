@@ -27,7 +27,16 @@ public class PurchaseButton : MonoBehaviour
 
     private void Start()
     {
+        EnableWholeCard(monthlySubscribe);
+        EnableWholeCard(yearlySubscribe);
         CheckView();
+    }
+
+    private static void EnableWholeCard(GameObject card)
+    {
+        if (card == null) return;
+        var toggle = card.GetComponentInChildren<Toggle>(true);
+        if (toggle != null) TouchTarget.Ensure(toggle, (RectTransform)card.transform);
     }
 
     public void CheckView()

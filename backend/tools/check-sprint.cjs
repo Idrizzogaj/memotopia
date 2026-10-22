@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),ts=require('typescript'),assert=require('assert');
+const box={exports:{}};vm.createContext(box);vm.runInContext(ts.transpileModule(fs.readFileSync('src/modules/challenge/sprint-rules.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,box);
+const r=box.exports;assert.equal(r.stageSize('Pairs',3),8);assert.equal(r.stageSize('Chain',20),20);
+const make=(times,errors=0)=>({completed:times.length,correct:0,turns:100,errors,roundMs:times,trace:[]});
+assert(r.compareSprint('Boxes',make([100,300]),make([200,200]))<0);
+assert(r.compareSprint('Flash',make([100,200]),make([200,200]))>0);
+assert(r.compareSprint('Chain',make([100],1),make([200],0))<0);
+const valid={completed:1,correct:1,turns:8,errors:0,roundMs:[3000],trace:[{ms:1000,units:1},{ms:2000,units:2},{ms:3000,units:3},{ms:4000,units:4}]};r.validateResult('Pairs',valid);
+assert.throws(()=>r.validateResult('Pairs',{...valid,trace:[...valid.trace.slice(0,3),{ms:90000,units:4}]}));
+assert.throws(()=>r.validateResult('Pairs',{...valid,roundMs:[2999]}));
+assert.throws(()=>r.validateResult('Pairs',{...valid,turns:1}));
+assert.equal(r.compareSprint('Pairs',valid,{...valid,turns:9}),1);
+console.log('SPRINT_SERVER_RULES_PASSED');

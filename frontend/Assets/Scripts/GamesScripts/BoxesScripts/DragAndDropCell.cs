@@ -9,6 +9,8 @@ using System.Collections;
 [RequireComponent(typeof(Image))]
 public class DragAndDropCell : MonoBehaviour, IDropHandler
 {
+    public static bool Matches(string cellName,string itemName) { return cellName == itemName + " Number"; }
+
     [HideInInspector]
     public BoxesManager boxesManager;
     [HideInInspector]
@@ -154,6 +156,7 @@ public class DragAndDropCell : MonoBehaviour, IDropHandler
     /// <param name="data"></param>
     public void OnDrop(PointerEventData data)
     {
+        if(SprintRuntime.Active && !SprintRuntime.Current.Ready)return;
         this.gameObject.GetComponent<Image>().sprite = Resources.Load<Sprite>("GamesResources\\Boxes\\boxes-ring") as Sprite;
 
         if (DragAndDropItem.icon != null)
@@ -164,21 +167,25 @@ public class DragAndDropCell : MonoBehaviour, IDropHandler
             // The tray cannot be re-ordered: a picture dropped on another tray picture jumps back to its own place.
             if (sourceCell != null && this.name.Contains("Prefabe") && sourceCell.name.Contains("Prefabe")) return;
 
-            if (!this.name.Contains(item.name) && !this.name.Contains("Prefabe"))
+            if (!Matches(this.name,item.name) && !this.name.Contains("Prefabe"))
             {
                 Handheld.Vibrate();
 
+                if(SprintRuntime.Active)SprintRuntime.Current.Error();
+                else {
                 boxesManager.countForLose++;
                 boxesManager.hearts[boxesManager.maxMistakes - boxesManager.countForLose].gameObject.SetActive(false);
 
                 if(boxesManager.countForLose >= boxesManager.maxMistakes) {
                     boxesManager.Finished();
                 }
+                }
             }
 
-            if (this.name.Contains(item.name) && !this.name.Contains("Prefabe"))
+            if (Matches(this.name,item.name) && !this.name.Contains("Prefabe"))
             {
                 boxesManager.countForWin++;
+                if(SprintRuntime.Active)SprintRuntime.Current.Solve(item.name);
 
                 if(boxesManager.countForWin >= boxesManager.spawnNumber) {
                     boxesManager.YouWon();
@@ -529,20 +536,21 @@ public class DragAndDropCell : MonoBehaviour, IDropHandler
             }
 
             // Disable drag and drop when matches
-            if(secondCell.name.Contains(firstItem.GetName())) {
+            if(Matches(secondCell.name,firstItem.GetName())) {
                 secondCell.GetComponent<DragAndDropCell>().enabled = false;
                 firstItem.GetComponent<DragAndDropItem>().enabled = false;
                 highlight = false;
             }
 
-            if(firstCell.name.Contains(secondItem.GetName())) {
+            if(Matches(firstCell.name,secondItem.GetName())) {
                 firstCell.GetComponent<DragAndDropCell>().enabled = false;
                 secondItem.GetComponent<DragAndDropItem>().enabled = false;
                 firstCell.highlight = false;
 
-                if (firstCell.name.Contains(secondItem.name) && !firstCell.name.Contains("Prefabe"))
+                if (Matches(firstCell.name,secondItem.name) && !firstCell.name.Contains("Prefabe"))
                 {
                     boxesManager.countForWin++;
+                    if(SprintRuntime.Active)SprintRuntime.Current.Solve(secondItem.name);
 
                     if(boxesManager.countForWin >= boxesManager.spawnNumber) {
                         boxesManager.YouWon();

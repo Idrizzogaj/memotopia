@@ -41,7 +41,7 @@ public class SideMenuAvailability : MonoBehaviour
             UserConstants.s_user != null && UserConstants.s_user.paymentStatus == PaymentStatus.s_monthly;
         foreach (var button in GetComponentsInChildren<Button>(true))
         {
-            bool active = false;
+            bool active = MemorySettingsPanel.IsEntry(button);
             for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
                 active |= IsAvailable(button.onClick.GetPersistentMethodName(i), MyIAPManager.CanBuySubscriptions, unsupportedUpgrade);
             button.interactable = active;

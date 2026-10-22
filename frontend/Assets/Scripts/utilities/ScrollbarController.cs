@@ -15,7 +15,7 @@ public class ScrollbarController : MonoBehaviour
     private Scene scene;
     private float minScrollbarSize;
 
-    private void Start()
+    private void Awake()
     {
         scrollbar = GetComponent<Scrollbar>();
         scene = SceneManager.GetActiveScene();
@@ -29,6 +29,9 @@ public class ScrollbarController : MonoBehaviour
     //called from ScrollRect onValueChanged
     public void UpdateSize()
     {
+        // ScrollRect can send its first layout callback before Start.
+        if (scrollbar == null) scrollbar = GetComponent<Scrollbar>();
+        if (scrollbar == null) return;
         if (scrollbar.size < minScrollbarSize)
             scrollbar.size = minScrollbarSize;
     }

@@ -13,6 +13,8 @@ import { ChallengeService } from './challenge.service';
 import { ChallengeController } from './challenge.controller';
 import { ChallengeRepository } from './challenge.repository';
 import { ParticipantRepository } from './participant.repository';
+import { SprintService } from './sprint.service';
+import { SprintController } from './sprint.controller';
 
 @Module({
     imports: [
@@ -30,7 +32,7 @@ import { ParticipantRepository } from './participant.repository';
         UserStatisticsModule,
         AchievementsModule,
     ],
-    providers: [ChallengeService],
-    controllers: [ChallengeController],
+    providers: [ChallengeService,SprintService],
+    controllers: [ChallengeController,SprintController],
 })
 export class ChallengeModule {}

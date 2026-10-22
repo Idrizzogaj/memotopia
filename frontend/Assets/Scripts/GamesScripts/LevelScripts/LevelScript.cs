@@ -88,13 +88,24 @@ public class LevelScript : MonoBehaviour
             LevelsCell[i].transform.GetChild(1).transform.GetChild(0).GetComponent<Text>().color = new Color32(r, g, b, c);
             LevelsCell[i].transform.GetChild(1).transform.GetChild(0).GetComponent<Text>().text = (i + 1).ToString();
         }
+        if(game!=Games.Pairs)TrainingAthleteTile.Attach(LevelsCell[19],LevelsCell[15],new Color32(r,g,b,c),StartAthlete,TrainingAthleteTile.Eligible(StaticVar.s_game));
+    }
+
+    public void StartAthlete() {
+        if(game==Games.Pairs || !TrainingAthleteTile.Eligible(StaticVar.s_game))return;
+        ChallengeConstants.s_isChallenge=false;
+        _selectedLevel=MemoryAthlete.Level;
+        OpenSelectedGame();
     }
 
     public void StartGame()
     {
         CurrentObject = EventSystem.current.currentSelectedGameObject;
         _selectedLevel = int.Parse(CurrentObject.transform.GetChild(0).GetComponent<Text>().text);
+        OpenSelectedGame();
+    }
 
+    private void OpenSelectedGame() {
         switch (game)
         {
             case Games.Boxes:

@@ -82,6 +82,7 @@ public class BoxesManager : GamesScript, IGameable
 
     private void Update()
     {
+        if(SprintRuntime.Active){countDownText.text=SprintRuntime.Current.ClockText;return;}
         if (shouldCountTime && countdownTime > 0)
         {
             countdownTime -= Time.deltaTime;
@@ -116,7 +117,7 @@ public class BoxesManager : GamesScript, IGameable
 
     void InitArrays()
     {
-        numbersOfImages = new int[MajorSystemImages.Count];
+        numbersOfImages = new int[CardFaces.ContentCount];
     }
 
     /// <summary>
@@ -124,6 +125,11 @@ public class BoxesManager : GamesScript, IGameable
     /// </summary>
     public void LevelSelector()
     {
+        if(SprintRuntime.Active){
+            int wanted=SprintRuntime.Current.Size,best=levelPanels.Length-1,count=int.MaxValue;
+            for(int i=0;i<levelPanels.Length;i++){int available=levelPanels[i].GetComponentsInChildren<Image>(true).Count(image=>image.name=="ImgPref");if(available>=wanted && available<count){best=i;count=available;}}
+            LevelAttributes(wanted,5,best);return;
+        }
         switch (LevelScript._selectedLevel)
         {
             case 1:
@@ -187,6 +193,7 @@ public class BoxesManager : GamesScript, IGameable
                 LevelAttributes(22, 5, 19);
                 break;
             case MemoryAthlete.Level:
+                if(!ChallengeConstants.s_isChallenge){LevelAttributes(22,1,19);break;}
                 LevelAttributes(MemoryAthlete.BoxesBoxes, MemoryAthlete.BoxesMistakes, 19);
                 AddExtraBoxes(MemoryAthlete.BoxesBoxes - 22);
                 gameTimeAllocation = MemoryAthlete.BoxesRecallSeconds;
@@ -246,14 +253,14 @@ public class BoxesManager : GamesScript, IGameable
             {
                 imagesArray[i - 1].GetComponentsInChildren<Image>()[0].name = imageNumbers[j].ToString() + " Number";
 
-                imagesArray[i].GetComponentsInChildren<Image>()[0].sprite = CardFaces.Face(imageNumbers[j]);
+                imagesArray[i].GetComponentsInChildren<Image>()[0].sprite = CardFaces.SmallFace(imageNumbers[j]);
                 BoxesPicturePerspective.Attach(imagesArray[i].GetComponentsInChildren<Image>()[0]);
                 imagesArray[i - 1].GetComponent<DragAndDropCell>().enabled = false;
                 imagesArray[i].GetComponent<DragAndDropItem>().enabled = false;
 
                 GameObject g = Instantiate(imagePrefab) as GameObject;
                 g.GetComponentsInChildren<Image>()[1].name = imageNumbers[j].ToString();
-                g.GetComponentsInChildren<Image>()[1].sprite = CardFaces.Face(imageNumbers[j]);
+                g.GetComponentsInChildren<Image>()[1].sprite = CardFaces.SmallFace(imageNumbers[j]);
                 BoxesPicturePerspective.Attach(g.GetComponentsInChildren<Image>()[1]);
                 g.transform.SetParent(scrollViewContent, false);
                 g.SetActive(true);
@@ -261,6 +268,7 @@ public class BoxesManager : GamesScript, IGameable
                 j++;
             }
         }
+        if(SprintRuntime.Active)foreach(var cell in panelLvl.GetComponentsInChildren<DragAndDropCell>(true))if(!cell.name.EndsWith(" Number"))cell.gameObject.SetActive(false);
     }
 
     /// <summary>
@@ -277,6 +285,7 @@ public class BoxesManager : GamesScript, IGameable
 
     public void Recall()
     {
+        if(SprintRuntime.Active && !SprintRuntime.Current.Ready)return;
         recallBtn.SetActive(false);
         RemoveImagesAfterRecall();
         StartCoroutine(SetBottomPanelToPlace());
@@ -294,9 +303,10 @@ public class BoxesManager : GamesScript, IGameable
     /// </summary>
     void EnableHeartsPerLevel()
     {
-        for (int i = 0; i < maxMistakes; i++)
+        if(SprintRuntime.Active){foreach(var heart in hearts)heart.gameObject.SetActive(false);return;}
+        for (int i = 0; i < hearts.Length; i++)
         {
-            hearts[i].gameObject.SetActive(true);
+            hearts[i].gameObject.SetActive(i<maxMistakes);
         }
     }
 
@@ -341,6 +351,7 @@ public class BoxesManager : GamesScript, IGameable
     // Use case of You Won is handled in the DragAndDropCell script
     public void YouWon()
     {
+        if(SprintRuntime.Active)return;
         shouldCountTime = false;
 
         float gameTimeSpent = gameTimeAllocation - countdownTime;

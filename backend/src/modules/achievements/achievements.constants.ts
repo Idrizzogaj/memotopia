@@ -1,4 +1,6 @@
 export const achievementConstants: string[] = [
+    'athlete-one-heart-boxes', 'athlete-one-heart-flash', 'athlete-one-heart-chain',
+    'chain-first', 'chain-all', 'tip-the-deck',
     'in-the-box', // first game boxes
     'pairing-up', // first game pairs
     'with-the-flash', // first game flash

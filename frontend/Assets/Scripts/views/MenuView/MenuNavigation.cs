@@ -274,9 +274,9 @@ public class MenuNavigation : MonoBehaviour
     }
 
     public void GoToNotification() {
-        challengeHomeScreen.SetActive(false);
-        challengeRandomScreen.SetActive(false);
-        challengeNotificationScreen.SetActive(true);
+        OpenChallengeScreen();
+        var navigation=GetComponent<ChallengeNavigation>();
+        if(navigation!=null)SprintLobby.Attach(navigation).Open();
     }
 
     public void GoToChallengeHome()

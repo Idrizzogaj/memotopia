@@ -7,11 +7,26 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace Assets.Script.Controllers
 {
     public class AuthAPIController : MonoBehaviour
     {
+        [Serializable] private class RenewedSession { public string accessToken; }
+        public void RenewSavedSession() { StartCoroutine(RenewSession()); }
+        private IEnumerator RenewSession() {
+            string original=PlayerPrefs.GetString("token");
+            if(string.IsNullOrEmpty(original))yield break;
+            string endpoint=new Uri(new APIConstants().GetUserRoute).GetLeftPart(UriPartial.Authority)+"/auth/session";
+            using(var request=new UnityWebRequest(endpoint,"POST")) {
+                request.downloadHandler=new DownloadHandlerBuffer();request.SetRequestHeader("Authorization",original);request.timeout=12;
+                yield return request.SendWebRequest();
+                if(request.isNetworkError || request.isHttpError || PlayerPrefs.GetString("token")!=original)yield break;
+                RenewedSession session=null;try{session=JsonUtility.FromJson<RenewedSession>(request.downloadHandler.text);}catch(Exception){}
+                if(session!=null && !string.IsNullOrEmpty(session.accessToken)){PlayerPrefs.SetString("token","Bearer "+session.accessToken);PlayerPrefs.Save();}
+            }
+        }
         APIConstants _apiConstants;
         DataController _dataController;
 

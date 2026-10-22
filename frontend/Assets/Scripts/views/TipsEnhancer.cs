@@ -15,7 +15,7 @@ public static class TipsEnhancer
         { "LinkMethodPage", "tip-link-method" }, { "FunPage", "tip-fun" }, { "MemoryPalacePage", "tip-memory-palace" },
         { "SensesPage", "tip-senses" }, { "EmotionsPage", "tip-emotions" }, { "RetrivalPage", "tip-retrieval" },
         { "MythPage", "tip-myth" }, { "MindsetPage", "tip-mindset" }, { "FocusPage", "tip-focus" },
-        { "BornPage", "tip-born" }, { "DreamPage", "tip-dream" }, { "MajorSystemPage", "tip-major-system" },
+        { "DeckGuidePage", "tip-the-deck" }, { "LinkGuidePage", "tip-link-method" }, { "DeckPage", "tip-the-deck" }, { "BornPage", "tip-born" }, { "DreamPage", "tip-dream" }, { "MajorSystemPage", "tip-major-system" },
     };
 
     private static readonly Color Purple = new Color32(123, 31, 255, 255);
@@ -65,6 +65,33 @@ public static class TipsEnhancer
             }
         }
 
+        // The native tips list has fixed-position cards on older iOS scenes. Put every
+        // card in a scrolling layout, so new guides cannot sit outside the content bounds.
+        var listLayout=content.GetComponent<VerticalLayoutGroup>();
+        if(listLayout==null) {
+            foreach(Transform child in content) {
+                var rt=child as RectTransform;if(rt==null)continue;
+                var sizing=child.GetComponent<LayoutElement>();if(sizing==null)sizing=child.gameObject.AddComponent<LayoutElement>();
+                sizing.preferredHeight=Mathf.Max(180f,rt.rect.height);
+            }
+            listLayout=content.gameObject.AddComponent<VerticalLayoutGroup>();
+            listLayout.spacing=22;listLayout.padding=new RectOffset(20,20,20,40);
+            listLayout.childControlWidth=true;listLayout.childControlHeight=true;listLayout.childForceExpandHeight=false;listLayout.childForceExpandWidth=true;
+            var fit=content.GetComponent<ContentSizeFitter>();if(fit==null)fit=content.gameObject.AddComponent<ContentSizeFitter>();fit.verticalFit=ContentSizeFitter.FitMode.PreferredSize;
+        }
+        var deck=screens.Find("DeckGuidePage");
+        if(deck==null)deck=BuildMajorSystemPage(screens,menu,true).transform;
+        var link=screens.Find("LinkGuidePage");
+        if(link==null)link=BuildMajorSystemPage(screens,menu,false,true).transform;
+        deck.gameObject.SetActive(false);link.gameObject.SetActive(false);
+        GuideCard(content,"TheDeckGuide","The Deck • 52 images",deck,0);
+        var originalLink=content.Find("LinkMethod");
+        if(originalLink!=null && originalLink.GetComponent<Button>()!=null) {
+            originalLink.GetComponent<Button>().onClick=new Button.ButtonClickedEvent();
+            originalLink.GetComponent<Button>().onClick.AddListener(()=>{link.gameObject.SetActive(true);link.SetAsLastSibling();});
+            originalLink.SetSiblingIndex(1);
+        } else GuideCard(content,"TheLinkGuide","The Link Method",link,1);
+
         // an "I have read this" box on every page
         foreach (Transform page in screens)
         {
@@ -77,6 +104,15 @@ public static class TipsEnhancer
         // a large touch area for the back button of every tip page
         foreach (Transform page in screens)
             if (PageKeys.ContainsKey(page.name)) EnlargeTopButtons(page);
+    }
+
+    private static void GuideCard(Transform content,string name,string title,Transform page,int order) {
+        var existing=content.Find(name);if(existing!=null)return;
+        var card=new GameObject(name,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement));card.transform.SetParent(content,false);card.transform.SetSiblingIndex(order);
+        card.GetComponent<Image>().sprite=ContentSelectorBar.Rounded();card.GetComponent<Image>().type=Image.Type.Sliced;card.GetComponent<Image>().color=new Color32(238,234,255,255);
+        card.GetComponent<LayoutElement>().preferredHeight=180;
+        card.GetComponent<Button>().onClick.AddListener(()=>{page.gameObject.SetActive(true);page.SetAsLastSibling();});
+        var label=MakeText(card.transform,"Title",title,46,FontStyle.Bold,Purple,TextAnchor.MiddleCenter);Stretch(label.rectTransform);
     }
 
     // ---------- bigger touch areas
@@ -169,18 +205,19 @@ public static class TipsEnhancer
 
     // ---------- the Major System page
 
-    private static GameObject BuildMajorSystemPage(Transform parent, MenuNavigation menu)
+    private static GameObject BuildMajorSystemPage(Transform parent, MenuNavigation menu, bool deckPage = false, bool linkPage = false)
     {
-        var page = new GameObject("MajorSystemPage", typeof(RectTransform), typeof(Image));
+        var page = new GameObject(linkPage ? "LinkGuidePage" : deckPage ? "DeckGuidePage" : "MajorSystemPage", typeof(RectTransform), typeof(Image));
         var rect = (RectTransform)page.transform;
         rect.SetParent(parent, false);
         rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero;
         page.GetComponent<Image>().color = Color.white;
 
         // title
-        var title = MakeText(rect, "Title", "The Major System", 60, FontStyle.Bold, Purple, TextAnchor.MiddleCenter);
+        var title = MakeText(rect, "Title", linkPage ? "The Link Method" : deckPage ? "The Deck" : "The Major System", 60, FontStyle.Bold, Purple, TextAnchor.MiddleCenter);
         var tr = (RectTransform)title.transform;
-        tr.anchorMin = new Vector2(0.2f, 0.915f); tr.anchorMax = new Vector2(0.8f, 0.985f); tr.offsetMin = tr.offsetMax = Vector2.zero;
+        tr.anchorMin = new Vector2(0.25f, 0.915f); tr.anchorMax = new Vector2(0.98f, 0.985f); tr.offsetMin = tr.offsetMax = Vector2.zero;
+        title.resizeTextForBestFit = true; title.resizeTextMinSize = 28; title.resizeTextMaxSize = 54;
 
         // back button
         var back = new GameObject("Back", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -217,6 +254,29 @@ public static class TipsEnhancer
         scroll.viewport = vr; scroll.content = cr; scroll.horizontal = false; scroll.vertical = true;
         scroll.movementType = ScrollRect.MovementType.Elastic; scroll.scrollSensitivity = 30f;
 
+        if(linkPage) {
+            AddParagraph(cr,"Make a chain of memorable images",44,true);
+            AddParagraph(cr,"Turn each item into a clear picture. Make the first picture interact with the next, then link that picture to the following one. Imagine actions, movement and sensory details that are easy for YOU to recall.",36,false);
+            AddParagraph(cr,"Example",44,true);
+            AddParagraph(cr,"DOLL → DUCK → HOSE: a doll rides a duck; the duck coils a hose around a tree. Recall the doll, follow its action to the duck, then follow the duck to the hose. The actions are your story, not extra items to memorise.",36,false);
+            AddParagraph(cr,"Practise with Chain",44,true);
+            AddParagraph(cr,"Study one item at a time and link it to the previous image. During recall, replay the story and tap the items in their original order. With Deck selected, use the same 52 card associations shown in The Deck guide.",36,false);
+        }
+        else if (deckPage)
+        {
+            AddParagraph(cr,"One card, one memorable image",44,true);
+            AddParagraph(cr,"Learn one clear association for each of the 52 playing cards. Link those images into a story, or place them along a familiar route in your memory palace.",36,false);
+            AddParagraph(cr,"Suit + value",44,true);
+            AddParagraph(cr,"Clubs uses hard C/K (7). Diamonds uses D (1). Spades uses S (0). Hearts uses H as a visual cue; H is silent in the numerical Major code. For example: Diamond 5 is D + L = DOLL (15).",36,false);
+            AddParagraph(cr,"Ace = 1; 2-9 keep their Major sounds; 10 = 0. Court cards are explicit exceptions: Jack = 11, Queen = 12, King = 13. Hearts King uses ATOM (13); the H is only a suit cue. These are English starter associations, not a universal card system.",36,false);
+            AddParagraph(cr,"Practise in Pairs, Boxes, Flash and Chain",44,true);
+            AddParagraph(cr,"Choose The Deck in Settings or Training to play with cards only. This setting applies to your next training round. Challenges keep their existing picture rules.",36,false);
+            AddParagraph(cr,"All 52 card associations",44,true);
+            AddParagraph(cr,"Open a rank below to see its four cards, words and mnemonic illustrations. Tick the read box after reading the tip to earn Deck Decoder.",36,false);
+            AddCatalog(cr,true);
+        }
+        else
+        {
         AddParagraph(cr, "Turn any number into a picture, and any picture back into a number. Memory champions use this system to remember long numbers, dates and phone numbers.", 36, false);
         AddParagraph(cr, "The idea", 44, true);
         AddParagraph(cr, "Every digit stands for a consonant sound. Put the sounds of a number together, add vowels, and you get a word you can SEE. That word is your picture.", 36, false);
@@ -242,9 +302,73 @@ public static class TipsEnhancer
             "Every number from 00 to 99 has its own picture in the games. Number 02 is a SIGN. Link the pictures in a story or place them in a memory palace and long numbers become easy.", 36, false);
         AddParagraph(cr, "Tick the box below when you have read this. It gives you a badge and unlocks Help in the games: a small label on every picture shows its number and its sounds.", 36, false);
 
-        BuildReadBar(rect, "tip-major-system");
+            AddParagraph(cr,"All 100 picture associations",44,true);
+            AddParagraph(cr,"Open a number group to see the picture, its exact number and its word. The 000-999 word system is available separately in Settings; it does not change these picture associations.",36,false);
+            AddParagraph(cr,"The 000-999 starter words use American English pronunciation: R counts, including the R sound at the end of a word. TH belongs to the 1 sound group in this list. Some harder codes use two words. Read the whole consonant sequence, including the sounds of leading zeroes.",36,false);
+            AddCatalog(cr,false);
+        }
+
+        BuildReadBar(rect, linkPage ? "tip-link-method" : deckPage ? "tip-the-deck" : "tip-major-system");
         page.SetActive(false);
         return page;
+    }
+
+    private static void AddCatalog(RectTransform content, bool deck)
+    {
+        string[] suits={"Clubs","Diamonds","Hearts","Spades"};
+        int groups=deck?13:10;
+        for (int group=0;group<groups;group++)
+        {
+            int captured=group;
+            string caption=deck?new[]{"Ace","2","3","4","5","6","7","8","9","10","Jack","Queen","King"}[group]:(group*10).ToString("D2")+"-"+(group*10+9).ToString("D2");
+            var header=new GameObject("Expand "+caption,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement));
+            header.transform.SetParent(content,false);header.GetComponent<Image>().color=new Color32(238,234,255,255);
+            header.GetComponent<LayoutElement>().preferredHeight=95;
+            var label=MakeText(header.transform,"Label","+ "+caption,40,FontStyle.Bold,Purple,TextAnchor.MiddleLeft);
+            Stretch(label.rectTransform);label.rectTransform.offsetMin=new Vector2(20,0);
+            var body=new GameObject("Group "+caption,typeof(RectTransform),typeof(VerticalLayoutGroup));
+            body.transform.SetParent(content,false);var layout=body.GetComponent<VerticalLayoutGroup>();
+            layout.childControlWidth=layout.childControlHeight=true;layout.childForceExpandHeight=false;layout.spacing=12;
+            body.SetActive(false);bool populated=false;
+            header.GetComponent<Button>().onClick.AddListener(()=>{
+                if (!populated)
+                {
+                    int count=deck?4:10;
+                    for(int j=0;j<count;j++)
+                    {
+                        int index=deck ? j*13+captured : captured*count+j;
+                        if (!deck) AddExample((RectTransform)body.transform,index,CardFaces.SoundLetters(index+1),CardFaces.ImageWord(index+1));
+                        else AddDeckRow((RectTransform)body.transform,index);
+                    }
+                    populated=true;
+                }
+                body.SetActive(!body.activeSelf);label.text=(body.activeSelf?"- ":"+ ")+caption;
+                LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)body.transform);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+            });
+        }
+    }
+
+    private static void AddDeckRow(RectTransform parent,int index)
+    {
+        var e=DeckCatalog.Get(index);
+        var row=new GameObject("Card "+e.Suit+e.Rank,typeof(RectTransform),typeof(HorizontalLayoutGroup),typeof(LayoutElement));
+        row.transform.SetParent(parent,false);row.GetComponent<LayoutElement>().preferredHeight=260;
+        var layout=row.GetComponent<HorizontalLayoutGroup>();layout.padding=new RectOffset(20,20,10,10);layout.spacing=24;
+        layout.childAlignment=TextAnchor.MiddleLeft;
+        layout.childControlWidth=layout.childControlHeight=true;layout.childForceExpandWidth=false;layout.childForceExpandHeight=false;
+        var art=new GameObject("Card",typeof(RectTransform),typeof(Image),typeof(LayoutElement));art.transform.SetParent(row.transform,false);
+        art.GetComponent<Image>().sprite=DeckCatalog.Face(index);art.GetComponent<Image>().preserveAspect=true;art.GetComponent<Image>().raycastTarget=false;
+        art.GetComponent<LayoutElement>().preferredWidth=170;art.GetComponent<LayoutElement>().preferredHeight=240;
+        var text=MakeText(row.transform,"Association",e.Rank+" of "+e.Suit+"\n"+DeckCatalog.Decode(index)+"\n"+e.Word,36,FontStyle.Bold,Ink,TextAnchor.MiddleLeft);
+        text.resizeTextForBestFit=true;text.resizeTextMinSize=24;text.resizeTextMaxSize=36;
+        text.gameObject.AddComponent<LayoutElement>().flexibleWidth=1;
+        var mnemonic=DeckCatalog.Mnemonic(index);
+        if(mnemonic!=null) {
+            var illustration=new GameObject("Mnemonic",typeof(RectTransform),typeof(Image),typeof(LayoutElement));illustration.transform.SetParent(row.transform,false);
+            illustration.GetComponent<Image>().sprite=mnemonic;illustration.GetComponent<Image>().preserveAspect=true;illustration.GetComponent<Image>().raycastTarget=false;
+            illustration.GetComponent<LayoutElement>().preferredWidth=180;illustration.GetComponent<LayoutElement>().preferredHeight=210;
+        }
     }
 
     /// <summary>One row that shows how a number turns into a picture: the picture, the number, its sounds and the word.</summary>

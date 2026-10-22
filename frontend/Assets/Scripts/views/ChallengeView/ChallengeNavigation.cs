@@ -92,6 +92,7 @@ public class ChallengeNavigation : MonoBehaviour
             //boxesImage.rectTransform.sizeDelta = new Vector2(720, 285);
         }
 
+        TrainingHubLayout.ApplyChallenge(this);
         _loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
         EnsureBellHitArea();
         userAPIController = gameObject.AddComponent<UserAPIController>();
@@ -365,6 +366,7 @@ public class ChallengeNavigation : MonoBehaviour
 
     public void GoToChallengeGame()
     {
+        TrainingHubLayout.ApplyChallenge(this);
         HideAthleteToastNow();
         challengeNotificationScreen.SetActive(false);
         challengeHomeScreen.SetActive(false);
@@ -426,7 +428,7 @@ public class ChallengeNavigation : MonoBehaviour
 
     private void ShowAthleteToast(string message)
     {
-        var root = challengeLevelScreen.transform;
+        var root = challengeGameScreen.transform;
         if (athleteToast == null)
         {
             athleteToast = new GameObject("AthleteToast", typeof(RectTransform), typeof(Image));
@@ -475,16 +477,20 @@ public class ChallengeNavigation : MonoBehaviour
 
     public void GoToChallengeLevel()
     {
-        HideAthleteToastNow();
-        EnsureAthleteButton();
-        challengeNotificationScreen.SetActive(false);
-        challengeHomeScreen.SetActive(false);
-        challengeRandomScreen.SetActive(false);
-        challengeGameScreen.SetActive(false);
-        challengeLevelScreen.SetActive(true);
+        GoToChallengeGame();
     }
 
-    public void GoToNotification() {
+    public void ChooseGameAndLevel(string game,int tier) {
+        if(game!="Pairs" && game!="Boxes" && game!="Flash" && game!="Chain")return;
+        if(tier!=6 && tier!=12 && tier!=18 && tier!=MemoryAthlete.Level)return;
+        if(tier==MemoryAthlete.Level && !MemoryAthlete.Unlocked){ShowAthleteToast(MemoryAthlete.LockedHint);return;}
+        if(UserConstants.s_challengeUser==null)return;
+        SprintLobby.Attach(this).Create(game,tier,UserConstants.s_challengeUser.id);
+    }
+
+    public void GoToNotification() { SprintLobby.Attach(this).Open(); }
+
+    public void GoToLegacyNotification() {
         HideAthleteToastNow();
         DeleteNotification();
         challengeHomeScreen.SetActive(false);
@@ -507,7 +513,9 @@ public class ChallengeNavigation : MonoBehaviour
         );
     }
     
-    public void GoToHistory() {
+    public void GoToHistory() { SprintLobby.Attach(this).Open(); }
+
+    public void GoToLegacyHistory() {
         HideAthleteToastNow();
         DeleteHistory();
         challengeHomeScreen.SetActive(false);
@@ -531,6 +539,7 @@ public class ChallengeNavigation : MonoBehaviour
         );
     }
 
+    private int profileRequest;
     public void goToUserProfileScreen(User user, bool isFavorite)
     {
         challengeHomeScreen.SetActive(false);
@@ -546,7 +555,14 @@ public class ChallengeNavigation : MonoBehaviour
         texts[0].text = user.Username;
         texts[4].text = user.userStatistics.level.ToString();
         texts[5].text = user.userStatistics.xp.ToString();
-        texts[6].text = "0";
+        texts[6].text = "…";
+        int request=++profileRequest;
+        var achievements=GetComponent<AchievementsAPIController>() ?? gameObject.AddComponent<AchievementsAPIController>();
+        achievements.GetProfileCount(user.ID, count=> {
+            if(this!=null && request==profileRequest && challengeUserProfileScreen.activeInHierarchy)texts[6].text=count.ToString();
+        }, error=> {
+            if(this!=null && request==profileRequest && challengeUserProfileScreen.activeInHierarchy)texts[6].text="—";
+        });
 
         challengeOnProfile.onClick.AddListener(() => {
             UserConstants.s_challengeUser = user;
@@ -616,25 +632,16 @@ public class ChallengeNavigation : MonoBehaviour
             graphic.raycastTarget = false;
     }
 
-    public void SetNotificationNumber(GetChallengeResponsePayload obj)
-    {
-        LetTapsPassThrough(notificationNumber);
-        LetTapsPassThrough(notificationNumberOnMainScreen);
-        if (obj.results.Length == 0)
-        {
-            notificationNumber.SetActive(false);
-            notificationNumberOnMainScreen.SetActive(false);
-        }
-        else
-        {
-            notificationNumber.SetActive(true);
-            notificationNumberOnMainScreen.SetActive(true);
-
-            Text[] texts = notificationNumber.GetComponentsInChildren<Text>();
-            texts[0].text = obj.results.Length.ToString();
-
-            Text[] texts1 = notificationNumberOnMainScreen.GetComponentsInChildren<Text>();
-            texts1[0].text = obj.results.Length.ToString();
+    private int legacyNotificationCount,sprintNotificationCount;
+    public void SetSprintNotificationCount(int count) { sprintNotificationCount=count;UpdateNotificationBadge(); }
+    public void SetNotificationNumber(GetChallengeResponsePayload obj) {
+        legacyNotificationCount=obj.results.Length;UpdateNotificationBadge();
+    }
+    private void UpdateNotificationBadge() {
+        int count=legacyNotificationCount+sprintNotificationCount;
+        foreach(var badge in new[]{notificationNumber,notificationNumberOnMainScreen}) {
+            if(badge==null)continue;LetTapsPassThrough(badge);badge.SetActive(count>0);
+            foreach(var label in badge.GetComponentsInChildren<Text>(true))label.text=count.ToString();
         }
     }
 

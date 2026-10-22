@@ -4,7 +4,7 @@ using System.Linq;
 using Assets.Script.Constants;
 using UnityEngine;
 
-public enum CardKind { Image, Number, Word }
+public enum CardKind { Image, Number, Word, PlayingCard }
 
 /// <summary>
 /// What a card shows in Pairs, Flash and Boxes: the Major System picture, its number (00-99) or a word.
@@ -15,7 +15,7 @@ public enum CardKind { Image, Number, Word }
 public static class CardFaces
 {
     [Flags]
-    public enum Choice { None = 0, Images = 1, Help = 2, Words = 4, Numbers = 8, Random = 16 }
+    public enum Choice { None = 0, Images = 1, Help = 2, Words = 4, Numbers = 8, Random = 16, Deck = 32 }
 
     public const string HelpKey = "tip-major-system";
     private const string DigitLetters = "STNMRLJKFP"; // Major System sounds: 0=S 1=T 2=N 3=M 4=R 5=L 6=J 7=K 8=F 9=P
@@ -50,12 +50,20 @@ public static class CardFaces
     {
         if (!AdvancedUnlocked) c &= ~(Choice.Words | Choice.Numbers | Choice.Random);
         if (!HelpUnlocked) c &= ~Choice.Help;
-        if ((c & (Choice.Images | Choice.Words | Choice.Numbers | Choice.Random)) == 0) c |= Choice.Images;
+        if ((c & Choice.Deck) != 0) return Choice.Deck;
+        // There are 100 images, not 1,000. Never relabel an image as a different three-digit code.
+        if (MemorySettings.Digits == 3 && AdvancedUnlocked)
+        {
+            if ((c & Choice.Images) != 0) c = (c & ~Choice.Images) | Choice.Words;
+        }
+        if ((c & (Choice.Images | Choice.Words | Choice.Numbers | Choice.Random)) == 0)
+            c |= MemorySettings.Digits == 3 && AdvancedUnlocked ? Choice.Words : Choice.Images;
         return c;
     }
 
     public static string Describe(Choice c)
     {
+        if ((c & Choice.Deck) != 0) return "The Deck (52 cards)";
         var parts = new List<string>();
         if ((c & Choice.Random) != 0) parts.Add("Random mix");
         else
@@ -70,23 +78,49 @@ public static class CardFaces
 
     // ---------- one game round
 
-    private static bool active, help;
+    private static bool active, help, imageNumbers, wordNumbers, deck, sprint;
+    private static readonly int[] sprintDeckIndex=new int[MajorSystemImages.Count+1];
+    private static int digits = 2;
+    private static DeckDisplay deckMode;
+    private static readonly DeckDisplay[] deckFaces = new DeckDisplay[MajorSystemImages.Count + 1];
+    private static readonly int[] numberOf = new int[MajorSystemImages.Count + 1];
+    private static readonly int[] wordCode = new int[MajorSystemImages.Count + 1];
+    public static int ContentCount { get { return active && deck ? DeckCatalog.Count : MajorSystemImages.Count; } }
+    public static string NumberText(int id) { return numberOf[id].ToString(digits == 3 ? "D3" : "D2"); }
+    public static int WordCode(int id) { return wordCode[id]; }
     private static readonly CardKind[] kinds = new CardKind[MajorSystemImages.Count + 1];
     private static readonly string[] wordOf = new string[MajorSystemImages.Count + 1];
     private static readonly Dictionary<string, Sprite> cache = new Dictionary<string, Sprite>();
-    private static string[] wordPool;
     private static string[] imageWords;
 
     /// <summary>Call when a game round is set up. Challenges always use pictures, for now.</summary>
     public static void BeginSession()
     {
+        if(SprintRuntime.Active){BeginSprintSession(SprintRuntime.Current.Battle.tier,SprintRuntime.Current.StageSeed);return;}
+        sprint=false;
         ClearCache();
         var c = ChallengeConstants.s_isChallenge ? Choice.Images : Selected;
-        help = (c & Choice.Help) != 0 && !ChallengeConstants.s_isChallenge;
+        bool challenge = ChallengeConstants.s_isChallenge;
+        deck = (c & Choice.Deck) != 0 && !challenge;
+        digits = !challenge && AdvancedUnlocked ? MemorySettings.Digits : 2;
+        imageNumbers = !challenge && MemorySettings.ShowImageNumbers;
+        wordNumbers = !challenge && MemorySettings.ShowWordNumbers;
+        help = (c & Choice.Help) != 0 && !challenge;
+        if (deck)
+        {
+            deckMode=MemorySettings.DeckMode;
+            for (int id=1; id<=DeckCatalog.Count; id++) {
+                deckFaces[id]=deckMode==DeckDisplay.Random ? new[]{DeckDisplay.Cards,DeckDisplay.Images,DeckDisplay.Decode,DeckDisplay.Words}[UnityEngine.Random.Range(0,4)] : deckMode;
+                kinds[id]=deckFaces[id]==DeckDisplay.Cards ? CardKind.PlayingCard : deckFaces[id]==DeckDisplay.Words ? CardKind.Word : CardKind.Image;
+                wordOf[id]=DeckCatalog.Get(id-1).Word;
+            }
+            active=true;
+            return;
+        }
         var allowed = new List<CardKind>();
         if ((c & Choice.Random) != 0)
         {
-            allowed.Add(CardKind.Image);
+            if (digits == 2) allowed.Add(CardKind.Image);
             if (AdvancedUnlocked) { allowed.Add(CardKind.Word); allowed.Add(CardKind.Number); }
         }
         else
@@ -97,31 +131,53 @@ public static class CardFaces
         }
         if (allowed.Count == 0) allowed.Add(CardKind.Image);
 
-        var pool = Words().ToArray();
-        for (int i = pool.Length - 1; i > 0; i--)
+        var pool = new int[MajorWordCatalog.Count];
+        for (int i=0; i<pool.Length; i++) pool[i]=i;
+        for (int i=pool.Length-1; i>0; i--)
         {
-            int j = UnityEngine.Random.Range(0, i + 1);
-            var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+            int j=UnityEngine.Random.Range(0,i+1);
+            int tmp=pool[i]; pool[i]=pool[j]; pool[j]=tmp;
         }
-        for (int id = 1; id <= MajorSystemImages.Count; id++)
+        for (int id=1; id<=MajorSystemImages.Count; id++)
         {
-            kinds[id] = allowed[UnityEngine.Random.Range(0, allowed.Count)];
-            wordOf[id] = pool[(id - 1) % pool.Length];
+            kinds[id]=allowed[UnityEngine.Random.Range(0,allowed.Count)];
+            numberOf[id]=digits==3 ? pool[id-1] : id-1;
+            wordCode[id]=numberOf[id];
+            wordOf[id]=digits==3 ? MajorWordCatalog.Word(wordCode[id]) : ImageWord(id);
         }
         active = true;
     }
 
-    public static void EndSession() { active = false; ClearCache(); }
+    public static void BeginSprintSession(int tier,int seed) {
+        ClearCache();sprint=active=true;deck=help=imageNumbers=wordNumbers=false;digits=2;
+        int count=ChallengeSprintRules.KindCount(tier);
+        var rng=new SprintRandom(seed);
+        var types=System.Linq.Enumerable.Range(0,MajorSystemImages.Count).Select(i=>i%count).ToArray();rng.Shuffle(types);
+        var cards=System.Linq.Enumerable.Range(0,52).ToArray();rng.Shuffle(cards);int card=0;
+        var numbers=System.Linq.Enumerable.Range(0,100).ToArray();rng.Shuffle(numbers);
+        for(int id=1;id<=MajorSystemImages.Count;id++){
+            kinds[id]=new[]{CardKind.Image,CardKind.Word,CardKind.Number,CardKind.PlayingCard}[types[id-1]];
+            numberOf[id]=numbers[id-1];wordCode[id]=id-1;wordOf[id]=ImageWord(id);
+            if(kinds[id]==CardKind.PlayingCard)sprintDeckIndex[id]=cards[card++];
+        }
+    }
+    public static void EndSession() { active = false; deck = sprint = false; ClearCache(); }
 
     private static void ClearCache()
     {
         foreach (var sprite in cache.Values)
         {
             if (sprite == null) continue;
-            if (sprite.texture != null) UnityEngine.Object.Destroy(sprite.texture);
-            UnityEngine.Object.Destroy(sprite);
+            MajorSystemImages.ForgetVisibleSize(sprite);
+            if (sprite.texture != null) DestroyGenerated(sprite.texture);
+            DestroyGenerated(sprite);
         }
         cache.Clear();
+    }
+    internal static void DestroyGenerated(UnityEngine.Object obj)
+    {
+        if (Application.isPlaying) UnityEngine.Object.Destroy(obj);
+        else UnityEngine.Object.DestroyImmediate(obj);
     }
 
     public static CardKind KindOf(int id) { return active && id >= 1 && id <= MajorSystemImages.Count ? kinds[id] : CardKind.Image; }
@@ -135,9 +191,10 @@ public static class CardFaces
         {
             switch (kinds[id])
             {
+                case CardKind.PlayingCard: return DeckCatalog.Face(sprint?sprintDeckIndex[id]:id-1);
                 case CardKind.Number: return NumberCard(id);
-                case CardKind.Word: return WordCard(id);
-                default: return help ? HelpImage(id) : MajorSystemImages.Load(id);
+                case CardKind.Word: return deck ? DeckWordCard(id) : WordCard(id);
+                default: if(deck)return DeckImage(id); return help || imageNumbers ? HelpImage(id) : MajorSystemImages.Load(id);
             }
         }
         catch (Exception e)
@@ -159,16 +216,20 @@ public static class CardFaces
     /// <summary>Text only, wide and transparent: used where the picture area is small and wide (Flash tiles).</summary>
     public static Sprite WideFace(int id)
     {
-        if (!active || id < 1 || id > MajorSystemImages.Count || kinds[id] == CardKind.Image) return Face(id);
+        if(active && sprint && kinds[id]==CardKind.PlayingCard)return DeckCatalog.CompactFace(sprintDeckIndex[id]);
+        if (active && deck && id >= 1 && id <= DeckCatalog.Count && kinds[id]==CardKind.PlayingCard) return DeckCatalog.CompactFace(id - 1);
+        if (!active || id < 1 || id > MajorSystemImages.Count || kinds[id] == CardKind.Image || kinds[id] == CardKind.PlayingCard) return Face(id);
         try
         {
             bool number = kinds[id] == CardKind.Number;
-            string text = number ? (id - 1).ToString("D2") : wordOf[id];
-            string key = "wide:" + text;
+            string text = number ? NumberText(id) : wordOf[id];
+            string sub = deck ? (deckMode==DeckDisplay.Decode ? DeckLabel(id) : null) : (!number && wordNumbers ? wordCode[id].ToString(digits==3 ? "D3" : "D2") : null);
+            string key = "wide:" + text + ":" + sub;
             Sprite sprite;
             if (cache.TryGetValue(key, out sprite)) return sprite;
             const int S = 512, H = 154; // 512 x 154 strip cut out of the middle of a square rendering
-            float[] cov = TextRaster.Coverage(text, S, 0.96f, 0.29f, 0.5f, 0.5f, true);
+            float[] cov = TextRaster.Coverage(text, S, 0.96f, sub == null ? 0.29f : 0.17f, 0.5f, sub == null ? 0.5f : 0.57f, true);
+            float[] subCov = sub == null ? null : TextRaster.Coverage(sub, S, 0.35f, 0.08f, 0.5f, 0.42f, true);
             var px = new Color32[S * H];
             Color ink = number ? PurpleInk : DarkInk;
             int offset = (S - H) / 2;
@@ -177,6 +238,8 @@ public static class CardFaces
                 {
                     float a = cov[(y + offset) * S + x];
                     if (a > 0.003f) px[y * S + x] = new Color32((byte)(ink.r * 255f), (byte)(ink.g * 255f), (byte)(ink.b * 255f), (byte)(a * 255f));
+                    if (subCov != null && subCov[(y + offset) * S + x] > .003f)
+                        px[y * S + x] = new Color32(123,31,255,(byte)(subCov[(y + offset) * S + x] * 255f));
                 }
             sprite = MakeSprite(px, S, H, 100f);
             MajorSystemImages.SetVisibleSize(sprite, Vector2.one);
@@ -190,13 +253,41 @@ public static class CardFaces
         }
     }
 
+    public static Sprite SmallFace(int id) { return active && (deck || sprint) ? WideFace(id) : Face(id); }
+    private static string DeckLabel(int id) {
+        var e=DeckCatalog.Get(id-1);
+        return DeckCatalog.Decode(id-1);
+    }
+    private static Sprite DeckWordCard(int id) {
+        string sub=deckMode==DeckDisplay.Decode ? DeckLabel(id) : null;
+        string key="deck:"+id+":"+sub;
+        Sprite sprite;
+        if(cache.TryGetValue(key,out sprite))return sprite;
+        sprite=BuildCard(wordOf[id],sub,DarkInk,GreyInk,false);
+        cache[key]=sprite;return sprite;
+    }
+
+    private static Sprite DeckImage(int id) {
+        var source=DeckCatalog.Mnemonic(id-1);
+        if(source==null)throw new InvalidOperationException("Missing deck illustration: "+id);
+        if(deckFaces[id]!=DeckDisplay.Decode)return source;
+        string key="deck-image-help:"+id;
+        Sprite result;if(cache.TryGetValue(key,out result))return result;
+        int w=source.texture.width,h=source.texture.height;
+        var pixels=ReadPixels(source.texture);
+        FillRounded(pixels,w,h,.02f,.01f,.98f,.24f,.04f,Color.white,Color.white);
+        Blend(pixels,TextRaster.Coverage(DeckCatalog.Decode(id-1),w,.92f,.09f,.5f,.12f,true),PurpleInk);
+        result=MakeSprite(pixels,w,h,source.pixelsPerUnit);
+        MajorSystemImages.SetVisibleSize(result,Vector2.one);cache[key]=result;return result;
+    }
+
     private static Sprite NumberCard(int id)
     {
-        string number = (id - 1).ToString("D2");
+        string number = NumberText(id);
         string key = "n" + number + (help ? "h" : "");
         Sprite sprite;
         if (cache.TryGetValue(key, out sprite)) return sprite;
-        sprite = BuildCard(number, help ? ImageWord(id) : null, PurpleInk, GreyInk, true);
+        sprite = BuildCard(number, help ? (digits == 3 ? MajorWordCatalog.Word(numberOf[id]) : ImageWord(id)) : null, PurpleInk, GreyInk, true);
         cache[key] = sprite;
         return sprite;
     }
@@ -207,7 +298,7 @@ public static class CardFaces
         string key = "w" + word;
         Sprite sprite;
         if (cache.TryGetValue(key, out sprite)) return sprite;
-        sprite = BuildCard(word, null, DarkInk, GreyInk, false);
+        sprite = BuildCard(word, wordNumbers ? wordCode[id].ToString(digits==3 ? "D3" : "D2") : null, DarkInk, GreyInk, false);
         cache[key] = sprite;
         return sprite;
     }
@@ -224,7 +315,7 @@ public static class CardFaces
 
         // small label in the bottom right corner: the number and its sound letters
         string number = (id - 1).ToString("D2");
-        string letters = SoundLetters(id);
+        string letters = help ? SoundLetters(id) : "";
         FillRounded(px, w, h, 0.50f, 0.02f, 0.98f, 0.32f, 0.07f, new Color(1f, 1f, 1f, 0.92f), new Color(0.80f, 0.74f, 1f, 1f));
         Blend(px, TextRaster.Coverage(number, w, 0.30f, 0.15f, 0.74f, 0.22f, true), PurpleInk);
         Blend(px, TextRaster.Coverage(letters, w, 0.28f, 0.075f, 0.74f, 0.095f, true), DarkInk);
@@ -265,7 +356,7 @@ public static class CardFaces
         RenderTexture.active = previous;
         RenderTexture.ReleaseTemporary(target);
         Color32[] pixels = copy.GetPixels32();
-        UnityEngine.Object.Destroy(copy);
+        DestroyGenerated(copy);
         return pixels;
     }
 
@@ -320,18 +411,6 @@ public static class CardFaces
     }
 
     // ---------- data
-
-    private static IEnumerable<string> Words()
-    {
-        if (wordPool == null)
-        {
-            var asset = Resources.Load<TextAsset>("Words/words");
-            wordPool = asset == null
-                ? new[] { "apple", "house", "horse", "chair", "tree", "boat", "bread", "clock", "river", "cloud" }
-                : asset.text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
-        }
-        return wordPool;
-    }
 
     private static string[] soundLetters;
 
@@ -454,7 +533,7 @@ internal static class TextRaster
         cam.targetTexture = null;
         RenderTexture.ReleaseTemporary(target);
         Color32[] pixels = readback.GetPixels32();
-        UnityEngine.Object.Destroy(readback);
+        CardFaces.DestroyGenerated(readback);
 
         var coverage = new float[size * size];
         for (int i = 0; i < coverage.Length; i++) coverage[i] = pixels[i].r / 255f;

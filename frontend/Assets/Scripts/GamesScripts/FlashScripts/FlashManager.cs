@@ -89,6 +89,7 @@ public class FlashManager : GamesScript, IGameable
 
     private void Update()
     {
+        if(SprintRuntime.Active){timerText.text=SprintRuntime.Current.ClockText;return;}
         if(shouldCountPreGameTime)
             preGameTimeSpent += Time.deltaTime;
 
@@ -134,7 +135,7 @@ public class FlashManager : GamesScript, IGameable
 
     void InitArrays()
     {
-        numbersOfImages = new int[MajorSystemImages.Count];
+        numbersOfImages = new int[CardFaces.ContentCount];
         imagesNumberForRecall = new int[imagesToShowNumber];
         imagesNumberForRecallNoShuffle = new int[imagesToShowNumber];
     }
@@ -155,6 +156,7 @@ public class FlashManager : GamesScript, IGameable
     /// </summary>
     public void LevelSelector()
     {
+        if(SprintRuntime.Active){LevelAttributes(SprintRuntime.Current.Size,5);return;}
         switch (LevelScript._selectedLevel)
         {
             case 1:
@@ -218,6 +220,7 @@ public class FlashManager : GamesScript, IGameable
                 LevelAttributes(32, 5);
                 break;
             case MemoryAthlete.Level:
+                if(!ChallengeConstants.s_isChallenge){LevelAttributes(32,1);break;}
                 LevelAttributes(MemoryAthlete.FlashImages, MemoryAthlete.FlashMistakes);
                 gameTimeAllocation = MemoryAthlete.FlashRecallSeconds;
                 break;
@@ -272,7 +275,8 @@ public class FlashManager : GamesScript, IGameable
     /// </summary>
     void TriggerAnimationOnRandomCell()
     {
-        int randomCellNumber = UnityEngine.Random.Range(0, activeCellsPanel.transform.childCount - imagesToShowCount);
+        int available=activeCellsPanel.transform.childCount-imagesToShowCount;
+        int randomCellNumber = SprintRuntime.Active?(int)(SprintRuntime.Current.Random.Next()%(uint)available):UnityEngine.Random.Range(0,available);
         GameObject cell = activeCellsPanel.transform.GetChild(Mathf.Abs(randomCellNumber)).gameObject;
         cell.GetComponent<Animator>().SetTrigger("Play");
         cell.transform.SetAsLastSibling();
@@ -338,13 +342,14 @@ public class FlashManager : GamesScript, IGameable
             newRecallImageCellBtn.name = imagesNumberForRecall[i].ToString();
 
             newRecallImageCellBtn.GetComponent<Button>().image.overrideSprite =
-                CardFaces.Face(imagesNumberForRecall[i]);
+                CardFaces.SmallFace(imagesNumberForRecall[i]);
+            newRecallImageCellBtn.GetComponent<Button>().image.preserveAspect=true;
 
             newRecallImageCellBtn.GetComponent<Button>().onClick.AddListener(() => CompareImages(newRecallImageCellBtn));
 
         }
         recallImageCellBtn.SetActive(false);
-        if (MemoryAthlete.IsRound) ArrangeAthleteGrid();
+        if (!SprintRuntime.Active && MemoryAthlete.IsRound && ChallengeConstants.s_isChallenge) ArrangeAthleteGrid();
     }
 
     // Memory Athlete shows 42 images: lay them out evenly (6 x 7 or 7 x 6), never a lone image on the last row.
@@ -378,13 +383,16 @@ public class FlashManager : GamesScript, IGameable
     /// <param name="newRecallImageCellBtn"></param>
     void CompareImages(GameObject newRecallImageCellBtn)
     {
+        if(SprintRuntime.Active && !SprintRuntime.Current.Ready)return;
         if (int.Parse(newRecallImageCellBtn.name) == imagesNumberForRecallNoShuffle[correctSelected])
         {
             correctSelected++;
+            if(SprintRuntime.Active)SprintRuntime.Current.Solve(newRecallImageCellBtn.name);
             newRecallImageCellBtn.SetActive(false);
         }
         else
         {
+            if(SprintRuntime.Active){SprintRuntime.Current.Error();return;}
             wrongSelected++;
             hearts[maxMistakes - wrongSelected].gameObject.SetActive(false);
         }
@@ -402,6 +410,7 @@ public class FlashManager : GamesScript, IGameable
         }
         else if (correctSelected == imagesToShowNumber)
         {
+            if(SprintRuntime.Active)return;
             shouldCountTime = false;
             if (ChallengeConstants.s_isChallenge)
             {
@@ -424,9 +433,10 @@ public class FlashManager : GamesScript, IGameable
     /// </summary>
     void EnableHeartsPerLevel()
     {
-        for (int i = 0; i < maxMistakes; i++)
+        if(SprintRuntime.Active){foreach(var heart in hearts)heart.gameObject.SetActive(false);return;}
+        for (int i = 0; i < hearts.Length; i++)
         {
-            hearts[i].gameObject.SetActive(true);
+            hearts[i].gameObject.SetActive(i<maxMistakes);
         }
     }
 

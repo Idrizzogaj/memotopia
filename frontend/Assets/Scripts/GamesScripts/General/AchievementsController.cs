@@ -66,6 +66,13 @@ public class AchievementsController : MonoBehaviour
 
     private void CheckProgress()
     {
+        if(!isChallange && TrainingAthleteTile.IsRound){
+            string key=TrainingAthleteTile.Badge(game);
+            if(!finished && TrainingAthleteTile.TakePopup(game)) {
+                var badge=catalog.Find(a=>a.constantString==key);if(badge!=null)awards.Enqueue(badge);
+            }
+            return;
+        }
         var user = UserConstants.s_user;
         var stats = user == null ? null : user.userStatistics;
         foreach (string key in AchievementRules.Eligible(isChallange ? null : game,

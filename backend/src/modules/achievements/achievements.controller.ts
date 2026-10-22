@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { User } from '~common/db/entities/user.entity';
@@ -15,6 +15,11 @@ import { AchievementsDto } from './dto/achievements.dto';
 @UseGuards(JwtAuthGuard)
 export class AchievementsController {
     constructor(private achievementsService: AchievementsService) {}
+
+    @Get('users/:id/count')
+    count(@Param('id', ParseIntPipe) id: number): Promise<{ count: number }> {
+        return this.achievementsService.countForProfile(id);
+    }
 
     @ApiOperation({ summary: 'Add Achievement' })
     @ApiResponse({ status: 201, description: 'Achievement created' })

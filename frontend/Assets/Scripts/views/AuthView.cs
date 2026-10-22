@@ -51,7 +51,7 @@ public class AuthView : MonoBehaviour
 #endif
 #if UNITY_ANDROID
         iOSSocialLogin.SetActive(false);
-        AndroidSocialLogin.SetActive(true);
+        AndroidSocialLogin.SetActive(false);
 #endif
     }
 
@@ -64,6 +64,9 @@ public class AuthView : MonoBehaviour
         _userAPIController = gameObject.AddComponent<UserAPIController>();
         _loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
         _dataController.MenuLastPage = NavigationConstants.s_homeNav;
+#if UNITY_ANDROID
+        if (GetComponent<AndroidGoogleSignIn>() == null) gameObject.AddComponent<AndroidGoogleSignIn>();
+#endif
 
         if (!String.IsNullOrEmpty(_dataController.Token))
         {
@@ -128,6 +131,7 @@ public class AuthView : MonoBehaviour
             _authApiController.PerformLogin(usernameLogIn.text, passwordLogIn.text,
                 (OnSuccess) =>
                 {
+                    ProgressSync.Instance.GetApi<AuthAPIController>().RenewSavedSession();
                     _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
                 },
                 (OnFailure) =>
@@ -146,6 +150,7 @@ public class AuthView : MonoBehaviour
     }
 
     public void signUp()
+
     {
         AlertMessageContainer alertMessageContainer = null;
 
@@ -207,6 +212,7 @@ public class AuthView : MonoBehaviour
                     }
                     _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
                 },
+
                 (OnFailure) =>
                 {
                     _loadingScreen.EndLoadingWithDelay();
@@ -220,24 +226,39 @@ public class AuthView : MonoBehaviour
         }
     }
 
+    private bool restoringSession,retrySavedSession;
+    private void OnApplicationFocus(bool focused) {
+        if(focused && retrySavedSession && !restoringSession && _dataController!=null && !String.IsNullOrEmpty(_dataController.Token))getUser();
+    }
     public void getUser()
     {
+        if(restoringSession)return;
+        restoringSession=true;retrySavedSession=false;
         try
         {
             _userAPIController.GetUser(
                 (OnSuccess) =>
                 {
+                    ProgressSync.Instance.GetApi<AuthAPIController>().RenewSavedSession();
+                    restoringSession=false;
                     _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
                 },
                 (OnFailure) =>
                 {
+                    restoringSession=false;
                     _loadingScreen.EndLoadingWithDelay();
-                    HandleConditionWithAlertMessages(OnFailure);
+                    if(OnFailure.StatusCode=="401")HandleConditionWithAlertMessages(OnFailure);
+                    else {
+                        retrySavedSession=true;
+                        errorLogin.GetComponent<Text>().text="Connection unavailable. Your sign-in is saved. Return to the app to retry.";
+                        errorLogin.SetActive(true);
+                    }
                 }
             );
         }
         catch (UserException e)
         {
+            restoringSession=false;
             Debug.Log(e.Message);
         }
     }
@@ -434,7 +455,7 @@ public class AuthView : MonoBehaviour
         try
         {
             _authApiController.PerformSocialLogin(userInfo.userId, userInfo.idToken, "APPLE",
-                (OnSuccess) => { _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu); },
+                (OnSuccess) => { ProgressSync.Instance.GetApi<AuthAPIController>().RenewSavedSession(); _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu); },
                 (OnFailure) => { ShowAppleLoginError("Unable to sign in to Memotopia. Please try again."); });
         }
         catch (Exception exception)

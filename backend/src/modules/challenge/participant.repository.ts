@@ -34,6 +34,7 @@ export class ParticipantRepository extends Repository<Participant> {
         const [results1, total1] = await query.getManyAndCount();
 
         const challenges = results1.map(i => i.challenge.id);
+        if(challenges.length===0)return {results:[],total:0,page,limit};
 
         const query1 = getRepository(Challenge)
             .createQueryBuilder('challenge')

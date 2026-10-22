@@ -1,4 +1,6 @@
-import { Body, Controller, Post, Req, UseInterceptors, ValidationPipe } from '@nestjs/common';
+import { JwtAuthGuard } from '~common/guards/jwt.guard';
+import { GetUser } from '~common/decorators/user.decorator';
+import { Body, Controller, Post, Req, UseGuards, UseInterceptors, ValidationPipe } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 
@@ -15,6 +17,12 @@ import { SocialUserReqDto } from './dto/socialUser-req.dto';
 @Controller('auth')
 export class AuthController {
     constructor(private authService: AuthService) {}
+
+    @Post('/session')
+    @UseGuards(JwtAuthGuard)
+    renewSession(@GetUser() user: User) {
+        return { accessToken: this.authService.generateAccessToken(user) };
+    }
 
     @ApiOperation({ summary: 'Signin' })
     @ApiResponse({ status: 200, description: 'Signin' })

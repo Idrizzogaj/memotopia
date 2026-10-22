@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -81,6 +81,7 @@ public class PairsManager : GamesScript, IGameable
 
     private void Update()
     {
+        if(SprintRuntime.Active){firstCountDown.text=firstCountDownIpad.text=secondCountDown.text=SprintRuntime.Current.ClockText;return;}
         if ((int)(Math.Round((float)Screen.width / (float)Screen.height * 4)) == 3)
         {
             firstCountDownIpad.text = firstCountDown.text;
@@ -140,6 +141,7 @@ public class PairsManager : GamesScript, IGameable
     /// </summary>
     public void SetNames()
     {
+        nameOfImages = new string[CardFaces.ContentCount];
         for (int i = 0; i < nameOfImages.Length; i++)
             nameOfImages[i] = MajorSystemImages.ResourcePath(i + 1);
         Shuffle(nameOfImages);
@@ -166,12 +168,15 @@ public class PairsManager : GamesScript, IGameable
     /// </summary>
     public void NextPair()
     {
-        if (nextCount >= numberOfPairs)
+        if(SprintRuntime.Active && (SprintRuntime.Current.State!=null?!SprintRuntime.Current.Ready:nextCount>0))return;
+        int studyPosition;
+        if (!StudySteps.Take(ref nextCount,numberOfPairs,2,out studyPosition))
         {
             PrepareGameScreen();
             return;
         }
 
+        nextCount=studyPosition;
         img1.sprite = CardFaces.FaceForPath(nameOfImages[nextCount]);
         img2.sprite = CardFaces.FaceForPath(nameOfImages[nextCount + 1]);
         img1Ipad.sprite = CardFaces.FaceForPath(nameOfImages[nextCount]);
@@ -191,6 +196,7 @@ public class PairsManager : GamesScript, IGameable
     /// <param name="selectedGameObject"></param>
     public void CompareCards(GameObject selectedGameObject)
     {
+        if(SprintRuntime.Active && (!selectedGameObject.GetComponent<Button>().interactable || !SprintRuntime.Current.Turn()))return;
         selectedGameObject.GetComponent<Animator>().SetTrigger("Pressed");
         if (cardFaceShown)
         {
@@ -201,10 +207,12 @@ public class PairsManager : GamesScript, IGameable
             if (pairs[firstBtn.name] == secondBtn.name || pairs[secondBtn.name] == firstBtn.name)
             {
                 gameOverCount -= 2;
+                if(SprintRuntime.Active)SprintRuntime.Current.Solve(firstBtn.name);
 
                 //If all pairs are found. Game won or challenge completed
                 if (gameOverCount == 0)
                 {
+                    if(SprintRuntime.Active)return;
                     shouldCountTime = false;
                     if (ChallengeConstants.s_isChallenge)
                     {
@@ -276,6 +284,7 @@ public class PairsManager : GamesScript, IGameable
     /// </summary>
     public void LevelSelector()
     {
+        if(SprintRuntime.Active){LevelAttributes(SprintRuntime.Current.Size*2);return;}
         switch (LevelScript._selectedLevel)
         {
             case 1:

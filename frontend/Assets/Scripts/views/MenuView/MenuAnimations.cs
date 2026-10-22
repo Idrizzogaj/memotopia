@@ -1,4 +1,4 @@
-﻿using Assets.Script.Constants;
+using Assets.Script.Constants;
 using Assets.Script.Controllers;
 using UnityEngine;
 using UnityEngine.UI;
@@ -56,6 +56,7 @@ public class MenuAnimations : MonoBehaviour
 
     public void OpenMenu()
     {
+        MemorySettingsPanel.Ensure(FindObjectOfType<MenuNavigation>());
         sideMenuScreen.SetActive(true);
         var availability = sideMenuScreen.GetComponent<SideMenuAvailability>() ?? sideMenuScreen.AddComponent<SideMenuAvailability>();
         availability.Refresh();

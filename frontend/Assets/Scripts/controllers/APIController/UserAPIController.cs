@@ -60,11 +60,12 @@ namespace Assets.Script.Controllers
             ErrorResponsePayload errorPayload = null;
             if (!String.IsNullOrEmpty(request.text))
             {
-                errorPayload = JsonUtility.FromJson<ErrorResponsePayload>(request.text);
+                try { errorPayload = JsonUtility.FromJson<ErrorResponsePayload>(request.text); } catch(ArgumentException) { }
             }
 
             var message = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Message)) ? errorPayload.Message : request.error;
             var code = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Code)) ? errorPayload.Code : "HTTP_ERROR";
+            if(request.responseHeaders!=null && request.responseHeaders.ContainsKey("STATUS") && request.responseHeaders["STATUS"].Contains("401"))code="401";
             if (onFailure != null) onFailure(ReturnAlertMessageType(message, code));
         }
 
