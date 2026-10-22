@@ -24,3 +24,8 @@ Reproduce backend checks from backend/: node tools/check-sprint.cjs; node tools/
 
 ## Release
 Production backend deployed23October2026; rollback image/source/database on server under sprint-20261023. iOS1.0.55/build2026102301 uses the Mac's Unity2019 exporter and existing signing/privacy fixes. See final release note for signing/install status. No Android/store upload in this change.
+
+## Final release status
+Backend deployment and HTTPS/auth checks passed. Unity2019 exports the corrected iOS player successfully, and the full repository's Editor scripts compile after Android-only build-tool guards. Windows Play Mode passes again with a real wrong-drop prefix-collision test for Boxes (1 must not match10), followed by all4stage resets, modal, deadline, outbox retry and menu checks.
+
+The iOS1.0.55/2026102301 Xcode build compiles, but remote codesigning is blocked by macOS errSecInternalComponent. No new app is installed yet. The original iPhone, now named iPhone, is absent from CoreDevice discovery (both its known identifier and current name were tested). A local Mac installer is prepared at ~/Projects/memotopia/ios-build/build-install-sprint-2026102301.sh; it verifies version/signature/privacy files and targets only the original phone. Continue after the user runs it locally or resolves keychain/device access. Do not report installation as completed before verifying the device.
