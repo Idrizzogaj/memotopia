@@ -32,3 +32,7 @@ The user completed local signing with the prepared Mac installer. After replacin
 
 ## Follow-up: Challenge selector touch fix
 The installed build exposed a full-card TouchTarget that intercepted the new tier buttons. Disable the retired parent Button and any previously created parent hit area so the global touch installer cannot cover the tier choices. A real GraphicRaycaster/pointer-click regression reproduced the failure before the fix (Pairs/Easy routed to the parent) and now passes all16tier buttons with repeated touch-target scans. Both mode buttons are also clicked through the raycaster and verified to swap orange/light-grey backgrounds with black labels. Only Flash's Athlete elephant is tinted black. The updated selector screenshot was visually reviewed. These source changes are not yet built or installed on the phone; its installed version remains1.0.55/2026102301.
+
+## Follow-up: shared Memory/Challenge symbols
+Boxes now uses a closed cube, keeping its lid clear of the Easy corner. Flash uses a smaller single filled lightning silhouette instead of the earlier S-shaped strokes. Both selectors call the same shared drawing code. Focus explicitly keeps the previous placeholder symbols. Existing Challenge touch/selection validation and Chain UI validation pass; actual phone/tablet Training and Challenge renders were inspected. Source only: the installed iPhone build is unchanged.
+

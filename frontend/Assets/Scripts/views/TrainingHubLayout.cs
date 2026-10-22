@@ -36,7 +36,7 @@ public static class TrainingHubLayout
         var back=tile.GetComponent<Image>();back.enabled=true;back.sprite=ContentSelectorBar.Rounded();back.type=Image.Type.Sliced;back.color=focus?FocusTone:MemoryTone;back.canvasRenderer.SetColor(Color.white);var selectable=tile.GetComponent<Button>();if(focus && selectable!=null){var colors=selectable.colors;colors.disabledColor=Color.white;selectable.colors=colors;selectable.transition=Selectable.Transition.None;}
         var border=tile.GetComponent<Outline>();if(border==null)border=tile.gameObject.AddComponent<Outline>();border.effectColor=Color.clear;border.effectDistance=new Vector2(2,-2);
         var art=new GameObject("Flat game symbol",typeof(RectTransform));art.transform.SetParent(tile,false);var ar=(RectTransform)art.transform;ar.anchorMin=new Vector2(.22f,.35f);ar.anchorMax=new Vector2(.78f,.87f);ar.offsetMin=ar.offsetMax=Vector2.zero;
-        Canvas.ForceUpdateCanvases();TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white);
+        Canvas.ForceUpdateCanvases();TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white,focus);
         var label=ChainGame.Label(tile,Names[index],new Vector2(.05f,.10f),new Vector2(.95f,.32f),46,Color.white);label.fontStyle=FontStyle.Bold;
         if(focus)ChainGame.Label(tile,"90 s • Coming soon",new Vector2(.04f,.02f),new Vector2(.96f,.12f),20,Color.white);
     }
@@ -92,7 +92,19 @@ public static class TrainingHubLayout
 
 public static class TrainingGameSymbol
 {
-    public static void Draw(RectTransform parent,int kind,Color color) {
+    public static void Draw(RectTransform parent,int kind,Color color,bool preserveFocus=false) {
+        // Focus keeps its original placeholders while Memory and Challenge share the revised symbols.
+        if(!preserveFocus && kind==2){
+            var bolt=new GameObject("Compact lightning",typeof(RectTransform),typeof(CanvasRenderer),typeof(TrainingFlashSymbol));
+            var rect=(RectTransform)bolt.transform;rect.SetParent(parent,false);rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;rect.offsetMin=rect.offsetMax=Vector2.zero;
+            var graphic=bolt.GetComponent<TrainingFlashSymbol>();graphic.color=color;graphic.raycastTarget=false;return;
+        }
+        if(!preserveFocus && kind==1){
+            // A closed lid keeps the silhouette below the Easy corner without moving any controls.
+            var points=new[]{new Vector2(.2f,.29f),new Vector2(.5f,.13f),new Vector2(.8f,.29f),new Vector2(.8f,.60f),new Vector2(.5f,.75f),new Vector2(.2f,.60f),new Vector2(.2f,.29f)};
+            for(int i=1;i<points.Length;i++)Line(parent,points[i-1],points[i],color);
+            Line(parent,new Vector2(.2f,.60f),new Vector2(.5f,.44f),color);Line(parent,new Vector2(.8f,.60f),new Vector2(.5f,.44f),color);Line(parent,new Vector2(.5f,.44f),new Vector2(.5f,.13f),color);return;
+        }
         if(kind==2) {Line(parent,new Vector2(.63f,.94f),new Vector2(.26f,.48f),color);Line(parent,new Vector2(.26f,.48f),new Vector2(.70f,.48f),color);Line(parent,new Vector2(.70f,.48f),new Vector2(.38f,.06f),color);return;}
         if(kind==1) {
             var points=new[]{new Vector2(.2f,.25f),new Vector2(.5f,.07f),new Vector2(.8f,.25f),new Vector2(.8f,.65f),new Vector2(.5f,.48f),new Vector2(.2f,.65f),new Vector2(.2f,.25f)};
