@@ -24,6 +24,7 @@ public static class TrainingHubLayout
         }
     }
     private static readonly string[] Names={"PAIRS","BOXES","FLASH","CHAIN"};
+    private static readonly Color[] GameTones={new Color32(36,189,224,255),new Color32(234,24,100,255),new Color32(254,191,75,255),new Color32(123,31,255,255)};
     public static readonly Color MemoryTone=new Color32(106,28,225,255), FocusTone=new Color32(0,112,122,255);
     private static void Header(RectTransform screen,string caption,float top,float width) {
         var go=ChainGame.Panel(screen,caption+" section",Vector2.zero,Vector2.one,caption=="FOCUS"?FocusTone:MemoryTone);
@@ -33,7 +34,7 @@ public static class TrainingHubLayout
     private static void Tile(RectTransform tile,int index,bool focus,RectTransform screen,float side,float gap,float top) {
         foreach(var old in tile.GetComponentsInChildren<Graphic>(true))if(old.transform!=tile)old.enabled=false;
         Place(tile,screen,(index%2==0?-1:1)*(side+gap)/2,top-(index/2)*(side+gap),side,side);
-        var back=tile.GetComponent<Image>();back.enabled=true;back.sprite=ContentSelectorBar.Rounded();back.type=Image.Type.Sliced;back.color=focus?FocusTone:MemoryTone;back.canvasRenderer.SetColor(Color.white);var selectable=tile.GetComponent<Button>();if(focus && selectable!=null){var colors=selectable.colors;colors.disabledColor=Color.white;selectable.colors=colors;selectable.transition=Selectable.Transition.None;}
+        var back=tile.GetComponent<Image>();back.enabled=true;back.sprite=ContentSelectorBar.Rounded();back.type=Image.Type.Sliced;back.color=focus?FocusTone:GameTones[index];back.canvasRenderer.SetColor(Color.white);var selectable=tile.GetComponent<Button>();if(focus && selectable!=null){var colors=selectable.colors;colors.disabledColor=Color.white;selectable.colors=colors;selectable.transition=Selectable.Transition.None;}
         var border=tile.GetComponent<Outline>();if(border==null)border=tile.gameObject.AddComponent<Outline>();border.effectColor=Color.clear;border.effectDistance=new Vector2(2,-2);
         var art=new GameObject("Flat game symbol",typeof(RectTransform));art.transform.SetParent(tile,false);var ar=(RectTransform)art.transform;ar.anchorMin=new Vector2(.22f,.35f);ar.anchorMax=new Vector2(.78f,.87f);ar.offsetMin=ar.offsetMax=Vector2.zero;
         Canvas.ForceUpdateCanvases();TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white,focus);
@@ -48,7 +49,7 @@ public static class TrainingHubLayout
         for(int i=0;i<images.Length;i++) {
             var back=images[i];if(back==null || back.transform.Find("Approved game icon")!=null)continue;
             foreach(var old in back.GetComponentsInChildren<Graphic>(true))if(old!=back)old.enabled=false;
-            back.sprite=ContentSelectorBar.Rounded();back.type=Image.Type.Sliced;back.color=new[]{new Color32(36,189,224,255),new Color32(234,24,100,255),new Color32(254,191,75,255),new Color32(123,31,255,255)}[i];
+            back.sprite=ContentSelectorBar.Rounded();back.type=Image.Type.Sliced;back.color=GameTones[i];
             // The old full-card Button must not get a last-sibling TouchTarget over the tier buttons.
             var parentButton=back.GetComponent<Button>();
             if(parentButton!=null){
