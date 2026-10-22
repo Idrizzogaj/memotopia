@@ -6,18 +6,25 @@ using UnityEngine.UI;
 public sealed class SprintLobby : MonoBehaviour {
  public static SprintBattleView Latest;
  private ChallengeNavigation navigation;private SprintAPI api;private bool match,creating;private GameObject panel,list;
- private Text singleLabel,matchLabel;private float refreshAt;private int page,selectedId,requestVersion;private bool refreshing,starting;
+ private Button singleButton,matchButton;private Text singleLabel,matchLabel;private float refreshAt;private int page,selectedId,requestVersion;private bool refreshing,starting;
  public static SprintLobby Attach(ChallengeNavigation navigation){
   var lobby=navigation.GetComponent<SprintLobby>();if(lobby!=null)return lobby;
   lobby=navigation.gameObject.AddComponent<SprintLobby>();lobby.navigation=navigation;lobby.api=navigation.gameObject.AddComponent<SprintAPI>();lobby.Build();return lobby;
  }
  private void Build(){
   var row=ChainGame.Panel(navigation.challengeGameScreen.transform,"Single or Match",new Vector2(.1f,.84f),new Vector2(.9f,.89f),Color.clear);
-  var single=SprintUi.Button(row.transform,"Single game",Vector2.zero,new Vector2(.49f,1),()=>SetMode(false));singleLabel=single.GetComponentInChildren<Text>();
-  var multiple=SprintUi.Button(row.transform,"Match!",new Vector2(.51f,0),Vector2.one,()=>SetMode(true));matchLabel=multiple.GetComponentInChildren<Text>();SetMode(false);
+  var single=SprintUi.Button(row.transform,"Single game",Vector2.zero,new Vector2(.49f,1),()=>SetMode(false));singleButton=single;singleLabel=single.GetComponentInChildren<Text>();
+  var multiple=SprintUi.Button(row.transform,"Match!",new Vector2(.51f,0),Vector2.one,()=>SetMode(true));matchButton=multiple;matchLabel=multiple.GetComponentInChildren<Text>();SetMode(false);
   SprintUi.Button(navigation.challengeHomeScreen.transform,"90 s Challenges / Match!",new Vector2(.12f,.83f),new Vector2(.88f,.88f),Open);
  }
- private void SetMode(bool value){match=value;singleLabel.color=value?ChainGame.Ink:ChainGame.Purple;matchLabel.color=value?ChainGame.Purple:ChainGame.Ink;}
+ private void SetMode(bool value){
+  match=value;StyleMode(singleButton,singleLabel,!value);StyleMode(matchButton,matchLabel,value);
+ }
+ private static void StyleMode(Button button,Text label,bool selected){
+  button.transition=Selectable.Transition.None;button.image.sprite=ContentSelectorBar.Rounded();button.image.type=Image.Type.Sliced;
+  button.image.color=selected?new Color32(254,191,75,255):new Color32(245,245,245,255);button.image.canvasRenderer.SetColor(Color.white);label.color=Color.black;
+  var outline=button.GetComponent<Outline>();if(outline==null)outline=button.gameObject.AddComponent<Outline>();outline.effectColor=new Color32(210,210,210,255);outline.effectDistance=new Vector2(1,-1);
+ }
  public void Create(string game,int tier,int opponent){
   if(creating || !CanStart())return;creating=true;
   api.Request<SprintBattleView>("",JsonUtility.ToJson(new SprintCreate{game=game,tier=tier,recipientId=opponent,mode=match?"match":"single"}),battle=>{creating=false;SprintRuntime.Begin(battle,null);},error=>{creating=false;Message(error);});

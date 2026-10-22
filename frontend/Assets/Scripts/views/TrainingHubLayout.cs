@@ -49,7 +49,12 @@ public static class TrainingHubLayout
             var back=images[i];if(back==null || back.transform.Find("Approved game icon")!=null)continue;
             foreach(var old in back.GetComponentsInChildren<Graphic>(true))if(old!=back)old.enabled=false;
             back.sprite=ContentSelectorBar.Rounded();back.type=Image.Type.Sliced;back.color=new[]{new Color32(36,189,224,255),new Color32(234,24,100,255),new Color32(254,191,75,255),new Color32(123,31,255,255)}[i];
-            var parentButton=back.GetComponent<Button>();if(parentButton!=null){parentButton.onClick=new Button.ButtonClickedEvent();parentButton.transition=Selectable.Transition.None;}
+            // The old full-card Button must not get a last-sibling TouchTarget over the tier buttons.
+            var parentButton=back.GetComponent<Button>();
+            if(parentButton!=null){
+                parentButton.onClick=new Button.ButtonClickedEvent();parentButton.enabled=false;
+                var oldHit=parentButton.transform.Find("Touch area");if(oldHit!=null)oldHit.gameObject.SetActive(false);
+            }
             var tile=back.rectTransform;
             Canvas.ForceUpdateCanvases();
             float height=Mathf.Min(tile.rect.height*.62f,tile.rect.width*.27f);
@@ -64,7 +69,7 @@ public static class TrainingHubLayout
             Corner(tile,navigation,game,"Hard",18,new Vector2(.03f,.02f),new Vector2(.42f,.28f));
             var athlete=Corner(tile,navigation,game,"",MemoryAthlete.Level,new Vector2(.03f,.72f),new Vector2(.30f,.98f));
             var logo=ChainGame.Panel(athlete.transform,"Existing elephant logo",new Vector2(.15f,.1f),new Vector2(.85f,.9f),Color.white).GetComponent<Image>();
-            logo.sprite=Resources.Load<Sprite>("GamesResources/Loading/Untitled-3-01");logo.preserveAspect=true;logo.raycastTarget=false;
+            logo.sprite=Resources.Load<Sprite>("GamesResources/Loading/Untitled-3-01");logo.preserveAspect=true;logo.raycastTarget=false;logo.color=i==2?Color.black:Color.white;
         }
         for(int i=0;i<images.Length;i++){var r=images[i].rectTransform;r.anchorMin=new Vector2(.05f,.64f-i*.20f);r.anchorMax=new Vector2(.95f,.82f-i*.20f);r.offsetMin=r.offsetMax=Vector2.zero;}
         SprintLobby.Attach(navigation);
