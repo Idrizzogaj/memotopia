@@ -27,6 +27,7 @@
 <tr><td>Password (stored only as a one-way hash)</td><td>Log you in</td><td>Contract</td></tr>
 <tr><td>Game results: levels, stars, scores, XP, achievements, time played</td><td>Run the games, progression and ranking; show your results to other players</td><td>Contract</td></tr>
 <tr><td>Challenge data: opponents, games, results, favourites</td><td>Run challenges between players</td><td>Contract</td></tr>
+<tr><td>Fixed emoji reactions, sender, recipient and send time</td><td>Let match participants exchange reactions; enforce the five-second sending limit and friend-only delivery during play</td><td>Contract for the requested game interaction</td></tr>
 <tr><td>Online visibility, friend requests and accepted friendships</td><td>Find friends and arrange live games. Favourites alone never grant access to hidden status.</td><td>Contract for requested friendships; consent for optional online visibility, which can be switched off</td></tr>
 <tr><td>Invitations, decisions, a private declined total, block lists and anti-spam counters</td><td>Control contact and prevent unwanted invitations</td><td>Contract for invitation controls; legitimate interest in preventing harassment and spam</td></tr>
 <tr><td>Live round start, progress and final results</td><td>Synchronise the 90-second game and compare participants</td><td>Contract</td></tr>
@@ -54,6 +55,7 @@
 <ul>
 <li>Account and game data: until you delete the account.</li>
 <li>Presence expires within 45 seconds without a heartbeat. Expired lease values are cleared on the next challenge refresh; no separate activity history is kept.</li>
+<li>Emoji reactions are visible only to the match participants. They expire for delivery after 10 minutes and are removed on the next challenge refresh; at most 32 are retained per match. Accepted friends can receive them during play, other participants before or after a timed round. Blocking stops reactions in both directions. No free-text chat is provided.</li>
 <li>Unaccepted friend requests, including refusals, expire after 7 days and are cleared on the next challenge refresh. Anti-spam counters keep the current or last one-hour window until the next request or account deletion.</li>
 <li>Unanswered challenge invitations expire after 24 hours. Declined, expired, blocked and withdrawn challenge invitations are removed after 30 days on the next challenge refresh. Accepted game results and the private declined total remain with your account.</li>
 <li>Friendships and privacy settings remain until changed or account deletion; block lists remain until unblocking or account deletion.</li>

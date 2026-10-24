@@ -7,6 +7,7 @@ export interface SprintLeg {
     results: { [user: string]: SprintResult }; winner: number | null;
 }
 export interface SprintBattleState {
+    reactions?: {sender:number;key:string;at:number}[];
     endReason?:string; forfeitedId?:number;
     invitation?: 'pending'|'accepted'|'declined'|'expired'|'blocked'|'withdrawn'; invitationExpires?:number; live?:boolean;
     version: number; mode: 'single' | 'match'; tier: number; legs: SprintLeg[];

@@ -10,6 +10,7 @@ using UnityEngine.Networking;
 [Serializable] public class SprintCreate {public int recipientId,tier,version=2;public bool live;public string game,mode;}
 [Serializable] public class SprintSubmit {public int legIndex;public SprintResult result;}
 [Serializable] public class SprintChoose {public string game;}
+[Serializable] public class SprintCancel {public string reason;}
 public class SprintAPI : MonoBehaviour {
  // Unity's serializer materialises null custom classes. Explicit receipt flags
  // distinguish a missing result from a valid played round with zero progress.
@@ -23,13 +24,13 @@ public class SprintAPI : MonoBehaviour {
 #if UNITY_EDITOR
  public static Action<string,string,Action<string>,Action<string>> EditorTransport;
 #endif
- public void Request<T>(string path,string body,Action<T> success,Action<string> failure){
+ public void Request<T>(string path,string body,Action<T> success,Action<string> failure,int timeout=20){
 #if UNITY_EDITOR
   if(EditorTransport!=null){EditorTransport(path,body,text=>success(Decode<T>(text)),failure);return;}
 #endif
-  StartCoroutine(Send(path,body,success,failure));
+  StartCoroutine(Send(path,body,success,failure,timeout));
  }
- private IEnumerator Send<T>(string path,string body,Action<T> success,Action<string> failure){
+ private IEnumerator Send<T>(string path,string body,Action<T> success,Action<string> failure,int timeout){
 #if UNITY_EDITOR
   if(EditorTransport!=null){EditorTransport(path,body,text=>success(Decode<T>(text)),failure);yield break;}
 #endif
@@ -37,7 +38,7 @@ public class SprintAPI : MonoBehaviour {
   string root=new Uri(new Assets.Script.Constants.APIConstants().GetUserRoute).GetLeftPart(UriPartial.Authority);
   using(var request=new UnityWebRequest(root+"/sprints"+path,body==null?"GET":"POST")){
    request.downloadHandler=new DownloadHandlerBuffer();if(body!=null)request.uploadHandler=new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
-   request.SetRequestHeader("Content-Type","application/json");request.SetRequestHeader("Authorization",token);request.timeout=20;
+   request.SetRequestHeader("Content-Type","application/json");request.SetRequestHeader("Authorization",token);request.timeout=timeout;
    float sent=Time.realtimeSinceStartup;yield return request.SendWebRequest();
    if(GameManager.AchievementUserId!=account || string.IsNullOrEmpty(PlayerPrefs.GetString("token")))yield break;
    if(PlayerPrefs.GetString("token")!=token){failure("Session refreshed. Please try again.");yield break;}

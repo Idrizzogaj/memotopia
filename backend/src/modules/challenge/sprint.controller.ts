@@ -22,5 +22,7 @@ export class SprintController {
     @Post(':id/game') async choose(@GetUser() user: User,@Param('id',ParseIntPipe) id:number,@Body() body:{game:string}){if(!body)throw new BadRequestException();return view(await this.service.choose(user.id,id,body.game));}
     @Post(':id/respond') async respond(@GetUser() user:User,@Param('id',ParseIntPipe) id:number,@Body() body:{accept:boolean}){return view(await this.service.respond(user.id,id,body&&body.accept));}
     @Post(':id/progress') async progress(@GetUser() user:User,@Param('id',ParseIntPipe) id:number,@Body() body:{legIndex:number;ms:number;units:number}){return view(await this.service.progress(user.id,id,body));}
-    @Post(':id/cancel') async cancel(@GetUser() user:User,@Param('id',ParseIntPipe) id:number){return view(await this.service.cancel(user.id,id));}
+    @Post(':id/cancel') async cancel(@GetUser() user:User,@Param('id',ParseIntPipe) id:number,@Body() body?:{reason?:string}){return view(await this.service.cancel(user.id,id,body&&body.reason));}
+    @Get(':id/reactions') async reactions(@GetUser() user:User,@Param('id',ParseIntPipe) id:number){return this.service.reactions(user.id,id);}
+    @Post(':id/reactions') async react(@GetUser() user:User,@Param('id',ParseIntPipe) id:number,@Body() body:{key:string}){return this.service.react(user.id,id,body&&body.key);}
 }

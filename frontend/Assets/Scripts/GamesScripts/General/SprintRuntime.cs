@@ -18,7 +18,8 @@ public sealed class SprintRuntime : MonoBehaviour {
  public string Game {get{return Battle.legs[LegIndex].game;}}
  public int StageSeed {get{return unchecked(Battle.legs[LegIndex].seed+(State==null?0:State.Stage)*104729);}}
  public SprintRandom Random {get;private set;}
- public bool Ready {get{return State!=null && !State.Finished && !transition && !ending && quitDialog==null;}}
+ public bool Ready {get{return State!=null && !State.Finished && !transition && !ending && !connecting && quitDialog==null;}}
+ private bool connecting;private float savedScale=1;private GameObject connectionOverlay;
  private GameObject stageRoot,stageTemplate,templateHolder;private ChainGame chainGame;
  private int owner;private bool transition,ending,introStarting,paced,cancelling,closed;private SprintAPI api;private GameObject quitDialog;private Button retry;
  private float progressAt;private bool progressBusy;private int liveUnits;
@@ -32,7 +33,7 @@ public sealed class SprintRuntime : MonoBehaviour {
 #if UNITY_EDITOR
   if(EditorNow!=null)return EditorNow();
 #endif
-  return (long)(Time.realtimeSinceStartup*1000);
+  return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
  }}
  public string ClockText {get{return State==null?"90":Mathf.CeilToInt(State.Remaining(Now)/1000f).ToString();}}
  public static void Begin(SprintBattleView battle,Action<SprintBattleView> finished){
@@ -41,6 +42,7 @@ public sealed class SprintRuntime : MonoBehaviour {
   var runtime=root.AddComponent<SprintRuntime>();Current=runtime;runtime.Battle=battle;runtime.LegIndex=battle.legs.Length-1;runtime.owner=GameManager.AchievementUserId;runtime.finished=finished;runtime.api=root.AddComponent<SprintAPI>();
   var leg=battle.legs[runtime.LegIndex];var result=runtime.owner==battle.ownerId?leg.recipientResult:leg.ownerResult;
   runtime.paced=result!=null;if(result!=null && result.trace!=null)runtime.opponent=result.trace;
+  PlayerPrefs.SetString("sprint.active."+runtime.owner,JsonUtility.ToJson(battle));PlayerPrefs.Save();
   runtime.Random=new SprintRandom(runtime.StageSeed);runtime.BuildHud();SceneManager.sceneLoaded+=runtime.SceneLoaded;runtime.LoadGame();
  }
  private void BuildHud(){
@@ -57,6 +59,10 @@ public sealed class SprintRuntime : MonoBehaviour {
   retry=SprintUi.Button(root.transform,"Retry",new Vector2(.25f,.20f),new Vector2(.75f,.29f),()=>{retry.gameObject.SetActive(false);if(cancelling)Cancel();else if(State==null)StartCoroutine(Intro());else StartCoroutine(Submit());});retry.gameObject.SetActive(false);
   waitingBack=SprintUi.Back(root.transform,Quit);
   SprintUi.Button(root.transform,"Give up",new Vector2(.73f,.925f),new Vector2(.98f,.975f),Quit);
+  SprintReactions.Attach(root.transform,Battle.id);
+  connectionOverlay=ChainGame.Panel(root.transform,"Connection recovery",Vector2.zero,Vector2.one,new Color(1,1,1,.12f));
+  var wifi=new GameObject("Connection wifi",typeof(RectTransform),typeof(CanvasRenderer),typeof(PresenceIndicator));wifi.transform.SetParent(connectionOverlay.transform,false);var wifiRect=(RectTransform)wifi.transform;wifiRect.anchorMin=wifiRect.anchorMax=new Vector2(.5f,.55f);wifiRect.sizeDelta=new Vector2(250,250);wifi.GetComponent<PresenceIndicator>().color=new Color(.8f,.05f,.12f,.24f);wifi.GetComponent<PresenceIndicator>().raycastTarget=false;
+  ChainGame.Label(connectionOverlay.transform,"Connecting",new Vector2(.15f,.38f),new Vector2(.85f,.46f),44,new Color(.65f,.08f,.12f));connectionOverlay.SetActive(false);
  }
  private void SceneLoaded(Scene scene,LoadSceneMode mode){
   if(!Active || ending)return;
@@ -132,6 +138,8 @@ public sealed class SprintRuntime : MonoBehaviour {
   if(GameManager.AchievementUserId!=owner){Close();return;}
   if(State==null || ending)return;
   State.Tick(Now);int remaining=State.Remaining(Now);
+  if(Battle.live && Application.internetReachability==NetworkReachability.NotReachable)SetConnecting(true);
+  if(connecting && State.Finished){Cancel(true);return;}
   timer.text=Mathf.CeilToInt(remaining/1000f).ToString();
   string announcement=ChallengeSprintRules.Cue(lastRemaining,remaining);lastRemaining=remaining;
   if(announcement!=null){cue.text=announcement;cueUntil=Time.realtimeSinceStartup+1;}
@@ -140,23 +148,26 @@ public sealed class SprintRuntime : MonoBehaviour {
   if(Battle.live && !progressBusy && Time.unscaledTime>=progressAt){
    progressAt=Time.unscaledTime+1;progressBusy=true;
    api.Request<SprintBattleView>("/"+Battle.id+"/progress",JsonUtility.ToJson(new SprintProgress{legIndex=LegIndex,ms=90000-remaining,units=own}),value=>{
-    progressBusy=false;Battle=value;var leg=value.legs[LegIndex];liveUnits=owner==value.ownerId?leg.recipientUnits:leg.ownerUnits;
+    if(this==null || closed)return;progressBusy=false;
+    if(connecting && State.Remaining(Now)<=0){Cancel(true);return;}
+    SetConnecting(false);Battle=value;var leg=value.legs[LegIndex];liveUnits=owner==value.ownerId?leg.recipientUnits:leg.ownerUnits;
     if(value.done && !ending){ending=true;SprintLobby.Latest=value;Close();SceneManager.LoadSceneAsync("GameMenu");}
-   },error=>{progressBusy=false;status.text="Reconnecting";});
+   },error=>{if(this==null || closed)return;progressBusy=false;SetConnecting(true);},3);
   }
   int gap=own-(Battle.live?liveUnits:ChallengeSprintRules.OpponentAt(opponent,90000-remaining));
   if(paced || Battle.live){float fraction=Mathf.Clamp(gap/20f,-1,1);lead.rectTransform.anchorMin=new Vector2(.5f+Mathf.Min(0,fraction)*.5f,0);lead.rectTransform.anchorMax=new Vector2(.5f+Mathf.Max(0,fraction)*.5f,1);lead.color=Color.Lerp(new Color(.65f,.65f,.65f),gap>=0?new Color(.05f,.7f,.25f):new Color(.9f,.1f,.15f),Mathf.Abs(fraction));status.text=gap==0?"Level":gap>0?"Ahead +"+gap:"Behind "+gap;}
   else status.text="Set the pace!";
-  if(State.Finished){ending=true;StartCoroutine(Submit());}
+  if(State.Finished){if(connecting)Cancel(true);else{ending=true;StartCoroutine(Submit());}}
  }
  private int lastRemaining=90000;
  private IEnumerator Submit(){
   if(quitDialog!=null){Destroy(quitDialog);quitDialog=null;}
   cue.text="BRAINS OUT!";
   foreach(var canvas in FindObjectsOfType<Canvas>())if(canvas.gameObject.scene==SceneManager.GetActiveScene()){var group=canvas.GetComponent<CanvasGroup>();if(group==null)group=canvas.gameObject.AddComponent<CanvasGroup>();group.interactable=false;group.blocksRaycasts=false;}
-  yield return new WaitForSecondsRealtime(1);
   string payload=JsonUtility.ToJson(new SprintSubmit{legIndex=LegIndex,result=State.Result()});
   PlayerPrefs.SetString("sprint.pending."+owner,JsonUtility.ToJson(Battle)+"\n"+payload);PlayerPrefs.Save();
+  PlayerPrefs.DeleteKey("sprint.active."+owner);PlayerPrefs.Save();
+  yield return new WaitForSecondsRealtime(1);
   api.Request<SprintBattleView>("/"+Battle.id+"/result",payload,battle=>{
    PlayerPrefs.DeleteKey("sprint.pending."+owner);PlayerPrefs.Save();SprintLobby.Latest=battle;var callback=finished;Close();SceneManager.LoadSceneAsync("GameMenu");if(callback!=null)callback(battle);
   },Fail);
@@ -176,13 +187,22 @@ public sealed class SprintRuntime : MonoBehaviour {
   no.onClick.AddListener(()=>{Destroy(quitDialog);quitDialog=null;});
   yes.onClick.AddListener(()=>{Destroy(quitDialog);quitDialog=null;Cancel();});
  }
- private void Cancel(){
+ private void Cancel(bool connectionLost=false){
   ending=cancelling=true;
+  Battle.endReason=connectionLost?"connection":"gave_up";
   PlayerPrefs.SetString("sprint.cancel."+owner,JsonUtility.ToJson(Battle));PlayerPrefs.Save();
-  api.Request<SprintBattleView>("/"+Battle.id+"/cancel","{}",ReturnToLobby,error=>{if(closed)return;Close();SceneManager.LoadSceneAsync("GameMenu");});
+  api.Request<SprintBattleView>("/"+Battle.id+"/cancel",JsonUtility.ToJson(new SprintCancel{reason=Battle.endReason}),ReturnToLobby,error=>{if(closed)return;Close();SceneManager.LoadSceneAsync("GameMenu");});
  }
+ private void SetConnecting(bool value){
+  if(connecting==value)return;connecting=value;
+  if(value){savedScale=Time.timeScale;Time.timeScale=0;}else Time.timeScale=savedScale;
+  if(connectionOverlay!=null){connectionOverlay.SetActive(value);connectionOverlay.transform.SetAsLastSibling();}
+ }
+ private void OnApplicationPause(bool paused){if(Battle!=null && Battle.live && State!=null && !ending){SetConnecting(true);progressAt=0;}}
  public void Close(){
   if(closed)return;closed=true;
+  SetConnecting(false);
+  PlayerPrefs.DeleteKey("sprint.active."+owner);PlayerPrefs.Save();
   SceneManager.sceneLoaded-=SceneLoaded;
   // The old scene can survive until the asynchronous menu load completes. Do not
   // let its normal180second training timers or coroutines resume in that gap.

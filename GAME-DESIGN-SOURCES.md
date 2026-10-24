@@ -21,3 +21,11 @@ All four sources new relative to the preceding entry. See docs/LIVE-CHALLENGE-AS
 - Photon recovery (new): https://doc.photonengine.com/realtime/v5/troubleshooting/analyzing-disconnects — distinguish transient disruption from terminal session loss; bounded rejoin.
 - AWS idempotent APIs (new): https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/ — safe retries, late arrivals and atomic exactly-once effects.
 These three independent primary sources support lifecycle recovery and receipt safety. Existing90second rounds and60second receipt grace remain; a previously indefinite one-ready-player wait now uses that same grace. No claim of empirically optimal timings. See docs/LIVE-RECOVERY-20261025.md.
+# 2026-10-25 — app closure versus temporary interruption
+
+- Unity lifecycle reference: https://docs.unity.cn/430/Documentation/ScriptReference/MonoBehaviour.OnApplicationQuit.html — iOS suspension does not reliably invoke quit; distinguishes suspension from explicit exit.
+- Photon Fusion recovery documentation: https://doc.photonengine.com/fusion/v2/troubleshooting/analyzing-disconnects — bounded recoverable reconnect/rejoin, no assumption that every disconnection is final.
+- AWS GameLift session states: https://docs.aws.amazon.com/gameliftservers/latest/apireference/API_PlayerSession.html — server-owned active/completed/timed-out states and bounded connection waits.
+
+Three independent primary organisations. Unity lifecycle and AWS session reference are new compared with the earlier live-recovery search. These support explicit lifecycle/recovery states, not a proven optimal grace period or whole-match forfeiture. Whole-match Give up is an implementation judgement; real90second time during interruption, resume position, terminal disconnection loss and reaction rules were explicitly requested by the user.
+
