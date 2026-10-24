@@ -566,6 +566,7 @@ public class ChallengeNavigation : MonoBehaviour
             if(this!=null && request==profileRequest && challengeUserProfileScreen.activeInHierarchy)texts[6].text="—";
         });
 
+        challengeOnProfile.onClick.RemoveAllListeners();deleteFavorite.onClick.RemoveAllListeners();addFavorite.onClick.RemoveAllListeners();
         challengeOnProfile.onClick.AddListener(() => {
             UserConstants.s_challengeUser = user;
             GoToChallengeGame();

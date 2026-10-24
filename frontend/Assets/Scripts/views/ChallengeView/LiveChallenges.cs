@@ -23,7 +23,8 @@ public sealed class LiveChallenges : MonoBehaviour {
  private OnlinePlayers online=new OnlinePlayers();private bool focused=true,paused,busy,loaded,polling,acting;private int account;
  private readonly List<PresenceLabel> labels=new List<PresenceLabel>();
  private sealed class PresenceLabel {public Text label;public int id;public string name;}
- public static void Watch(Text label,int id,string name){label.text="    "+name+(IsOnline(id)?" · Online":" · Offline");PresenceIndicator.Set(label,IsOnline(id));if(Current!=null)Current.labels.Add(new PresenceLabel{label=label,id=id,name=name});}
+ private static string Status(int id,string name){return (string.IsNullOrEmpty(name)?"":name+" · ")+(IsOnline(id)?"Online":"Offline");}
+ public static void Watch(Text label,int id,string name){label.text=Status(id,name);PresenceIndicator.Set(label,IsOnline(id));if(Current!=null)Current.labels.Add(new PresenceLabel{label=label,id=id,name=name});}
  private string sessionToken;
  private float beatAt,pollAt;private GameObject panel,banner;private Transform content;private Text notice;private int showingInvite;
  public static LiveChallenges Attach(ChallengeNavigation navigation){
@@ -37,8 +38,16 @@ public sealed class LiveChallenges : MonoBehaviour {
  public void Profile(Transform parent,int id){
   var old=parent.Find("Block");if(old!=null)Remove(old.gameObject);
   var friendOld=parent.Find("Friend");if(friendOld!=null)Remove(friendOld.gameObject);
-  SprintUi.Button(parent,"Friend",new Vector2(.05f,.015f),new Vector2(.30f,.065f),()=>ConfirmFriend(id));
+  var relation=(settings.friends??new SocialPlayer[0]).FirstOrDefault(p=>p.id==id);
+  var friend=SprintUi.Button(parent,"Friend",new Vector2(.05f,.015f),new Vector2(.30f,.065f),()=>ConfirmFriend(id));
+  var friendText=friend.GetComponentInChildren<Text>();friendText.text=relation==null?"Friend":relation.accepted?"Friends":relation.requesterId==account?"Already sent":"Request";
+  friend.interactable=relation==null || (!relation.accepted && relation.requesterId!=account);
   SprintUi.Button(parent,"Block",new Vector2(.32f,.015f),new Vector2(.68f,.065f),()=>ConfirmBlock(id));
+  var oldStatus=parent.Find("Player presence");if(oldStatus!=null)Remove(oldStatus.gameObject);
+  var name=parent.GetComponentsInChildren<Text>(true).First();
+  var status=ChainGame.Label(parent,"",new Vector2(.2f,.48f),new Vector2(.8f,.53f),26,Muted);status.name="Player presence";
+  if(name.transform.parent==parent){var r=status.rectTransform;var original=name.rectTransform;r.anchorMin=original.anchorMin;r.anchorMax=original.anchorMax;r.pivot=original.pivot;r.sizeDelta=original.sizeDelta;r.anchoredPosition=original.anchoredPosition-new Vector2(0,original.rect.height*.75f);}
+  Watch(status,id,"");
  }
  private void Update(){
   int user=GameManager.AchievementUserId;
@@ -57,7 +66,7 @@ public sealed class LiveChallenges : MonoBehaviour {
  private void OnApplicationFocus(bool value){focused=value;LeaseChanged();}
  private void LeaseChanged(){if(api!=null && loaded && account==GameManager.AchievementUserId && !busy)Heartbeat(settings.visible);beatAt=0;pollAt=0;}
  private void Poll(){
-  polling=true;api.Request<OnlinePlayers>("/social/online",null,value=>{online=value;labels.RemoveAll(p=>p.label==null);foreach(var p in labels){p.label.text="    "+p.name+(IsOnline(p.id)?" · Online":" · Offline");PresenceIndicator.Set(p.label,IsOnline(p.id));}if(panel!=null)Render();},error=>{});
+  polling=true;api.Request<OnlinePlayers>("/social/online",null,value=>{online=value;labels.RemoveAll(p=>p.label==null);foreach(var p in labels){p.label.text=Status(p.id,p.name);PresenceIndicator.Set(p.label,IsOnline(p.id));}if(panel!=null)Render();},error=>{});
   api.Request<SprintBattleList>("",null,value=>{
    polling=false;
    var invite=(value.battles??new SprintBattleView[0]).FirstOrDefault(b=>!b.done&&b.invitation=="pending"&&b.recipientId==account);
@@ -85,7 +94,7 @@ public sealed class LiveChallenges : MonoBehaviour {
  private static RectTransform PlayerCard(Transform parent,SocialPlayer player,string status,bool? presence=null){
   var card=ChainGame.Panel(parent,"Player "+player.id,Vector2.zero,Vector2.one,Paper);SprintUi.Edges(card.GetComponent<Image>());card.AddComponent<LayoutElement>().preferredHeight=150;
   var name=ChainGame.Label(card.transform,player.username,new Vector2(.04f,.59f),new Vector2(.96f,.97f),31,ChainGame.Ink);name.alignment=TextAnchor.MiddleLeft;name.fontStyle=FontStyle.Bold;name.supportRichText=false;
-  var label=ChainGame.Label(card.transform,(presence.HasValue?"    ":"")+status,new Vector2(.04f,.38f),new Vector2(.96f,.60f),22,Muted);label.alignment=TextAnchor.MiddleLeft;if(presence.HasValue)PresenceIndicator.Set(label,presence.Value);
+  var label=ChainGame.Label(card.transform,status,new Vector2(.04f,.38f),new Vector2(.96f,.60f),22,Muted);label.alignment=TextAnchor.MiddleLeft;if(presence.HasValue)PresenceIndicator.Set(label,presence.Value);
   return (RectTransform)card.transform;
  }
  private static void Note(Transform parent,string caption,int height=54){
@@ -141,6 +150,8 @@ public sealed class LiveChallenges : MonoBehaviour {
   var bar=ChainGame.Panel(box.transform,"Dialog heading",new Vector2(.03f,.84f),new Vector2(.97f,.97f),TrainingHubLayout.MemoryTone);bar.GetComponent<Image>().raycastTarget=false;ChainGame.Label(bar.transform,title.ToUpperInvariant(),Vector2.zero,Vector2.one,24,Color.white).fontStyle=FontStyle.Bold;return box.transform;
  }
  private void ConfirmFriend(int id){
+  var relation=(settings.friends??new SocialPlayer[0]).FirstOrDefault(p=>p.id==id);
+  if(relation!=null){if(!relation.accepted && relation.requesterId!=account){Open();return;}var info=Dialog("Friend");showingInvite=-1;ChainGame.Label(info,relation.accepted?"Already friends":"Already sent",new Vector2(.06f,.4f),new Vector2(.94f,.8f),28,ChainGame.Ink);ActionButton(info,"OK",new Vector2(.2f,.08f),new Vector2(.8f,.3f),HideInvite);return;}
   if(Root()==null)return;var box=Dialog("Friend request");showingInvite=-1;
   ChainGame.Label(box,"Send a friend request?\nFriends can see when you are online. Turn off Friends visibility any time.",new Vector2(.06f,.38f),new Vector2(.94f,.80f),28,ChainGame.Ink);
   ActionButton(box,"No",new Vector2(.05f,.08f),new Vector2(.47f,.30f),HideInvite);

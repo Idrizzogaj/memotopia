@@ -20,7 +20,7 @@ public sealed class SprintRuntime : MonoBehaviour {
  public SprintRandom Random {get;private set;}
  public bool Ready {get{return State!=null && !State.Finished && !transition && !ending && quitDialog==null;}}
  private GameObject stageRoot,stageTemplate,templateHolder;private ChainGame chainGame;
- private int owner;private bool transition,ending,introStarting,paced,cancelling;private SprintAPI api;private GameObject quitDialog;private Button retry;
+ private int owner;private bool transition,ending,introStarting,paced,cancelling,closed;private SprintAPI api;private GameObject quitDialog;private Button retry;
  private float progressAt;private bool progressBusy;private int liveUnits;
  private Button waitingBack;private Canvas hud;private Text timer,cue,status;private Image lead;private GameObject introCover;private float cueUntil;
  private readonly HashSet<string> solved=new HashSet<string>();
@@ -56,6 +56,7 @@ public sealed class SprintRuntime : MonoBehaviour {
   introCover=ChainGame.Panel(root.transform,"Original round intro cover",Vector2.zero,Vector2.one,Color.white);cue.transform.SetAsLastSibling();
   retry=SprintUi.Button(root.transform,"Retry",new Vector2(.25f,.20f),new Vector2(.75f,.29f),()=>{retry.gameObject.SetActive(false);if(cancelling)Cancel();else if(State==null)StartCoroutine(Intro());else StartCoroutine(Submit());});retry.gameObject.SetActive(false);
   waitingBack=SprintUi.Back(root.transform,Quit);
+  SprintUi.Button(root.transform,"Give up",new Vector2(.73f,.925f),new Vector2(.98f,.975f),Quit);
  }
  private void SceneLoaded(Scene scene,LoadSceneMode mode){
   if(!Active || ending)return;
@@ -88,6 +89,7 @@ public sealed class SprintRuntime : MonoBehaviour {
   api.Request<SprintBattleView>("/"+Battle.id+"/start","{}",battle=>{Battle=battle;waiting=false;},error=>{failure=error;waiting=false;});
   while(waiting)yield return null;
   if(failure!=null){introStarting=false;Fail(failure);while(State==null && !ending)yield return null;yield break;}
+  if(Concluded(Battle)){ReturnToLobby(Battle);yield break;}
   if(Battle.live){
    // Both originals must be loaded before the server schedules one common deadline.
    while(Battle.legs[LegIndex].liveStart==0){
@@ -95,7 +97,7 @@ public sealed class SprintRuntime : MonoBehaviour {
     waiting=true;failure=null;api.Request<SprintBattleView>("/"+Battle.id,null,battle=>{Battle=battle;waiting=false;},error=>{failure=error;waiting=false;});
     while(waiting)yield return null;
     if(failure!=null){introStarting=false;Fail(failure);while(State==null && !ending)yield return null;yield break;}
-    if(Battle.done){Close();SceneManager.LoadSceneAsync("GameMenu");yield break;}
+    if(Concluded(Battle)){ReturnToLobby(Battle);yield break;}
    }
   }
   long start=owner==Battle.ownerId?Battle.legs[LegIndex].ownerStart:Battle.legs[LegIndex].recipientStart;
@@ -159,20 +161,28 @@ public sealed class SprintRuntime : MonoBehaviour {
    PlayerPrefs.DeleteKey("sprint.pending."+owner);PlayerPrefs.Save();SprintLobby.Latest=battle;var callback=finished;Close();SceneManager.LoadSceneAsync("GameMenu");if(callback!=null)callback(battle);
   },Fail);
  }
- private void Fail(string error){cue.text="";status.text=error;retry.gameObject.SetActive(true);retry.transform.SetAsLastSibling();}
+ private bool Concluded(SprintBattleView battle){return battle.done || (battle.legs!=null && LegIndex<battle.legs.Length && (owner==battle.ownerId?battle.legs[LegIndex].ownerPlayed:battle.legs[LegIndex].recipientPlayed));}
+ private void ReturnToLobby(SprintBattleView battle){if(closed)return;PlayerPrefs.DeleteKey("sprint.pending."+owner);if(battle.done)PlayerPrefs.DeleteKey("sprint.cancel."+owner);PlayerPrefs.Save();SprintLobby.Latest=battle;Close();SceneManager.LoadSceneAsync("GameMenu");}
+ private void Fail(string error){
+  cue.text="";status.text=error;retry.gameObject.SetActive(true);retry.transform.SetAsLastSibling();waitingBack.gameObject.SetActive(true);
+  api.Request<SprintBattleView>("/"+Battle.id,null,battle=>{if(this!=null && Concluded(battle))ReturnToLobby(battle);},ignored=>{});
+ }
  public void Quit(){
   if(quitDialog!=null)return;
   quitDialog=Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/MidGameQuitPanel"),hud.transform,false);
   var content=quitDialog.transform.GetChild(0);var no=content.GetChild(2).GetComponent<Button>();var yes=content.GetChild(3).GetComponent<Button>();
+  foreach(var text in content.GetComponentsInChildren<Text>(true))text.text=text.text.Replace("quit?","give up?").Replace("Quit?","Give up?");
   no.onClick=new Button.ButtonClickedEvent();yes.onClick=new Button.ButtonClickedEvent();
   no.onClick.AddListener(()=>{Destroy(quitDialog);quitDialog=null;});
   yes.onClick.AddListener(()=>{Destroy(quitDialog);quitDialog=null;Cancel();});
  }
  private void Cancel(){
   ending=cancelling=true;
-  api.Request<SprintBattleView>("/"+Battle.id+"/cancel","{}",battle=>{PlayerPrefs.DeleteKey("sprint.pending."+owner);PlayerPrefs.Save();SprintLobby.Latest=battle;Close();SceneManager.LoadSceneAsync("GameMenu");},Fail);
+  PlayerPrefs.SetString("sprint.cancel."+owner,JsonUtility.ToJson(Battle));PlayerPrefs.Save();
+  api.Request<SprintBattleView>("/"+Battle.id+"/cancel","{}",ReturnToLobby,error=>{if(closed)return;Close();SceneManager.LoadSceneAsync("GameMenu");});
  }
  public void Close(){
+  if(closed)return;closed=true;
   SceneManager.sceneLoaded-=SceneLoaded;
   // The old scene can survive until the asynchronous menu load completes. Do not
   // let its normal180second training timers or coroutines resume in that gap.

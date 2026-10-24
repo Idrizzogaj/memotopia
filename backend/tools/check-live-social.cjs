@@ -41,6 +41,23 @@ const realNow=Date.now;let now=realNow(),conn;Date.now=()=>now;
  // Declining after sending must not reset pair cooldown or permit a refusal counter to leak.
  await social.friend(a,c,'request');await social.friend(c,a,'decline');await assert.rejects(()=>social.friend(a,c,'request'));
  assert(!('declined' in (await social.online(c)).players));
+ // Reproduce both invitation directions and cancellation/late-receipt races.
+ for(const [sender,recipient] of [[a,b],[b,a]]){
+  await social.heartbeat(sender,{active:true,visible:true});await social.heartbeat(recipient,{active:true,visible:true});
+  await conn.query('UPDATE sprint_battle SET "createdAt"=now()-interval \'2 minutes\'');
+  let game=await sprint.create(sender,{recipientId:recipient,game:'Boxes',tier:6,mode:'single',version:2,live:true});assert(game.state.live);
+  assert.equal((await sprint.create(recipient,{recipientId:sender,game:'Flash',tier:6,mode:'single',version:2,live:true})).id,game.id,'Crossed/retried invites return the existing invitation without accepting it');
+  await sprint.respond(recipient,game.id,true);await sprint.start(sender,game.id);game=await sprint.start(recipient,game.id);
+  const beforeCancel=await stats(sender);game=await sprint.cancel(sender,game.id);assert.equal(game.state.endReason,'gave_up');assert.equal(game.state.forfeitedId,sender);assert.equal(game.state.winner,recipient);
+  const afterCancel=await stats(sender);assert.equal(afterCancel.numberOfChallenges,beforeCancel.numberOfChallenges+1);
+  assert((await sprint.submit(recipient,game.id,0,empty)).state.done,'Late result acknowledges give-up instead of409');
+  assert((await sprint.progress(recipient,game.id,{legIndex:0,ms:0,units:0})).state.done);
+  assert((await sprint.start(recipient,game.id)).state.done);await sprint.cancel(sender,game.id);assert.deepEqual(await stats(sender),afterCancel,'Late operations never count a second match');
+ }
+ await conn.query('UPDATE sprint_battle SET "createdAt"=now()-interval \'2 minutes\'');
+ await social.heartbeat(a,{active:true,visible:true});await social.heartbeat(b,{active:true,visible:true});
+ let waiting=await sprint.create(a,{recipientId:b,game:'Chain',tier:6,mode:'single',version:2,live:true});await sprint.respond(b,waiting.id,true);await sprint.start(a,waiting.id);now+=61000;
+ waiting=await sprint.read(a,waiting.id);assert(waiting.state.done);assert.equal(waiting.state.endReason,'connection');assert.equal(waiting.state.winner,a,'One ready player is not trapped forever before start');assert((await sprint.start(b,waiting.id)).state.done);
  await conn.query('DELETE FROM favorites WHERE "requesterId"=$1 OR "favoritesId"=$1',[a]);await conn.getRepository(User).delete(a);for(const table of ['player_social','player_block','player_friend']){const cols=table==='player_social'?'"userId"':table==='player_block'?'"ownerId"':'"lowId"';assert.equal((await conn.query('SELECT 1 FROM '+table+' WHERE '+cols+'=$1',[a])).length,0);}
  console.log('LIVE_SOCIAL_POSTGRES_PASSED: friend consent, independent privacy, favorites, blocks, cooldown, concurrent decline/submit, shared start, progress, disconnect settlement, account deletion');
 })().catch(e=>{console.error(e.stack);if(e.query)console.error(e.query);process.exitCode=1}).finally(async()=>{Date.now=realNow;if(conn)await conn.close();});
