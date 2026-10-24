@@ -42,5 +42,21 @@ let connection;
   const gaveUp=await request('/sprints/'+gameId+'/cancel',st,{});assert.equal(gaveUp.status,201);assert.equal(gaveUp.body.endReason,'gave_up');assert.equal(gaveUp.body.forfeitedId,sender.id);
   for(const path of ['result','start','progress']){const response=await request('/sprints/'+gameId+'/'+path,rt,path==='result'?{legIndex:0,result:empty}:path==='progress'?{legIndex:0,ms:0,units:0}:{});assert.equal(response.status,201);assert(response.body.done);assert.equal(response.body.winner,recipient.id);}
  }
- console.log('LIVE_HTTP_PASSED: authenticated routing, both invitation directions, idempotent crossed invitations, give-up receipts, late result/start/progress acknowledgement, shared live deadline and original social/statistics checks');
+ // Reactions: real authenticated routing, membership, server cooldown and friendship delivery gate.
+ await connection.query('UPDATE sprint_battle SET "createdAt"=now()-interval \'2 minutes\'');
+ const em=await request('/sprints',ta,{recipientId:c.id,game:'Chain',tier:6,mode:'single',version:2,live:false});assert.equal(em.status,201);const eid=em.body.id;
+ await request('/sprints/'+eid+'/respond',tc,{accept:true});await request('/sprints/'+eid+'/start',ta,{});
+ assert.equal((await request('/sprints/'+eid+'/reactions',tb)).status,403);
+ assert.equal((await request('/sprints/'+eid+'/reactions',ta,{key:'unknown'})).status,400);
+ assert.equal((await request('/sprints/'+eid+'/reactions',tc,{key:'happy'})).status,201);
+ const hidden=await request('/sprints/'+eid+'/reactions',ta);assert.equal(hidden.status,200);assert(hidden.body.playing);assert(!hidden.body.friends);assert.equal(hidden.body.events.length,0,'Stranger reaction hidden during play');
+ assert.equal((await request('/sprints/'+eid+'/reactions',tc,{key:'clap'})).status,409,'Five second server throttle');
+ await request('/sprints/social/friend',ta,{targetId:c.id,action:'request'});await request('/sprints/social/friend',tc,{targetId:a.id,action:'accept'});
+ const shown=await request('/sprints/'+eid+'/reactions',ta);assert(shown.body.friends && shown.body.playing);assert.equal(shown.body.events[0].key,'happy','Friend reaction delivered in play');
+ await request('/sprints/social/friend',ta,{targetId:c.id,action:'remove'});
+ await request('/sprints/'+eid+'/cancel',tc,{reason:'connection'});
+ const after=await request('/sprints/'+eid+'/reactions',ta);assert(!after.body.playing && !after.body.friends);assert.equal(after.body.events[0].key,'happy','Stranger reaction released after play');
+ assert.equal((await request('/sprints/'+eid,ta)).body.endReason,'connection');
+ await request('/sprints/social/block',ta,{targetId:c.id,blocked:true});assert.equal((await request('/sprints/'+eid+'/reactions',tc)).status,403);
+ console.log('LIVE_HTTP_PASSED: lifecycle recovery both directions; reaction membership, whitelist,5second throttle, friendship gating, end delivery, blocking and connection forfeit');
 })().catch(e=>{console.error(e.stack);process.exitCode=1}).finally(async()=>{if(connection)await connection.close();});

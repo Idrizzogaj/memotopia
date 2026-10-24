@@ -11,7 +11,7 @@ using UnityEditor;
 using Assets.Script.Constants;
 using Assets.Script.Models;
 public sealed class SprintPlayDriver : MonoBehaviour {
- private long now;private string priorToken;private bool exiting;private SprintBattleView battle;private int resultAttempts;private string lastResult;
+ private long now;private string priorToken;private bool exiting,networkOffline;private SprintBattleView battle;private int resultAttempts;private string lastResult;
  void Start(){
   priorToken=PlayerPrefs.GetString("token");if(priorToken=="Bearer editor-sprint-test")priorToken="";SessionState.SetString("SprintPlayPriorToken",priorToken);PlayerPrefs.SetString("token","Bearer editor-sprint-test");
   UserConstants.s_user=new User{id=1999999963,username="Sprint test",userStatistics=new UserStatistics{xp=1000,level=10}};
@@ -22,7 +22,8 @@ public sealed class SprintPlayDriver : MonoBehaviour {
  private void SceneLoaded(Scene scene,LoadSceneMode mode){if(scene.name=="GameMenu")foreach(var root in scene.GetRootGameObjects())foreach(var behaviour in root.GetComponentsInChildren<MonoBehaviour>(true))if(behaviour!=null && !(behaviour is UnityEngine.EventSystems.UIBehaviour))behaviour.enabled=false;}
  private void Transport(string path,string payload,Action<string> success,Action<string> fail){
   if(path.EndsWith("/start")){if(battle.live)Check(((Text)Field(SprintRuntime.Current,"cue")).text=="Waiting for opponent","Waiting must precede ready cue");Debug.Log("Mock start live="+battle.live+" now="+now);battle.serverTime=100000;battle.legs[0].ownerStart=battle.live?104000:100000;if(battle.live){battle.legs[0].liveStart=104000;battle.legs[0].recipientStart=104000;}success(JsonUtility.ToJson(battle));return;}
-  if(path.EndsWith("/progress")){battle.legs[0].recipientUnits=2;success(JsonUtility.ToJson(battle));return;}
+  if(path.EndsWith("/progress")){if(networkOffline){fail("Simulated connection loss");return;}battle.legs[0].recipientUnits=2;success(JsonUtility.ToJson(battle));return;}
+  if(path.EndsWith("/cancel")){battle.done=true;battle.winner=battle.recipientId;battle.forfeitedId=battle.ownerId;battle.endReason="connection";success(JsonUtility.ToJson(battle));return;}
   if(path.EndsWith("/result")){lastResult=payload;resultAttempts++;if(resultAttempts==1)fail("Test offline retry");else{battle.done=true;success(JsonUtility.ToJson(battle));}return;}
   if(path=="" && payload==null){success(JsonUtility.ToJson(new SprintBattleList{battles=new[]{battle}}));return;}
   fail("Unexpected test request "+path);
@@ -102,7 +103,11 @@ public sealed class SprintPlayDriver : MonoBehaviour {
   Check(SprintRuntime.Current.State==null,"Live countdown cannot start gameplay early");now=4000;
   yield return Wait(()=>SprintRuntime.Current!=null && SprintRuntime.Current.Ready,"Live shared start");Check(SprintRuntime.Current.ClockText=="90","Shared start has90seconds");
   now=5000;yield return new WaitForSecondsRealtime(1.2f);Check(((Text)Field(SprintRuntime.Current,"status")).text=="Behind -2","Live opponent progress reaches the original HUD");
-  now=94000;yield return Wait(()=>!SprintRuntime.Active,"Shared deadline submits live receipt");Debug.Log("LIVE_SPRINT_PLAY_PASSED: future start gates originals, common90seconds, live lead bar, deadline receipt");
+  var liveRuntime=SprintRuntime.Current;networkOffline=true;now=34000;yield return new WaitForSecondsRealtime(1.3f);
+  Check(!liveRuntime.Ready && (bool)Field(liveRuntime,"connecting"),"Connection loss blocks input");Check(((GameObject)Field(liveRuntime,"connectionOverlay")).activeSelf,"Large Connecting wifi overlay visible");
+  int before=liveRuntime.State.Correct;liveRuntime.Solve("offline input");Check(before==liveRuntime.State.Correct,"No offline progress");
+  now=64000;networkOffline=false;yield return new WaitForSecondsRealtime(1.3f);Check(liveRuntime.Ready && liveRuntime.ClockText=="30","Reconnect resumes same state with real30seconds left");Check(liveRuntime.State.Correct==before,"Reconnect must preserve board progress");
+  networkOffline=true;now=90000;yield return new WaitForSecondsRealtime(1.3f);now=94000;yield return Wait(()=>!SprintRuntime.Active,"Offline deadline forfeits");Check(battle.endReason=="connection" && battle.winner==battle.recipientId,"Offline at90seconds loses match");Check(Mathf.Approximately(Time.timeScale,1),"Connection freeze must be restored on exit");Debug.Log("LIVE_SPRINT_PLAY_PASSED: shared clock, input freeze, visible wifi,30second reconnect preserves progress, offline deadline forfeit");
   }
   yield return Wait(()=>SceneManager.GetActiveScene().name=="GameMenu" && FindObjectOfType<MenuNavigation>()!=null,"Return to menu");
   var menu=FindObjectOfType<MenuNavigation>();var navigation=menu.GetComponent<ChallengeNavigation>();TrainingHubLayout.ApplyChallenge(navigation);

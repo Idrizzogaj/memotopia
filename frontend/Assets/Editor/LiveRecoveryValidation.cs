@@ -20,11 +20,16 @@ public static class LiveRecoveryValidation {
    var retry=typeof(SprintLobby).GetMethod("RetryPending",BindingFlags.Instance|BindingFlags.NonPublic);retry.Invoke(lobby,null);
    if(PlayerPrefs.HasKey(pending)||posts!=0)throw new Exception("Authoritative ended battle must clear obsolete receipt without re-posting it");
    PlayerPrefs.SetString(cancel,JsonUtility.ToJson(battle));retry.Invoke(lobby,null);if(PlayerPrefs.HasKey(cancel)||posts!=1)throw new Exception("Queued give-up must acknowledge exactly once");
+   PlayerPrefs.SetString("sprint.active."+user,JsonUtility.ToJson(battle));retry.Invoke(lobby,null);if(PlayerPrefs.HasKey("sprint.active."+user)||PlayerPrefs.HasKey(cancel)||posts!=2)throw new Exception("Force-close ticket must recover to one acknowledged forfeit");
+   var reactions=SprintReactions.Attach(nav.challengeUserProfileScreen.transform,battle.id);foreach(string key in SprintReactions.Keys)if(SprintReactions.Icon(key)==null)throw new Exception("Missing standard emoji sprite "+key);
+   var receive=typeof(SprintReactions).GetMethod("Receive",BindingFlags.Instance|BindingFlags.NonPublic);var feed=new SprintReactionFeed{playing=true,friends=false,events=new[]{new SprintReaction{sender=2,key="brain",at=12345}}};PlayerPrefs.DeleteKey("sprint.reaction.seen."+user+"."+battle.id);
+   receive.Invoke(reactions,new object[]{feed});var toast=reactions.transform.Find("Opponent reaction").gameObject;if(toast.activeSelf)throw new Exception("Stranger emoji must wait during play");
+   feed.friends=true;receive.Invoke(reactions,new object[]{feed});if(!toast.activeSelf)throw new Exception("Friend emoji must display during play");PlayerPrefs.DeleteKey("sprint.reaction.seen."+user+"."+battle.id);
    Set(live,"account",user);Set(live,"loaded",true);Set(live,"settings",new SocialSettings{friendsVisible=false,visible=false,friends=new[]{new SocialPlayer{id=2,requesterId=user}}});Set(live,"online",new OnlinePlayers{players=new[]{new SocialPlayer{id=2}}});
    live.Profile(nav.challengeUserProfileScreen.transform,2);var friend=nav.challengeUserProfileScreen.transform.Find("Friend").GetComponent<Button>();if(friend.interactable||friend.GetComponentInChildren<Text>().text!="Already sent")throw new Exception("Pending outgoing request must show Already sent and be disabled");
    var label=nav.challengeUserProfileScreen.transform.Find("Player presence").GetComponent<Text>();Canvas.ForceUpdateCanvases();PresenceIndicator.Set(label,true);var icon=label.GetComponentInChildren<PresenceIndicator>(true);
    if(label.text!="Online" || icon.rectTransform.anchoredPosition.x<label.rectTransform.rect.width*.5f)throw new Exception("Single-player profile must put presence icon after Online");
-   Debug.Log("LIVE_RECOVERY_VALIDATION_PASSED: obsolete outbox recovery, queued give-up, Already sent, profile presence after label");
+   Debug.Log("LIVE_RECOVERY_VALIDATION_PASSED: obsolete outbox, queued give-up, forced-close recovery, six emoji sprites and friendship gate, Already sent, presence after label");
   }finally{PlayerPrefs.DeleteKey(pending);PlayerPrefs.DeleteKey(cancel);UserConstants.s_user=prior;SprintAPI.EditorTransport=null;}
  }
 }

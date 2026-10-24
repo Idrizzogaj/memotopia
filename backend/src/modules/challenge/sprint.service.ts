@@ -152,6 +152,7 @@ export class SprintService {
         if(battle.state.invitation && battle.state.invitation!=='accepted')throw new ConflictException('Invitation has not been accepted');
     }
     private async expire():Promise<void>{
+        await this.connection.query(`UPDATE sprint_battle SET state=jsonb_set(state,'{reactions}',COALESCE((SELECT jsonb_agg(r) FROM jsonb_array_elements(state->'reactions') r WHERE (r->>'at')::bigint>$1),'[]'::jsonb)) WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(state->'reactions','[]'::jsonb)) r WHERE (r->>'at')::bigint<=$1)`,[Date.now()-600000]);
         await this.connection.query(`UPDATE sprint_battle SET state=jsonb_set(jsonb_set(state,'{invitation}','"expired"'),'{done}','true'),"updatedAt"=now() WHERE state->>'invitation'='pending' AND (state->>'invitationExpires')::bigint<$1`,[Date.now()]);
         await this.connection.query('UPDATE player_social SET "onlineUntil"=0 WHERE "onlineUntil">0 AND "onlineUntil"<$1',[Date.now()]);
         await this.connection.query('DELETE FROM player_friend WHERE NOT accepted AND "requestedAt"<$1',[Date.now()-604800000]);
@@ -183,14 +184,43 @@ export class SprintService {
             leg.progress[user]={ms:body.ms,units:body.units};
         });
     }
-    async cancel(user:number,id:number):Promise<SprintBattle>{
+    async cancel(user:number,id:number,reason?:string):Promise<SprintBattle>{
+        if(reason!==undefined && !['gave_up','connection'].includes(reason))throw new BadRequestException();
         return this.change(user,id,battle=>{
             if(battle.state.done)return;
             if(battle.state.invitation==='pending'){battle.state.invitation='withdrawn';battle.state.done=true;return;}
             this.accepted(battle);
             battle.state.done=true;battle.state.chooser=null;
             battle.state.winner=user===battle.ownerId?battle.recipientId:battle.ownerId;
-            battle.state.endReason='gave_up';battle.state.forfeitedId=user;
+            battle.state.endReason=reason||'gave_up';battle.state.forfeitedId=user;
         });
+    }
+    async reactions(user:number,id:number) {
+        const battle=await this.connection.getRepository(SprintBattle).findOne(id);this.member(battle,user);
+        return this.connection.transaction(async manager=>{
+            await this.social.allowed(manager,battle.ownerId,battle.recipientId);
+            const friends=(await manager.query('SELECT 1 FROM player_friend WHERE "lowId"=$1 AND "highId"=$2 AND accepted AND NOT declined',[Math.min(battle.ownerId,battle.recipientId),Math.max(battle.ownerId,battle.recipientId)])).length>0;
+            const leg=battle.state.legs[battle.state.legs.length-1],now=Date.now();
+            const started=leg.liveStart||leg.starts[user]||0;
+            const playing=!battle.state.done && started>0 && now>=started && now<started+90000 && !leg.results[user];
+            const visible=friends||!playing;
+            const events=(battle.state.reactions||[]).filter(r=>r.at>now-600000);
+            const own=events.filter(r=>r.sender===user);
+            return {friends,playing,serverTime:now,cooldownUntil:own.length?own[own.length-1].at+5000:0,events:visible?events.filter(r=>r.sender!==user):[]};
+        });
+    }
+    async react(user:number,id:number,key:string) {
+        if(!['happy','angry','love','brain','clap','thumb'].includes(key))throw new BadRequestException('Unknown reaction');
+        await this.change(user,id,async(battle,manager)=>{
+            this.accepted(battle);await this.social.allowed(manager,battle.ownerId,battle.recipientId);
+            if(battle.state.done && Date.now()-new Date(battle.updatedAt).getTime()>600000)throw new ConflictException('Reaction window ended');
+            const now=Date.now();
+            // Player locks in change() serialise sends even across different matches.
+            const recent=await manager.query(`SELECT 1 FROM sprint_battle b, LATERAL jsonb_array_elements(COALESCE(b.state->'reactions','[]'::jsonb)) r WHERE (b."ownerId"=$1 OR b."recipientId"=$1) AND (r->>'sender')::int=$1 AND (r->>'at')::bigint>$2 LIMIT 1`,[user,now-5000]);
+            if(recent.length)throw new ConflictException('Wait5seconds before sending another reaction');
+            battle.state.reactions=(battle.state.reactions||[]).filter(r=>r.at>now-600000).slice(-31);
+            battle.state.reactions.push({sender:user,key,at:now});
+        });
+        return this.reactions(user,id);
     }
 }

@@ -41,10 +41,15 @@ public sealed class SprintLobby : MonoBehaviour {
  }
  private void RetryPending(){
   if(recovering)return;
+  string activeKey="sprint.active."+GameManager.AchievementUserId;
+  if(!SprintRuntime.Active && PlayerPrefs.HasKey(activeKey)){
+   if(!PlayerPrefs.HasKey("sprint.pending."+GameManager.AchievementUserId))PlayerPrefs.SetString("sprint.cancel."+GameManager.AchievementUserId,PlayerPrefs.GetString(activeKey));
+   PlayerPrefs.DeleteKey(activeKey);PlayerPrefs.Save();
+  }
   string cancelKey="sprint.cancel."+GameManager.AchievementUserId,cancel=PlayerPrefs.GetString(cancelKey,"");
   if(!string.IsNullOrEmpty(cancel)){
    try{var cancelled=SprintAPI.Decode<SprintBattleView>(cancel);recovering=true;
-    api.Request<SprintBattleView>("/"+cancelled.id+"/cancel","{}",updated=>{recovering=false;PlayerPrefs.DeleteKey(cancelKey);PlayerPrefs.DeleteKey("sprint.pending."+GameManager.AchievementUserId);PlayerPrefs.Save();Latest=updated;if(panel!=null)ShowBattle(updated);},error=>{recovering=false;if(panel!=null)Message(error);});
+    api.Request<SprintBattleView>("/"+cancelled.id+"/cancel",JsonUtility.ToJson(new SprintCancel{reason=cancelled.endReason=="connection"?"connection":"gave_up"}),updated=>{recovering=false;PlayerPrefs.DeleteKey(cancelKey);PlayerPrefs.DeleteKey("sprint.pending."+GameManager.AchievementUserId);PlayerPrefs.Save();Latest=updated;if(panel!=null)ShowBattle(updated);},error=>{recovering=false;if(panel!=null)Message(error);});
    }catch(Exception){recovering=false;Debug.LogWarning("Pending give-up retained for recovery.");}return;
   }
   string key="sprint.pending."+GameManager.AchievementUserId;string pending=PlayerPrefs.GetString(key,"");if(string.IsNullOrEmpty(pending))return;
@@ -78,6 +83,7 @@ public sealed class SprintLobby : MonoBehaviour {
   errorLabel=ChainGame.Label(safe.transform,"",new Vector2(.05f,0),new Vector2(.95f,.05f),22,ChainGame.Ink);
  }
  private void Back(){
+  var reactions=panel==null?null:panel.GetComponentInChildren<SprintReactions>();if(reactions!=null)reactions.gameObject.SetActive(false);
   if(selectedId!=0){SaveScroll();selectedId=0;legacyDetail=null;detailPosition=1;RenderList(battles);return;}
   requestVersion++;panel.SetActive(false);CardFaces.DestroyGenerated(panel);panel=null;list=null;activeScroll=historyScroll=detailScroll=null;var menu=navigation.GetComponent<MenuNavigation>();if(menu!=null)menu.GoToChallengeHome();navigation.GoToChallengeHome();
  }
@@ -180,6 +186,7 @@ public sealed class SprintLobby : MonoBehaviour {
   RenderBattle(battle);
  }
  private void RenderBattle(SprintBattleView battle){
+  if(battle.invitation=="accepted" || string.IsNullOrEmpty(battle.invitation))SprintReactions.Attach(panel.transform,battle.id);
   ClearList();detailScroll=SprintUi.Scroll(list.transform,"Match scroll",Vector2.zero,Vector2.one);BattleRow(detailScroll.content,battle);
   if(!battle.done){
    int user=GameManager.AchievementUserId;
