@@ -14,8 +14,8 @@ public class MemotopiaBuild
         PlayerSettings.iOS.appleEnableAutomaticSigning = true;
         PlayerSettings.iOS.appleDeveloperTeamID = "E838WX6KF8";
         PlayerSettings.iOS.targetOSVersionString = "15.0";
-        PlayerSettings.bundleVersion = "1.0.58";
-        PlayerSettings.iOS.buildNumber = "2026102402";
+        PlayerSettings.bundleVersion = "1.0.59";
+        PlayerSettings.iOS.buildNumber = "2026102403";
 
         MajorSystemValidation.Validate();
         ChainValidation.ValidateLogic();
