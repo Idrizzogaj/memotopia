@@ -104,14 +104,14 @@ public static class ChainUiValidation
         var build=(System.Collections.IEnumerator)typeof(ContentSelectorBar).GetMethod("Build",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(bar,new object[]{training});
         while(build.MoveNext()){}
         
-        Check(training.Find("Chain")!=null && training.Find("FOCUS section")!=null && training.Find("ContentSelectorBar/Deck modes")==null,"Training integration missing");
+        Check(training.Find("Chain")!=null && training.Find("FOCUS section")==null && training.Find("ContentSelectorBar/Deck modes")==null,"Training integration missing or unreleased FOCUS visible");
         var nav=UnityEngine.Object.FindObjectOfType<TrainingNavigation>();
-        Check(training.GetComponentsInChildren<Image>(true).Count(i=>i.name=="Symbol stroke")>=80,"Game symbols missing");
         foreach(string name in new[]{"PAIRS","BOXES","FLASH","CHAIN"}) {
-            var focus=training.Find("Focus "+name);Check(focus!=null && !focus.GetComponent<Button>().interactable,"Focus placeholder accidentally launches a Memory game");
+            Check(training.Find("Focus "+name)==null,"Unreleased Focus placeholder visible");
         }
         var corners=new Vector3[4];
         foreach(var tile in new[]{nav.pairsImage.rectTransform,nav.boxesImage.rectTransform,nav.flashImage.rectTransform,(RectTransform)training.Find("Chain")}) {
+            Check(tile.GetComponentsInChildren<Image>(true).Any(i=>i.name=="Symbol stroke") || tile.GetComponentInChildren<TrainingFlashSymbol>(true)!=null,"Game symbol missing: "+tile.name);
             tile.GetWorldCorners(corners);
             foreach(var point in corners) {
                 var local=training.InverseTransformPoint(point);

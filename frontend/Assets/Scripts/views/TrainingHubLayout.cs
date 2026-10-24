@@ -5,6 +5,8 @@ using UnityEngine.UI;
 // Shared, flat visual language for Memory and the forthcoming Focus games.
 public static class TrainingHubLayout
 {
+    // FOCUS is reserved for2.1; keep its placeholders out of2.0 and its test builds.
+    public static bool ShowFocus { get { return false; } }
     public static void Arrange(RectTransform screen,List<RectTransform> memory,float top)
     {
         foreach(var label in new[]{"MEMORY section","Memory section","FOCUS section","Focus PAIRS","Focus BOXES","Focus FLASH","Focus CHAIN"}) {
@@ -15,6 +17,7 @@ public static class TrainingHubLayout
         float start=top-238f;
         Header(screen,"Memory",top,width);
         for(int i=0;i<memory.Count;i++) Tile(memory[i],i,false,screen,side,gap,start);
+        if(!ShowFocus)return;
         float focusTop=start-2*(side+gap)-12f;
         Header(screen,"FOCUS",focusTop,width);
         for(int i=0;i<4;i++) {

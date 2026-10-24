@@ -104,6 +104,7 @@ public class BoxesManager : GamesScript, IGameable
         inGame = false;
         InitArrays();
         SpawnImages();
+        BoxesBoardFit.Fit(panelLvl,recallBtn,topPanel);
         EnableHeartsPerLevel();
         StartCoroutine(SequenceStart());
     }

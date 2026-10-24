@@ -19,7 +19,7 @@ public static class LiveSocialValidation {
   EditorSceneManager.OpenScene("Assets/_Scenes/GameMenu.unity");
   var nav=Resources.FindObjectsOfTypeAll<ChallengeNavigation>().First(n=>n.gameObject.scene.IsValid());var canvas=nav.challengeGameScreen.GetComponentsInParent<Canvas>(true).First().rootCanvas;
   SprintLobby.Attach(nav);var live=LiveChallenges.Current;
-  var state=new SocialSettings{friendsVisible=true,visible=false,declined=3,friends=new[]{new SocialPlayer{id=2,username="Hanushe",requesterId=2}},blocked=new SocialPlayer[0]};
+  var state=new SocialSettings{friendsVisible=true,visible=false,declined=3,friends=new[]{new SocialPlayer{id=2,username="Hanushe",requesterId=2},new SocialPlayer{id=3,username="Alex",accepted=true}},blocked=new SocialPlayer[0]};
   Set(live,"settings",state);Set(live,"loaded",true);Set(live,"account",1999999977);Set(live,"online",new OnlinePlayers{players=new[]{new SocialPlayer{id=2,username="Hanushe",favorite=true}}});
   var requests=new List<string>();SprintAPI.EditorTransport=(path,body,success,fail)=>{requests.Add(path+":"+body);if(path=="/social/heartbeat"){var heart=JsonUtility.FromJson<SocialHeartbeat>(body);state.visible=heart.visible;state.friendsVisible=heart.friendsVisible;}success(JsonUtility.ToJson(state));};
   live.Open();var panel=(GameObject)Get(live,"panel");
@@ -29,6 +29,7 @@ public static class LiveSocialValidation {
   var events=UnityEngine.Object.FindObjectOfType<EventSystem>();if(events==null)events=new GameObject("Live events",typeof(EventSystem)).GetComponent<EventSystem>();
   Action<Button> tap=button=>{Canvas.ForceUpdateCanvases();foreach(var t in canvas.GetComponentsInChildren<TouchTarget>())t.Refresh();Canvas.ForceUpdateCanvases();camera.Render();var rect=(RectTransform)button.transform;var point=RectTransformUtility.WorldToScreenPoint(camera,rect.TransformPoint(rect.rect.center));var hits=new List<RaycastResult>();canvas.GetComponent<GraphicRaycaster>().Raycast(new PointerEventData(events){position=point},hits);var handler=hits.Count==0?null:ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);Check(handler==button.gameObject,"Blocked live control: "+button.name+" by "+(hits.Count==0?"nothing":hits[0].gameObject.name));ExecuteEvents.Execute(handler,new PointerEventData(events){button=PointerEventData.InputButton.Left},ExecuteEvents.pointerClickHandler);};
   try{
+   var badges=panel.GetComponentsInChildren<PresenceIndicator>();Check(badges.Any(i=>i.color.g>i.color.r) && badges.Any(i=>i.color.r>i.color.g),"Online green and offline red wifi indicators");Check(badges.All(i=>!i.raycastTarget),"Wifi graphics do not block buttons");
    Check(panel.GetComponentsInChildren<Text>().Any(t=>t.text.Contains("Only you can see")),"Private decline label");
    Check(panel.GetComponentsInChildren<Text>().Any(t=>t.text.Contains("Friends share online")),"Friend acceptance disclosure");
    tap(panel.transform.Find("Everyone").GetComponent<Button>());Check(state.visible,"Public visibility can turn on");

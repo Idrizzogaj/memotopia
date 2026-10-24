@@ -81,7 +81,9 @@ public sealed class SprintRuntime : MonoBehaviour {
  public IEnumerator Intro(){
   if(State!=null)yield break;
   if(introStarting){while(State==null && !ending)yield return null;yield break;}
-  introStarting=true;cue.text="Neurons on the ready";yield return new WaitForSecondsRealtime(2);
+  introStarting=true;
+  if(Battle.live)cue.text="Waiting for opponent";
+  else {cue.text="Neurons on the ready";yield return new WaitForSecondsRealtime(2);}
   bool waiting=true;string failure=null;
   api.Request<SprintBattleView>("/"+Battle.id+"/start","{}",battle=>{Battle=battle;waiting=false;},error=>{failure=error;waiting=false;});
   while(waiting)yield return null;
@@ -98,6 +100,11 @@ public sealed class SprintRuntime : MonoBehaviour {
   }
   long start=owner==Battle.ownerId?Battle.legs[LegIndex].ownerStart:Battle.legs[LegIndex].recipientStart;
   long target=Now+(start-Battle.serverTime)-Battle.roundTripMs/2;
+  if(Battle.live){
+   // The common server deadline stays fixed while the ready cue is shown.
+   cue.text="Neurons on the ready";long until=Math.Min(target,Now+2000);
+   while(Now<until)yield return null;
+  }
   while(Battle.live && Now<target){cue.text=Mathf.CeilToInt((target-Now)/1000f).ToString();yield return null;}
   State=new ChallengeSprintState(Game,Battle.tier,target);
   introCover.SetActive(false);
@@ -165,7 +172,15 @@ public sealed class SprintRuntime : MonoBehaviour {
   ending=cancelling=true;
   api.Request<SprintBattleView>("/"+Battle.id+"/cancel","{}",battle=>{PlayerPrefs.DeleteKey("sprint.pending."+owner);PlayerPrefs.Save();SprintLobby.Latest=battle;Close();SceneManager.LoadSceneAsync("GameMenu");},Fail);
  }
- public void Close(){SceneManager.sceneLoaded-=SceneLoaded;ChallengeConstants.s_isChallenge=false;CardFaces.EndSession();Current=null;Destroy(gameObject);}
+ public void Close(){
+  SceneManager.sceneLoaded-=SceneLoaded;
+  // The old scene can survive until the asynchronous menu load completes. Do not
+  // let its normal180second training timers or coroutines resume in that gap.
+  if(stageRoot!=null)stageRoot.SetActive(false);
+  foreach(var game in FindObjectsOfType<GamesScript>())if(game.gameObject.scene==SceneManager.GetActiveScene()){game.StopAllCoroutines();game.enabled=false;}
+  if(chainGame!=null)chainGame.enabled=false;
+  ChallengeConstants.s_isChallenge=false;CardFaces.EndSession();Current=null;Destroy(gameObject);
+ }
  private void OnDestroy(){SceneManager.sceneLoaded-=SceneLoaded;if(Current==this)Current=null;}
 }
 

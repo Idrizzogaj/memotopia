@@ -23,7 +23,7 @@ public sealed class LiveChallenges : MonoBehaviour {
  private OnlinePlayers online=new OnlinePlayers();private bool focused=true,paused,busy,loaded,polling,acting;private int account;
  private readonly List<PresenceLabel> labels=new List<PresenceLabel>();
  private sealed class PresenceLabel {public Text label;public int id;public string name;}
- public static void Watch(Text label,int id,string name){label.text=name+(IsOnline(id)?" · Online":"");if(Current!=null)Current.labels.Add(new PresenceLabel{label=label,id=id,name=name});}
+ public static void Watch(Text label,int id,string name){label.text="    "+name+(IsOnline(id)?" · Online":" · Offline");PresenceIndicator.Set(label,IsOnline(id));if(Current!=null)Current.labels.Add(new PresenceLabel{label=label,id=id,name=name});}
  private string sessionToken;
  private float beatAt,pollAt;private GameObject panel,banner;private Transform content;private Text notice;private int showingInvite;
  public static LiveChallenges Attach(ChallengeNavigation navigation){
@@ -57,7 +57,7 @@ public sealed class LiveChallenges : MonoBehaviour {
  private void OnApplicationFocus(bool value){focused=value;LeaseChanged();}
  private void LeaseChanged(){if(api!=null && loaded && account==GameManager.AchievementUserId && !busy)Heartbeat(settings.visible);beatAt=0;pollAt=0;}
  private void Poll(){
-  polling=true;api.Request<OnlinePlayers>("/social/online",null,value=>{online=value;labels.RemoveAll(p=>p.label==null);foreach(var p in labels)p.label.text=p.name+(IsOnline(p.id)?" · Online":"");if(panel!=null)Render();},error=>{});
+  polling=true;api.Request<OnlinePlayers>("/social/online",null,value=>{online=value;labels.RemoveAll(p=>p.label==null);foreach(var p in labels){p.label.text="    "+p.name+(IsOnline(p.id)?" · Online":" · Offline");PresenceIndicator.Set(p.label,IsOnline(p.id));}if(panel!=null)Render();},error=>{});
   api.Request<SprintBattleList>("",null,value=>{
    polling=false;
    var invite=(value.battles??new SprintBattleView[0]).FirstOrDefault(b=>!b.done&&b.invitation=="pending"&&b.recipientId==account);
@@ -82,10 +82,10 @@ public sealed class LiveChallenges : MonoBehaviour {
   var title=ChainGame.Label(bar.transform,caption.ToUpperInvariant(),new Vector2(.035f,0),new Vector2(.85f,1),25,Color.white);title.alignment=TextAnchor.MiddleLeft;title.fontStyle=FontStyle.Bold;
   ChainGame.Label(bar.transform,count.ToString(),new Vector2(.86f,0),new Vector2(.97f,1),23,Color.white);
  }
- private static RectTransform PlayerCard(Transform parent,SocialPlayer player,string status){
+ private static RectTransform PlayerCard(Transform parent,SocialPlayer player,string status,bool? presence=null){
   var card=ChainGame.Panel(parent,"Player "+player.id,Vector2.zero,Vector2.one,Paper);SprintUi.Edges(card.GetComponent<Image>());card.AddComponent<LayoutElement>().preferredHeight=150;
   var name=ChainGame.Label(card.transform,player.username,new Vector2(.04f,.59f),new Vector2(.96f,.97f),31,ChainGame.Ink);name.alignment=TextAnchor.MiddleLeft;name.fontStyle=FontStyle.Bold;name.supportRichText=false;
-  var label=ChainGame.Label(card.transform,status,new Vector2(.04f,.38f),new Vector2(.96f,.60f),22,Muted);label.alignment=TextAnchor.MiddleLeft;
+  var label=ChainGame.Label(card.transform,(presence.HasValue?"    ":"")+status,new Vector2(.04f,.38f),new Vector2(.96f,.60f),22,Muted);label.alignment=TextAnchor.MiddleLeft;if(presence.HasValue)PresenceIndicator.Set(label,presence.Value);
   return (RectTransform)card.transform;
  }
  private static void Note(Transform parent,string caption,int height=54){
@@ -122,10 +122,10 @@ public sealed class LiveChallenges : MonoBehaviour {
   }
   Section(content,"Friends",accepted.Length);
   if(accepted.Length==0)Note(content,"Accept a friend request to connect");
-  foreach(var player in accepted){var local=player;var row=PlayerCard(content,player,IsOnline(player.id)?"Online":"Not showing online");ActionButton(row,"Remove",new Vector2(.52f,.07f),new Vector2(.96f,.36f),()=>Friend(local.id,"remove"));}
+  foreach(var player in accepted){var local=player;var row=PlayerCard(content,player,IsOnline(player.id)?"Online":"Offline",IsOnline(player.id));ActionButton(row,"Remove",new Vector2(.52f,.07f),new Vector2(.96f,.36f),()=>Friend(local.id,"remove"));}
   var players=online.players??new SocialPlayer[0];Section(content,"Online",players.Length);
   if(players.Length==0)Note(content,"No players showing online");
-  foreach(var player in players){var local=player;var row=PlayerCard(content,player,player.friend?"Online · Friend":player.favorite?"Online · Favourite":"Online");
+  foreach(var player in players){var local=player;var row=PlayerCard(content,player,player.friend?"Online · Friend":player.favorite?"Online · Favourite":"Online",true);
    ActionButton(row,"Challenge",new Vector2(.04f,.07f),new Vector2(.61f,.36f),()=>{Close();UserConstants.s_challengeUser=new User{id=local.id,username=local.username};navigation.GoToChallengeGame();},true);
    ActionButton(row,"Block",new Vector2(.65f,.07f),new Vector2(.96f,.36f),()=>ConfirmBlock(local.id));
   }

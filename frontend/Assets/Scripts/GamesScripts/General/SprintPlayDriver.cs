@@ -21,7 +21,7 @@ public sealed class SprintPlayDriver : MonoBehaviour {
  private void Log(string message,string stack,LogType type){if(type==LogType.Exception)Exit(1,"PLAY_EXCEPTION: "+message+" "+stack);}
  private void SceneLoaded(Scene scene,LoadSceneMode mode){if(scene.name=="GameMenu")foreach(var root in scene.GetRootGameObjects())foreach(var behaviour in root.GetComponentsInChildren<MonoBehaviour>(true))if(behaviour!=null && !(behaviour is UnityEngine.EventSystems.UIBehaviour))behaviour.enabled=false;}
  private void Transport(string path,string payload,Action<string> success,Action<string> fail){
-  if(path.EndsWith("/start")){Debug.Log("Mock start live="+battle.live+" now="+now);battle.serverTime=100000;battle.legs[0].ownerStart=battle.live?104000:100000;if(battle.live){battle.legs[0].liveStart=104000;battle.legs[0].recipientStart=104000;}success(JsonUtility.ToJson(battle));return;}
+  if(path.EndsWith("/start")){if(battle.live)Check(((Text)Field(SprintRuntime.Current,"cue")).text=="Waiting for opponent","Waiting must precede ready cue");Debug.Log("Mock start live="+battle.live+" now="+now);battle.serverTime=100000;battle.legs[0].ownerStart=battle.live?104000:100000;if(battle.live){battle.legs[0].liveStart=104000;battle.legs[0].recipientStart=104000;}success(JsonUtility.ToJson(battle));return;}
   if(path.EndsWith("/progress")){battle.legs[0].recipientUnits=2;success(JsonUtility.ToJson(battle));return;}
   if(path.EndsWith("/result")){lastResult=payload;resultAttempts++;if(resultAttempts==1)fail("Test offline retry");else{battle.done=true;success(JsonUtility.ToJson(battle));}return;}
   if(path=="" && payload==null){success(JsonUtility.ToJson(new SprintBattleList{battles=new[]{battle}}));return;}
@@ -89,7 +89,9 @@ public sealed class SprintPlayDriver : MonoBehaviour {
     var retry=(Button)Field(runtime,"retry");Check(retry.gameObject.activeSelf,"Offline retry shown");retry.onClick.Invoke();
     yield return Wait(()=>!SprintRuntime.Active,"Result acknowledged");Check(!PlayerPrefs.HasKey("sprint.pending."+GameManager.AchievementUserId),"Receipt clears outbox");Debug.Log("SPRINT_DEADLINE_RETRY_VALIDATION_PASSED");yield return null;continue;
    }
-   SprintRuntime.Current.Close();yield return null;
+   var oldTimers=FindObjectsOfType<Text>().Where(t=>t==((game=="Boxes"?FindObjectOfType<BoxesManager>().countDownText:game=="Flash"?FindObjectOfType<FlashManager>().timerText:null))).ToArray();var timerValues=oldTimers.Select(t=>t.text).ToArray();
+   SprintRuntime.Current.Close();yield return null;yield return null;
+   for(int t=0;t<oldTimers.Length;t++)Check(oldTimers[t].text==timerValues[t],"Training timer must stay frozen after Challenge close");
   }
   if(SessionState.GetBool("SprintLiveOnly",false)){
   resultAttempts=2;
