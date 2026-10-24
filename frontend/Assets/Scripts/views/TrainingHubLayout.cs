@@ -6,7 +6,7 @@ using UnityEngine.UI;
 public static class TrainingHubLayout
 {
     // FOCUS is reserved for2.1; keep its placeholders out of2.0 and its test builds.
-    public static bool ShowFocus { get { return false; } }
+    public static bool ShowFocus { get { return true; } }
     public static void Arrange(RectTransform screen,List<RectTransform> memory,float top)
     {
         foreach(var label in new[]{"MEMORY section","Memory section","FOCUS section","Focus PAIRS","Focus BOXES","Focus FLASH","Focus CHAIN"}) {
@@ -22,7 +22,7 @@ public static class TrainingHubLayout
         Header(screen,"FOCUS",focusTop,width);
         for(int i=0;i<4;i++) {
             var go=ChainGame.Panel(screen,"Focus "+Names[i],Vector2.zero,Vector2.one,Color.white);
-            var button=go.AddComponent<Button>();button.interactable=false;button.transition=Selectable.Transition.None;
+            int game=i;var button=go.AddComponent<Button>();button.transition=Selectable.Transition.None;button.onClick.AddListener(()=>FocusGame.Open(screen,game));
             Tile((RectTransform)go.transform,i,true,screen,side,gap,focusTop-66f);
         }
     }
@@ -43,9 +43,9 @@ public static class TrainingHubLayout
     }
     private static void DrawTileContents(RectTransform tile,int index,bool focus){
         var art=new GameObject("Flat game symbol",typeof(RectTransform));art.transform.SetParent(tile,false);var ar=(RectTransform)art.transform;ar.anchorMin=new Vector2(.22f,.35f);ar.anchorMax=new Vector2(.78f,.87f);ar.offsetMin=ar.offsetMax=Vector2.zero;
-        Canvas.ForceUpdateCanvases();TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white,focus);
+        Canvas.ForceUpdateCanvases();TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white,false);
         var label=ChainGame.Label(tile,Names[index],new Vector2(.05f,.10f),new Vector2(.95f,.32f),46,Color.white);label.fontStyle=FontStyle.Bold;
-        if(focus)ChainGame.Label(tile,"90 s • Coming soon",new Vector2(.04f,.02f),new Vector2(.96f,.12f),20,Color.white);
+        if(focus)ChainGame.Label(tile,"90 s",new Vector2(.04f,.02f),new Vector2(.96f,.12f),20,Color.white);
     }
     // Match choices reuse exactly the Memory tiles' symbols, type and colours.
     public static Button GameButton(Transform parent,string game,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action){

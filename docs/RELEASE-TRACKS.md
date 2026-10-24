@@ -1,11 +1,9 @@
 # Release tracks
 
-The 2.0.0 release contains the revised Challenge, live play and social controls. FOCUS and its placeholder tiles are hidden entirely. Current device builds remain test versions until release approval.
+Keep `codex/challenge-sprint-90` for the2.0.0 release. It contains revised Challenge, live play, social privacy, Give up, reconnect recovery and fixed emoji reactions. FOCUS and its placeholder tiles remain entirely hidden. Current device builds are test versions until release approval.
 
-`codex/focus-2.1.0` starts from the verified 2.0 baseline (code commit `672df33`, plus the shared release record). Keep `codex/challenge-sprint-90` for 2.0 release fixes. The Focus branch targets 2.1.0; the user will supply three games. Do not enable Focus in the 2.0 branch or merge unfinished Focus work into it. Cherry-pick applicable release fixes into 2.1 as needed. No Focus games have been specified or implemented in the new branch yet.
+`codex/focus-2.1.0` also contains all shared release fixes, plus four native Unity Focus games from the handwritten PDF: arithmetic Pairs, wall-anticipation Boxes, scattered-number Flash and number-row Chain. Native Focus is enabled only here. The browser prototype is a historical design reference, not the app implementation. Native test build2.1.0/2026102501 targets the user's iPhone and Hana's iPad. Export and native compilation/install status are tracked separately in the build record. Focus has no account XP, achievements or server statistics yet; provisional interpretations are recorded in FOCUS-2.1-SPEC.md for user testing.
 
-Privacy and terms were published on memotopia.com on 24 October 2026, after backing up the old public pages. Independent HTTPS verification matched the local files. App Store privacy / Google Data Safety declarations and age-consent assessment still require release review; publishing the policy does not complete those checks.
+The common recovery/reaction change is `ec48cb1`; cherry-pick it into2.0 rather than merging native Focus into the release branch. Presence after Online/Offline, the individual-player presence badge and Already sent protection were implemented in `1c31037` and are shared.
 
-Focus2.1 now has a browser mockup and transcribed specification for four games, based on the user's handwritten PDF. Native Focus games remain to be implemented after review.
-
-Queued2.0 UI corrections: place the presence badge after Online/Offline; show the same presence in the single-player profile opened by the sword; show Already sent for a pending outgoing friend request and prevent repeat requests. These were inspected, but are not implemented by the Focus mockup work. The user requested no further device builds while testing.
+Privacy and terms were published on memotopia.com on24October2026. The new fixed-reaction disclosure in docs/web/site/privacy.html has not yet been published; publish/reverify that update before the public release. App Store privacy / Google Data Safety declarations and age-consent assessment still require release review. No store publication is part of this device test.

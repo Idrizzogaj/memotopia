@@ -104,10 +104,10 @@ public static class ChainUiValidation
         var build=(System.Collections.IEnumerator)typeof(ContentSelectorBar).GetMethod("Build",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(bar,new object[]{training});
         while(build.MoveNext()){}
         
-        Check(training.Find("Chain")!=null && training.Find("FOCUS section")==null && training.Find("ContentSelectorBar/Deck modes")==null,"Training integration missing or unreleased FOCUS visible");
+        Check(training.Find("Chain")!=null && (training.Find("FOCUS section")!=null)==TrainingHubLayout.ShowFocus && training.Find("ContentSelectorBar/Deck modes")==null,"Training integration missing or wrong Focus release gate");
         var nav=UnityEngine.Object.FindObjectOfType<TrainingNavigation>();
         foreach(string name in new[]{"PAIRS","BOXES","FLASH","CHAIN"}) {
-            Check(training.Find("Focus "+name)==null,"Unreleased Focus placeholder visible");
+            var focus=training.Find("Focus "+name);Check(TrainingHubLayout.ShowFocus?focus!=null && focus.GetComponent<Button>().interactable:focus==null,"Incorrect Focus release gate or disabled game");
         }
         var corners=new Vector3[4];
         foreach(var tile in new[]{nav.pairsImage.rectTransform,nav.boxesImage.rectTransform,nav.flashImage.rectTransform,(RectTransform)training.Find("Chain")}) {

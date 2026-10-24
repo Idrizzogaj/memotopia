@@ -79,7 +79,7 @@ Five consecutive errors return the user to the preceding level (minimum1). The P
 
 The handwritten level7 red range reads1→6, but the page heading explicitly says red/down and subsequent mixed levels descend. Prototype follows the heading: red6→1. Repeated rounds at the final described level retain the same rules. No invented extra levels or speed ramp. No clinical or training-efficacy claims are made.
 
-## Review questions before native implementation
+## Provisional details for native test review
 
 - Confirm the arithmetic range interpretation and integer-only division.
 - Confirm Chain7's red direction and Boxes9+ continuation.
@@ -87,3 +87,7 @@ The handwritten level7 red range reads1→6, but the page heading explicitly say
 - Confirm whether the Flash five-error fallback should apply to other Focus games as well.
 
 These are interpretations of the user's approved concept, not new game-design recommendations. If new balance/mechanic alternatives are proposed, apply AGENTS.md's three-source rule and record them in GAME-DESIGN-SOURCES.md.
+
+## Native test implementation,25October2026
+
+All four games are implemented in FocusGame.cs and FocusRules.cs, enabled only on codex/focus-2.1.0. They reuse the original Flash header, original button/back hierarchy and quit/result dialog. Each runs90seconds with local score only. The native test follows the provisional interpretations above; no new XP/achievement/account writes. Windows Unity validation passed2,000 arithmetic cases, all unique number sequences, wall prediction/reflection/early tap handling, native callbacks,90second termination, score popup and four rendered native scenes. The actual Unity2019 iOS export also compiled its managed sources successfully. Native binary/signing/install verification is tracked in the build record.
