@@ -9,10 +9,13 @@ public sealed class PresenceIndicator : MaskableGraphic {
   if(child==null){var go=new GameObject("Presence wifi",typeof(RectTransform),typeof(CanvasRenderer),typeof(PresenceIndicator));go.transform.SetParent(label.transform,false);icon=go.GetComponent<PresenceIndicator>();}
   else icon=child.GetComponent<PresenceIndicator>();
   float size=Mathf.Clamp(label.fontSize,22,30),width=label.rectTransform.rect.width;
-  float textWidth=Mathf.Min(label.preferredWidth,Mathf.Max(0,width-size-10));
+  // Never shorten the measured text to make room: that placed the badge over
+  // the final letters. Leave a clear gap after the complete label instead.
+  float textWidth=Mathf.Max(0,label.preferredWidth);
   bool centred=label.alignment==TextAnchor.MiddleCenter || label.alignment==TextAnchor.UpperCenter || label.alignment==TextAnchor.LowerCenter;
-  float offset=centred?Mathf.Max(0,(width-textWidth)*.5f):0;
-  var rect=icon.rectTransform;rect.anchorMin=rect.anchorMax=new Vector2(0,.5f);rect.sizeDelta=new Vector2(size,size);rect.anchoredPosition=new Vector2(offset+textWidth+size*.5f+6,0);
+  bool right=label.alignment==TextAnchor.MiddleRight || label.alignment==TextAnchor.UpperRight || label.alignment==TextAnchor.LowerRight;
+  float offset=centred?Mathf.Max(0,(width-textWidth)*.5f):right?Mathf.Max(0,width-textWidth):0;
+  var rect=icon.rectTransform;rect.anchorMin=rect.anchorMax=new Vector2(0,.5f);rect.sizeDelta=new Vector2(size,size);rect.anchoredPosition=new Vector2(offset+textWidth+size*.7f+32,0);
   icon.raycastTarget=false;icon.color=online?(Color)new Color32(28,145,89,255):(Color)new Color32(202,48,75,255);icon.SetVerticesDirty();
   icon.textStamp=label.text;icon.widthStamp=width;icon.fontStamp=label.fontSize;icon.alignmentStamp=label.alignment;
  }
