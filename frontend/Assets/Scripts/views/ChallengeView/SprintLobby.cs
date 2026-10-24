@@ -9,7 +9,7 @@ using UnityEngine.UI;
 // One inbox for ongoing and completed games. Original game rules and receipts stay unchanged.
 public sealed class SprintLobby : MonoBehaviour {
  public static SprintBattleView Latest;
- private ChallengeNavigation navigation;private SprintAPI api;private bool match,creating,refreshing,starting,legacyRefreshing;
+ private ChallengeNavigation navigation;private SprintAPI api;private bool match,creating,refreshing,starting,legacyRefreshing,recovering;
  private GameObject panel,list;private Text errorLabel;private Button singleButton,matchButton;private Text singleLabel,matchLabel;
  private float refreshAt;private int selectedId,requestVersion;private float activePosition=1,historyPosition=1,detailPosition=1;
  private ScrollRect activeScroll,historyScroll,detailScroll;
@@ -32,22 +32,36 @@ public sealed class SprintLobby : MonoBehaviour {
  }
  public void Create(string game,int tier,int opponent){
   if(creating || !CanStart())return;creating=true;
-  api.Request<SprintBattleView>("",JsonUtility.ToJson(new SprintCreate{game=game,tier=tier,recipientId=opponent,mode=match?"match":"single",live=LiveChallenges.Visible}),battle=>{creating=false;OpenBattle(battle);},error=>{creating=false;Message(error);});
+  api.Request<SprintBattleView>("",JsonUtility.ToJson(new SprintCreate{game=game,tier=tier,recipientId=opponent,mode=match?"match":"single",live=LiveChallenges.IsOnline(opponent)}),battle=>{creating=false;OpenBattle(battle);},error=>{creating=false;Message(error);});
  }
  private void Start(){RetryPending();refreshAt=Time.unscaledTime;if(Latest!=null){var battle=Latest;Latest=null;Open();ShowBattle(battle);}}
  private bool CanStart(){
-  if(!PlayerPrefs.HasKey("sprint.pending."+GameManager.AchievementUserId))return true;
+  if(!PlayerPrefs.HasKey("sprint.pending."+GameManager.AchievementUserId) && !PlayerPrefs.HasKey("sprint.cancel."+GameManager.AchievementUserId))return true;
   Message("Sync your previous result before starting another game.");RetryPending();return false;
  }
  private void RetryPending(){
+  if(recovering)return;
+  string cancelKey="sprint.cancel."+GameManager.AchievementUserId,cancel=PlayerPrefs.GetString(cancelKey,"");
+  if(!string.IsNullOrEmpty(cancel)){
+   try{var cancelled=SprintAPI.Decode<SprintBattleView>(cancel);recovering=true;
+    api.Request<SprintBattleView>("/"+cancelled.id+"/cancel","{}",updated=>{recovering=false;PlayerPrefs.DeleteKey(cancelKey);PlayerPrefs.DeleteKey("sprint.pending."+GameManager.AchievementUserId);PlayerPrefs.Save();Latest=updated;if(panel!=null)ShowBattle(updated);},error=>{recovering=false;if(panel!=null)Message(error);});
+   }catch(Exception){recovering=false;Debug.LogWarning("Pending give-up retained for recovery.");}return;
+  }
   string key="sprint.pending."+GameManager.AchievementUserId;string pending=PlayerPrefs.GetString(key,"");if(string.IsNullOrEmpty(pending))return;
+  recovering=true;
   try{int split=pending.IndexOf('\n');var battle=SprintAPI.Decode<SprintBattleView>(pending.Substring(0,split));string result=pending.Substring(split+1);
-   api.Request<SprintBattleView>("/"+battle.id+"/result",result,updated=>{PlayerPrefs.DeleteKey(key);PlayerPrefs.Save();Latest=updated;if(panel!=null)ShowBattle(updated);},error=>{if(panel!=null)Message(error);});
-  }catch(Exception){Debug.LogWarning("Pending Challenge result could not be read; retained for recovery.");}
+   Action<SprintBattleView> acknowledged=updated=>{recovering=false;PlayerPrefs.DeleteKey(key);PlayerPrefs.Save();Latest=updated;if(panel!=null)ShowBattle(updated);};
+   api.Request<SprintBattleView>("/"+battle.id,null,current=>{
+    int leg=JsonUtility.FromJson<SprintSubmit>(result).legIndex;
+    bool played=current.legs!=null && leg>=0 && leg<current.legs.Length && (GameManager.AchievementUserId==current.ownerId?current.legs[leg].ownerPlayed:current.legs[leg].recipientPlayed);
+    if(current.done || played){acknowledged(current);return;}
+    api.Request<SprintBattleView>("/"+battle.id+"/result",result,acknowledged,error=>{recovering=false;if(panel!=null)Message(error);});
+   },error=>{recovering=false;if(panel!=null)Message(error);});
+  }catch(Exception){recovering=false;Debug.LogWarning("Pending Challenge result could not be read; retained for recovery.");}
  }
  private void Update(){
   if(panel!=null && Input.GetKeyDown(KeyCode.Escape)){Back();return;}
-  if(Time.unscaledTime>=refreshAt){refreshAt=Time.unscaledTime+2;Refresh();if(panel!=null)LoadEarlier();}
+  if(Time.unscaledTime>=refreshAt){refreshAt=Time.unscaledTime+2;RetryPending();Refresh();if(panel!=null)LoadEarlier();}
  }
  public void Open(){
   selectedId=0;legacyDetail=null;requestVersion++;if(panel!=null){panel.SetActive(false);CardFaces.DestroyGenerated(panel);}
@@ -112,7 +126,7 @@ public sealed class SprintLobby : MonoBehaviour {
  private static void RestoreScroll(ScrollRect scroll,float position){Canvas.ForceUpdateCanvases();scroll.Rebuild(CanvasUpdate.PostLayout);scroll.verticalNormalizedPosition=Mathf.Clamp01(position);}
  private void Toggle(string key){if(!expanded.Add(key))expanded.Remove(key);RenderCurrent();}
  private string Contestants(SprintBattleView battle){return battle.ownerName+"  vs  "+battle.recipientName;}
- private string Outcome(SprintBattleView battle){return battle.invitation=="pending"?"Invitation":battle.invitation=="declined"?"Declined":battle.invitation=="expired"?"Expired":battle.invitation=="blocked"?"Unavailable":battle.invitation=="withdrawn"?"Withdrawn":!battle.done?"Waiting":battle.winner==0?"Draw":(battle.winner==battle.ownerId?battle.ownerName:battle.recipientName)+" wins";}
+ private string Outcome(SprintBattleView battle){if(battle.done && battle.endReason=="gave_up")return (battle.forfeitedId==battle.ownerId?battle.ownerName:battle.recipientName)+" · Gave up";if(battle.done && battle.endReason=="connection")return battle.winner==0?"Connection lost · Draw":(battle.forfeitedId==battle.ownerId?battle.ownerName:battle.recipientName)+" · Connection lost";return battle.invitation=="pending"?"Invitation":battle.invitation=="declined"?"Declined":battle.invitation=="expired"?"Expired":battle.invitation=="blocked"?"Unavailable":battle.invitation=="withdrawn"?"Withdrawn":!battle.done?"Waiting":battle.winner==0?"Draw":(battle.winner==battle.ownerId?battle.ownerName:battle.recipientName)+" wins";}
  private int Verdict(SprintBattleView battle){return !battle.done || (battle.invitation!="accepted" && !string.IsNullOrEmpty(battle.invitation)) || battle.winner==0?0:battle.winner==GameManager.AchievementUserId?1:-1;}
  private void BattleRow(Transform parent,SprintBattleView battle){
   string key="sprint:"+battle.id;bool open=expanded.Contains(key);
@@ -178,8 +192,19 @@ public sealed class SprintLobby : MonoBehaviour {
     var games=ChallengeSprintRules.Games.Where(g=>!battle.legs.Any(l=>l.game==g)).ToArray();GameChoices(detailScroll.content,games,game=>{if(creating)return;creating=true;api.Request<SprintBattleView>("/"+battle.id+"/game",JsonUtility.ToJson(new SprintChoose{game=game}),updated=>{creating=false;ShowBattle(updated);},error=>{creating=false;Message(error);});});
    }else if(Actionable(battle))GameChoices(detailScroll.content,new[]{battle.legs.Last().game},game=>{if(starting || !CanStart())return;starting=true;SprintRuntime.Begin(battle,null);});
    else SprintUi.Note(detailScroll.content,"Waiting for your opponent");
+   if(battle.invitation!="pending" || user==battle.ownerId)Consent(detailScroll.content,battle.invitation=="pending"?"Withdraw":"Give up",()=>ConfirmGiveUp(battle));
   }
   RestoreScroll(detailScroll,detailPosition);
+ }
+ private void ConfirmGiveUp(SprintBattleView battle){
+  var dialog=UnityEngine.Object.Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/MidGameQuitPanel"),panel.transform,false);var content=dialog.transform.GetChild(0);
+  foreach(var text in content.GetComponentsInChildren<Text>(true))text.text=text.text.Replace("quit?","give up?");
+  var no=content.GetChild(2).GetComponent<Button>();var yes=content.GetChild(3).GetComponent<Button>();no.onClick=new Button.ButtonClickedEvent();yes.onClick=new Button.ButtonClickedEvent();
+  no.onClick.AddListener(()=>CardFaces.DestroyGenerated(dialog));yes.onClick.AddListener(()=>{
+   CardFaces.DestroyGenerated(dialog);if(creating)return;creating=true;
+   string key="sprint.cancel."+GameManager.AchievementUserId;PlayerPrefs.SetString(key,JsonUtility.ToJson(battle));PlayerPrefs.Save();
+   api.Request<SprintBattleView>("/"+battle.id+"/cancel","{}",updated=>{creating=false;PlayerPrefs.DeleteKey(key);PlayerPrefs.DeleteKey("sprint.pending."+GameManager.AchievementUserId);PlayerPrefs.Save();ShowBattle(updated);},error=>{creating=false;Message("Give up saved. Reconnecting…");});
+  });
  }
  private static void Consent(Transform parent,string caption,UnityEngine.Events.UnityAction action){var row=ChainGame.Panel(parent,caption,Vector2.zero,Vector2.one,Color.clear);row.AddComponent<LayoutElement>().preferredHeight=90;SprintUi.Button(row.transform,caption,Vector2.zero,Vector2.one,action);}
  private static void GameChoices(Transform parent,string[] games,Action<string> choose){

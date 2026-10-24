@@ -33,7 +33,9 @@ export class SprintService {
             // Per sender and per pair limits are protected by the same database locks as blocking.
             const recent=await manager.query(`SELECT COUNT(*)::int AS n FROM sprint_battle WHERE "ownerId"=$1 AND "createdAt">now()-interval '1 minute'`,[user]);
             if(Number(recent[0].n)>=5)throw new ConflictException('Please wait before inviting again');
-            const pair=await manager.query(`SELECT 1 FROM sprint_battle WHERE (("ownerId"=$1 AND "recipientId"=$2) OR ("ownerId"=$2 AND "recipientId"=$1)) AND ("createdAt">now()-interval '1 minute' OR (state->>'invitation'='pending' AND (state->>'invitationExpires')::bigint>$3))`,[user,body.recipientId,Date.now()]);
+            const pending=await manager.query(`SELECT id FROM sprint_battle WHERE (("ownerId"=$1 AND "recipientId"=$2) OR ("ownerId"=$2 AND "recipientId"=$1)) AND state->>'invitation'='pending' AND (state->>'invitationExpires')::bigint>$3 ORDER BY id DESC LIMIT 1`,[user,body.recipientId,Date.now()]);
+            if(pending.length)return manager.getRepository(SprintBattle).findOne(pending[0].id);
+            const pair=await manager.query(`SELECT 1 FROM sprint_battle WHERE (("ownerId"=$1 AND "recipientId"=$2) OR ("ownerId"=$2 AND "recipientId"=$1)) AND "createdAt">now()-interval '1 minute'`,[user,body.recipientId]);
             if(pair.length)throw new ConflictException('An invitation already exists or was recently sent');
             // Older clients keep their recorded-pace flow. Version2 always requires consent.
             if(body.version===2){battle.state.version=2;battle.state.invitation='pending';battle.state.invitationExpires=Date.now()+86400000;
@@ -73,14 +75,19 @@ export class SprintService {
     }
     async choose(user: number,id: number,game: string): Promise<SprintBattle> {
         return this.change(user,id,battle=>{
+            if(battle.state.done)return;
             this.accepted(battle);
+            const last=battle.state.legs[battle.state.legs.length-1];
+            if(battle.state.chooser===null && last.game===game && last.pacer===user)return;
             if(battle.state.done || battle.state.chooser!==user || !sprintGames.includes(game) || battle.state.legs.some(l=>l.game===game))throw new ConflictException('Not an available game choice');
             battle.state.legs.push(this.leg(game,user));battle.state.chooser=null;
         });
     }
     async start(user: number,id: number): Promise<SprintBattle> {
+        await this.settleStale(user);
         return this.change(user,id,battle=>{
             const leg=battle.state.legs[battle.state.legs.length-1];
+            if(battle.state.done || leg.results[user])return;
             this.accepted(battle);
             if(battle.state.done || battle.state.chooser!==null || leg.results[user])throw new ConflictException('Round not playable');
             const pacer=leg.pacer || battle.ownerId;
@@ -95,10 +102,14 @@ export class SprintService {
     }
     async submit(user: number,id: number,legIndex: number,result: SprintResult): Promise<SprintBattle> {
         return this.change(user,id,battle=>{
-            const state=battle.state;this.accepted(battle);
+            const state=battle.state;
             if(!Number.isInteger(legIndex) || legIndex<0 || legIndex>=state.legs.length)throw new BadRequestException('Invalid round');
             const leg=state.legs[legIndex];
             try{validateResult(leg.game,result);}catch(error){throw new BadRequestException('Invalid sprint result');}
+            // A late receipt must acknowledge an already forfeited match, never trap
+            // the other phone in a permanent409/outbox loop or award statistics twice.
+            if(state.done && (state.endReason || state.legs.some(l=>!l.results[battle.ownerId] || !l.results[battle.recipientId])))return;
+            this.accepted(battle);
             if(leg.results[user]){
                 const fingerprint=(r:SprintResult)=>JSON.stringify([r.completed,r.correct,r.turns,r.errors,r.roundMs,r.trace.map(p=>[p.ms,p.units])]);
                 if(fingerprint(leg.results[user])===fingerprint(result))return;
@@ -119,14 +130,22 @@ export class SprintService {
         });
     }
     private async settleStale(user:number):Promise<void>{
-        const rows=await this.connection.query(`SELECT id FROM sprint_battle WHERE ("ownerId"=$1 OR "recipientId"=$1) AND state->>'live'='true' AND state->>'done'='false' AND ((state->'legs'->-1->>'liveStart')::bigint)<$2 LIMIT 20`,[user,Date.now()-150000]);
+        const rows=await this.connection.query(`SELECT id FROM sprint_battle WHERE ("ownerId"=$1 OR "recipientId"=$1) AND state->>'live'='true' AND state->>'done'='false' AND (((state->'legs'->-1->>'liveStart')::bigint)<$2 OR (COALESCE((state->'legs'->-1->>'liveStart')::bigint,0)=0 AND (SELECT MIN(value::bigint) FROM jsonb_each_text(COALESCE(state->'legs'->-1->'ready','{}'::jsonb)))<$3)) LIMIT 20`,[user,Date.now()-150000,Date.now()-60000]);
         for(const row of rows)await this.change(user,row.id,battle=>{
             const leg=battle.state.legs[battle.state.legs.length-1];
-            if(battle.state.done||!leg.liveStart||Date.now()<leg.liveStart+150000)return;
+            if(battle.state.done)return;
+            if(!leg.liveStart){
+                const ready=leg.ready||{},a=ready[battle.ownerId],b=ready[battle.recipientId];
+                if((!a&&!b)||(a&&b)||Date.now()<Number(a||b)+60000)return;
+                battle.state.done=true;battle.state.chooser=null;battle.state.winner=a?battle.ownerId:battle.recipientId;
+                battle.state.endReason='connection';battle.state.forfeitedId=a?battle.recipientId:battle.ownerId;return;
+            }
+            if(Date.now()<leg.liveStart+150000)return;
             if(leg.results[battle.ownerId] && leg.results[battle.recipientId])return;
             battle.state.done=true;battle.state.chooser=null;
             battle.state.winner=leg.results[battle.ownerId]?battle.ownerId:leg.results[battle.recipientId]?battle.recipientId:0;
             battle.state.endReason='connection';
+            battle.state.forfeitedId=battle.state.winner===0?0:battle.state.winner===battle.ownerId?battle.recipientId:battle.ownerId;
         });
     }
     private accepted(battle:SprintBattle):void {
@@ -152,8 +171,11 @@ export class SprintService {
     }
     async progress(user:number,id:number,body:{legIndex:number;ms:number;units:number}):Promise<SprintBattle>{
         if(!body||!Number.isInteger(body.legIndex)||!Number.isInteger(body.ms)||!Number.isInteger(body.units)||body.ms<0||body.ms>90000||body.units<0||body.units>10000)throw new BadRequestException();
+        await this.settleStale(user);
         return this.change(user,id,battle=>{
+            if(battle.state.done)return;
             this.accepted(battle);const leg=battle.state.legs[body.legIndex];
+            if(leg && leg.results[user])return;
             if(!battle.state.live||battle.state.done||body.legIndex!==battle.state.legs.length-1||!leg||!leg.liveStart||Date.now()<leg.liveStart||Date.now()>leg.liveStart+105000)throw new ConflictException('Live round unavailable');
             if(body.ms>Date.now()-leg.liveStart+1500)throw new BadRequestException('Progress ahead of clock');
             leg.progress=leg.progress||{};const prior=leg.progress[user];
@@ -168,6 +190,7 @@ export class SprintService {
             this.accepted(battle);
             battle.state.done=true;battle.state.chooser=null;
             battle.state.winner=user===battle.ownerId?battle.recipientId:battle.ownerId;
+            battle.state.endReason='gave_up';battle.state.forfeitedId=user;
         });
     }
 }

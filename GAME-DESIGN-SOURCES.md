@@ -15,3 +15,9 @@ All four sources new relative to the preceding entry. See docs/LIVE-CHALLENGE-AS
 - [IMY: children's personal data](https://www.imy.se/verksamhet/dataskydd/det-har-galler-enligt-gdpr/introduktion-till-gdpr/personuppgifter/personuppgifter-om-barn/) (new): clear explanations, capacity to understand, and country/age consent requirements matter. A13+ label alone is not blanket consent approval.
 - [Epic: Fortnite social privacy controls](https://www.epicgames.com/help/c-34254770/a11220579) (new): first-party precedent for user-facing presence and social privacy controls; no evidence that a particular default is best.
 - Apple and Google sources above support blocking, disclosures and privacy controls. Together these are four independent organisations; IMY/Epic are new pages for this follow-up. No new game balance or scoring rule is proposed here.
+
+## 2026-10-25 — Disconnects, give-up and late receipts
+- Unity session lifecycle (new): https://docs.unity.com/en-us/mps-sdk/session-states — explicit connected/disconnected/deleted states.
+- Photon recovery (new): https://doc.photonengine.com/realtime/v5/troubleshooting/analyzing-disconnects — distinguish transient disruption from terminal session loss; bounded rejoin.
+- AWS idempotent APIs (new): https://aws.amazon.com/builders-library/making-retries-safe-with-idempotent-APIs/ — safe retries, late arrivals and atomic exactly-once effects.
+These three independent primary sources support lifecycle recovery and receipt safety. Existing90second rounds and60second receipt grace remain; a previously indefinite one-ready-player wait now uses that same grace. No claim of empirically optimal timings. See docs/LIVE-RECOVERY-20261025.md.

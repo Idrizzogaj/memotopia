@@ -3,13 +3,20 @@ using UnityEngine.UI;
 
 // Game-presence badge, not the phone's Wi-Fi connection. Hidden status is never disclosed.
 public sealed class PresenceIndicator : MaskableGraphic {
+ private string textStamp;private float widthStamp;private int fontStamp;private TextAnchor alignmentStamp;
  public static void Set(Text label,bool online){
   var child=label.transform.Find("Presence wifi");PresenceIndicator icon;
   if(child==null){var go=new GameObject("Presence wifi",typeof(RectTransform),typeof(CanvasRenderer),typeof(PresenceIndicator));go.transform.SetParent(label.transform,false);icon=go.GetComponent<PresenceIndicator>();}
   else icon=child.GetComponent<PresenceIndicator>();
-  float size=Mathf.Clamp(label.fontSize,22,30);var rect=icon.rectTransform;rect.anchorMin=rect.anchorMax=new Vector2(0,.5f);rect.sizeDelta=new Vector2(size,size);rect.anchoredPosition=new Vector2(size*.5f,0);
+  float size=Mathf.Clamp(label.fontSize,22,30),width=label.rectTransform.rect.width;
+  float textWidth=Mathf.Min(label.preferredWidth,Mathf.Max(0,width-size-10));
+  bool centred=label.alignment==TextAnchor.MiddleCenter || label.alignment==TextAnchor.UpperCenter || label.alignment==TextAnchor.LowerCenter;
+  float offset=centred?Mathf.Max(0,(width-textWidth)*.5f):0;
+  var rect=icon.rectTransform;rect.anchorMin=rect.anchorMax=new Vector2(0,.5f);rect.sizeDelta=new Vector2(size,size);rect.anchoredPosition=new Vector2(offset+textWidth+size*.5f+6,0);
   icon.raycastTarget=false;icon.color=online?(Color)new Color32(28,145,89,255):(Color)new Color32(202,48,75,255);icon.SetVerticesDirty();
+  icon.textStamp=label.text;icon.widthStamp=width;icon.fontStamp=label.fontSize;icon.alignmentStamp=label.alignment;
  }
+ private void LateUpdate(){var label=transform.parent.GetComponent<Text>();if(label!=null && (label.text!=textStamp || label.fontSize!=fontStamp || label.alignment!=alignmentStamp || !Mathf.Approximately(label.rectTransform.rect.width,widthStamp)))Set(label,color.g>color.r);}
  protected override void OnPopulateMesh(VertexHelper mesh){
   mesh.Clear();var rect=GetPixelAdjustedRect();float size=Mathf.Min(rect.width,rect.height);Vector2 centre=rect.center+Vector2.down*size*.28f;
   foreach(float radius in new[]{.24f,.44f,.64f})for(int i=0;i<16;i++){

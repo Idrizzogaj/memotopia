@@ -33,5 +33,14 @@ let connection;
  const [record]=await connection.query('SELECT state FROM sprint_battle WHERE id=$1',[lid]);record.state.legs[0].liveStart=Date.now()-90001;record.state.legs[0].starts[a.id]=record.state.legs[0].liveStart;record.state.legs[0].starts[b.id]=record.state.legs[0].liveStart;await connection.query('UPDATE sprint_battle SET state=$1::jsonb WHERE id=$2',[JSON.stringify(record.state),lid]);
  const empty={completed:0,correct:0,turns:0,errors:0,roundMs:[],trace:[]};assert.equal((await request('/sprints/'+lid+'/result',ta,{legIndex:0,result:empty})).status,201);const final=await request('/sprints/'+lid+'/result',tb,{legIndex:0,result:empty});assert.equal(final.status,201);assert(final.body.done);assert.equal(final.body.winner,0);
  const stats=await request('/user-statistics',tb);assert.equal(stats.body.numberOfChallenges,1);assert.equal(stats.body.numberOfSingleChallenges,1);
- console.log('LIVE_HTTP_PASSED: authenticated routes, membership, consent, private declines, correct statistics, block bypass prevention, friendship privacy, shared live deadline and result receipts');
+ for(const [sender,recipient,st,rt] of [[a,b,ta,tb],[b,a,tb,ta]]){
+  await connection.query('UPDATE sprint_battle SET "createdAt"=now()-interval \'2 minutes\'');
+  for(const t of [st,rt])await request('/sprints/social/heartbeat',t,{active:true,visible:false,friendsVisible:true});
+  const invitation=await request('/sprints',st,{recipientId:recipient.id,game:'Boxes',tier:6,mode:'single',version:2,live:true});assert.equal(invitation.status,201);assert(invitation.body.live);const gameId=invitation.body.id;
+  const duplicate=await request('/sprints',rt,{recipientId:sender.id,game:'Chain',tier:6,mode:'single',version:2,live:true});assert.equal(duplicate.status,201);assert.equal(duplicate.body.id,gameId);assert.equal(duplicate.body.invitation,'pending');
+  await request('/sprints/'+gameId+'/respond',rt,{accept:true});await request('/sprints/'+gameId+'/start',st,{});await request('/sprints/'+gameId+'/start',rt,{});
+  const gaveUp=await request('/sprints/'+gameId+'/cancel',st,{});assert.equal(gaveUp.status,201);assert.equal(gaveUp.body.endReason,'gave_up');assert.equal(gaveUp.body.forfeitedId,sender.id);
+  for(const path of ['result','start','progress']){const response=await request('/sprints/'+gameId+'/'+path,rt,path==='result'?{legIndex:0,result:empty}:path==='progress'?{legIndex:0,ms:0,units:0}:{});assert.equal(response.status,201);assert(response.body.done);assert.equal(response.body.winner,recipient.id);}
+ }
+ console.log('LIVE_HTTP_PASSED: authenticated routing, both invitation directions, idempotent crossed invitations, give-up receipts, late result/start/progress acknowledgement, shared live deadline and original social/statistics checks');
 })().catch(e=>{console.error(e.stack);process.exitCode=1}).finally(async()=>{if(connection)await connection.close();});

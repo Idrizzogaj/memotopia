@@ -7,7 +7,7 @@ import { SprintResult } from './sprint-rules';
 import { SprintBattle } from '~common/db/entities/sprint-battle.entity';
 function view(battle:SprintBattle){
  const s=battle.state;
- return {id:battle.id,ownerId:battle.ownerId,recipientId:battle.recipientId,ownerName:battle.ownerName,recipientName:battle.recipientName,serverTime:Date.now(),version:s.version,mode:s.mode,tier:s.tier,chooser:s.chooser,winner:s.winner,done:s.done,invitation:s.invitation||"accepted",live:!!s.live,endReason:s.endReason||"",
+ return {id:battle.id,ownerId:battle.ownerId,recipientId:battle.recipientId,ownerName:battle.ownerName,recipientName:battle.recipientName,serverTime:Date.now(),version:s.version,mode:s.mode,tier:s.tier,chooser:s.chooser,winner:s.winner,done:s.done,invitation:s.invitation||"accepted",live:!!s.live,endReason:s.endReason||"",forfeitedId:s.forfeitedId||0,
  legs:s.legs.map(l=>({liveStart:l.liveStart||0,ownerUnits:l.progress&&l.progress[battle.ownerId]?l.progress[battle.ownerId].units:0,recipientUnits:l.progress&&l.progress[battle.recipientId]?l.progress[battle.recipientId].units:0,game:l.game,seed:l.seed,pacer:l.pacer||battle.ownerId,ownerStart:l.starts[battle.ownerId]||0,recipientStart:l.starts[battle.recipientId]||0,ownerPlayed:!!l.results[battle.ownerId],recipientPlayed:!!l.results[battle.recipientId],ownerResult:l.results[battle.ownerId]||null,recipientResult:l.results[battle.recipientId]||null,winner:l.winner}))};
 }
 @Controller('sprints')
