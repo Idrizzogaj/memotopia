@@ -51,6 +51,19 @@ export class UserStatisticsService {
         return userStatistics;
     }
 
+    async getChallengeSummary(user: User): Promise<UserStatistics & { challengeFormatsAvailable: boolean; numberOfMatchChallenges: number; numberOfSingleChallenges: number }> {
+        const statistics = await this.getByUser(user);
+        // All-time count, not the inbox's latest100records. Settled forfeits follow existing counters.
+        const rows = await this.userStatisticsRepository.query(
+            `SELECT s."numberOfChallenges" AS games, s."numberOfLossChallenges" AS losses, s."numberOfDrawChallenges" AS draws, (SELECT COUNT(*)::int FROM "sprint_battle" WHERE ("ownerId"=$1 OR "recipientId"=$1) AND state->>'done'='true' AND state->>'mode'='match') AS matches FROM "user_statistics" s WHERE s."userId"=$1`,
+            [user.id],
+        );
+        const matches = Number(rows[0].matches);
+        return Object.assign(statistics, { challengeFormatsAvailable: true, numberOfMatchChallenges: matches,
+            numberOfSingleChallenges: Math.max(0, Number(rows[0].games) - matches), numberOfChallenges: Number(rows[0].games),
+            numberOfLossChallenges: Number(rows[0].losses), numberOfDrawChallenges: Number(rows[0].draws) });
+    }
+
     async getGlobalScore(): Promise<UserStatisticsDto[]> {
         const userStatistics: UserStatistics[] = await this.userStatisticsRepository.find({
             relations: ['user'],

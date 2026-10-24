@@ -54,7 +54,7 @@ public static class ChallengeCombinedValidation {
    if(clicks!=1)throw new Exception("Selector click did not reach "+image.name+"/"+caption);
   }
   var row=navigation.challengeGameScreen.transform.Find("Single or Match");
-  var single=row.Find("Single game").GetComponent<Button>();var match=row.Find("Match!").GetComponent<Button>();
+  var single=row.Find("Single").GetComponent<Button>();var match=row.Find("Match!").GetComponent<Button>();
   var orange=(Color)new Color32(254,191,75,255);var grey=(Color)new Color32(245,245,245,255);
   if(single.image.color!=orange || match.image.color!=grey)throw new Exception("Single selection colours incorrect");
   foreach(var button in new[]{match,single}){

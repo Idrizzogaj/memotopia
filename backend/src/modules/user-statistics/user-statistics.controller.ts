@@ -24,7 +24,7 @@ export class UserStatisticsController {
     @UseInterceptors(ExcludeInterceptor)
     @Get()
     getUserStatisticsChallengeGames(@GetUser() user: User): Promise<UserStatisticsDto> {
-        return this.userStatisticsService.getByUser(user);
+        return this.userStatisticsService.getChallengeSummary(user);
     }
 
     @ApiOperation({ summary: 'Get global score' })

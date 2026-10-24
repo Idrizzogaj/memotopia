@@ -35,6 +35,7 @@ public class StatisticsView : MonoBehaviour
     [SerializeField]
     private TextMeshProUGUI starsPerGame;
 
+    private int challengeRequest;
     private int rankingRequest;
     private readonly Dictionary<Text, Color> rankingColors = new Dictionary<Text, Color>();
 
@@ -56,6 +57,7 @@ public class StatisticsView : MonoBehaviour
 
     private void OnEnable()
     {
+        ApplyChallengeCounters(UserConstants.s_user == null ? null : UserConstants.s_user.userStatistics);
         if (userStatisticsAPIController == null)
             userStatisticsAPIController = gameObject.AddComponent<UserStatisticsAPIController>();
         int request = ++rankingRequest;
@@ -117,8 +119,47 @@ public class StatisticsView : MonoBehaviour
         }
     }
 
+    // Keep the existing Statistics panel/background, replacing only its old four-field contents.
+    public void ApplyChallengeCounters(UserStatistics statistics)
+    {
+        if (challengeStatsPanel == null) return;
+        var heading = challengeStatsPanel.transform.Find("ChallengeStatsText");
+        if (heading != null) { var text = heading.GetComponent<Text>(); if (text != null) { text.text = "Challenges"; text.color = Color.white; } }
+        var holder = challengeStatsPanel.transform.Find("StatsHolder");
+        if (holder == null) holder = challengeStatsPanel.transform;
+        var fields = holder.Find("Challenge format stats");
+        if (fields == null) {
+            foreach (Transform child in holder) child.gameObject.SetActive(false);
+            var go = ChainGame.Panel(holder, "Challenge format stats", new Vector2(.02f,.05f),new Vector2(.98f,.95f),Color.clear);
+            go.GetComponent<Image>().raycastTarget=false;go.AddComponent<LayoutElement>().ignoreLayout=true;fields=go.transform;
+            string[] names={"Games","Matches","Single","Losses","Draw"};
+            for(int i=0;i<names.Length;i++) {
+                var column=ChainGame.Panel(fields,names[i],new Vector2(i/5f,0),new Vector2((i+1)/5f,1),Color.clear);
+                column.GetComponent<Image>().raycastTarget=false;
+                ChainGame.Label(column.transform,names[i],new Vector2(.02f,.10f),new Vector2(.98f,.44f),28,Color.white);
+                var value=ChainGame.Label(column.transform,"—",new Vector2(.02f,.47f),new Vector2(.98f,.92f),44,Color.white);value.name="Value";value.fontStyle=FontStyle.Bold;
+            }
+        }
+        string unknown="—";
+        string[] values={statistics==null?unknown:statistics.numberOfChallenges.ToString(),
+            statistics==null || !statistics.challengeFormatsAvailable?unknown:statistics.numberOfMatchChallenges.ToString(),
+            statistics==null || !statistics.challengeFormatsAvailable?unknown:statistics.numberOfSingleChallenges.ToString(),
+            statistics==null?unknown:statistics.numberOfLossChallenges.ToString(),statistics==null?unknown:statistics.numberOfDrawChallenges.ToString()};
+        string[] captions={"Games","Matches","Single","Losses","Draw"};
+        for(int i=0;i<captions.Length;i++)fields.Find(captions[i]+"/Value").GetComponent<Text>().text=values[i];
+    }
+    private void RefreshChallengeCounters()
+    {
+        int request=++challengeRequest, owner=GameManager.AchievementUserId;
+        userStatisticsAPIController.GetUserStatisticsChallengeGames(result=>{
+            if(this==null || request!=challengeRequest || GameManager.AchievementUserId!=owner)return;
+            ApplyChallengeCounters(result);if(UserConstants.s_user!=null)UserConstants.s_user.userStatistics=result;
+        },error=>{ /* Keep last verified counters; unavailable format counts stay unknown. */ });
+    }
+
     public void CallLevelsAvg()
     {
+        RefreshChallengeCounters();
         InitStars();
         userStatisticsAPIController.GetLevelsAvg(
         (OnSuccess) =>

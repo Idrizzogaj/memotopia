@@ -121,6 +121,7 @@ public class ChallengeNavigation : MonoBehaviour
                 winsNrStatistics.text = OnSuccess.numberOfWinChallenges.ToString();
                 lossesNrStatistics.text = OnSuccess.numberOfLossChallenges.ToString();
                 drawsNrStatistics.text = OnSuccess.numberOfDrawChallenges.ToString();
+                var statisticsView=GetComponent<StatisticsView>();if(statisticsView!=null)statisticsView.ApplyChallengeCounters(OnSuccess);
 
                 statisticsSlider.maxValue = OnSuccess.numberOfChallenges;
                 statisticsSlider.minValue = 0;

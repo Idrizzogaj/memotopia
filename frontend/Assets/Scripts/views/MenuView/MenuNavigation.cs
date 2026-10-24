@@ -281,6 +281,7 @@ public class MenuNavigation : MonoBehaviour
 
     public void GoToChallengeHome()
     {
+        OpenChallengeScreen();
         challengeNotificationScreen.SetActive(false);
         challengeRandomScreen.SetActive(false);
         challengeHomeScreen.SetActive(true);

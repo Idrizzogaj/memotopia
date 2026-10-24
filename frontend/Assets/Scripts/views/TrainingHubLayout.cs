@@ -36,10 +36,21 @@ public static class TrainingHubLayout
         Place(tile,screen,(index%2==0?-1:1)*(side+gap)/2,top-(index/2)*(side+gap),side,side);
         var back=tile.GetComponent<Image>();back.enabled=true;back.sprite=ContentSelectorBar.Rounded();back.type=Image.Type.Sliced;back.color=focus?FocusTone:GameTones[index];back.canvasRenderer.SetColor(Color.white);var selectable=tile.GetComponent<Button>();if(focus && selectable!=null){var colors=selectable.colors;colors.disabledColor=Color.white;selectable.colors=colors;selectable.transition=Selectable.Transition.None;}
         var border=tile.GetComponent<Outline>();if(border==null)border=tile.gameObject.AddComponent<Outline>();border.effectColor=Color.clear;border.effectDistance=new Vector2(2,-2);
+        DrawTileContents(tile,index,focus);
+    }
+    private static void DrawTileContents(RectTransform tile,int index,bool focus){
         var art=new GameObject("Flat game symbol",typeof(RectTransform));art.transform.SetParent(tile,false);var ar=(RectTransform)art.transform;ar.anchorMin=new Vector2(.22f,.35f);ar.anchorMax=new Vector2(.78f,.87f);ar.offsetMin=ar.offsetMax=Vector2.zero;
         Canvas.ForceUpdateCanvases();TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white,focus);
         var label=ChainGame.Label(tile,Names[index],new Vector2(.05f,.10f),new Vector2(.95f,.32f),46,Color.white);label.fontStyle=FontStyle.Bold;
         if(focus)ChainGame.Label(tile,"90 s • Coming soon",new Vector2(.04f,.02f),new Vector2(.96f,.12f),20,Color.white);
+    }
+    // Match choices reuse exactly the Memory tiles' symbols, type and colours.
+    public static Button GameButton(Transform parent,string game,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action){
+        int index=System.Array.IndexOf(new[]{"Pairs","Boxes","Flash","Chain"},game);
+        if(index<0)throw new System.ArgumentException("Unknown game", "game");
+        var go=ChainGame.Panel(parent,game,min,max,GameTones[index]);SprintUi.Edges(go.GetComponent<Image>());
+        var button=go.AddComponent<Button>();button.transition=Selectable.Transition.None;button.onClick.AddListener(action);
+        Canvas.ForceUpdateCanvases();DrawTileContents((RectTransform)go.transform,index,false);return button;
     }
     public static void ApplyChallenge(ChallengeNavigation navigation) {
         if(navigation==null)return;
