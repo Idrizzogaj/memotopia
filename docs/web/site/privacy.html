@@ -11,7 +11,7 @@
 <header class="nav"><div><strong><a href="index.html" style="text-decoration:none;color:inherit">Memotopia</a></strong><a href="support.html">Support</a><a href="delete-account.html">Delete account</a></div></header>
 <div class="doc">
 <h1>Privacy policy</h1>
-<p><em>Last updated: 10 October 2026</em></p>
+<p><em>Last updated: 24 October 2026</em></p>
 
 <h2>1. Who is responsible</h2>
 <p>The controller is <strong>Zogaj of Sweden AB</strong>, org. no. 556802-0753, Östgatan 20, 412 75 Göteborg, Sweden. Contact: <a href="mailto:memotopia@memotopia.com">memotopia@memotopia.com</a>.</p>
@@ -27,6 +27,9 @@
 <tr><td>Password (stored only as a one-way hash)</td><td>Log you in</td><td>Contract</td></tr>
 <tr><td>Game results: levels, stars, scores, XP, achievements, time played</td><td>Run the games, progression and ranking; show your results to other players</td><td>Contract</td></tr>
 <tr><td>Challenge data: opponents, games, results, favourites</td><td>Run challenges between players</td><td>Contract</td></tr>
+<tr><td>Online visibility, friend requests and accepted friendships</td><td>Find friends and arrange live games. Favourites alone never grant access to hidden status.</td><td>Contract for requested friendships; consent for optional online visibility, which can be switched off</td></tr>
+<tr><td>Invitations, decisions, a private declined total, block lists and anti-spam counters</td><td>Control contact and prevent unwanted invitations</td><td>Contract for invitation controls; legitimate interest in preventing harassment and spam</td></tr>
+<tr><td>Live round start, progress and final results</td><td>Synchronise the 90-second game and compare participants</td><td>Contract</td></tr>
 <tr><td>Subscription status (free / monthly / yearly)</td><td>Give you Premium features</td><td>Contract</td></tr>
 <tr><td>Technical data in server logs (IP address, time, requested function)</td><td>Keep the service secure and working, stop abuse and mass registration</td><td>Legitimate interest (Art. 6.1.f)</td></tr>
 <tr><td>Crash reports sent to Unity Technologies (a unique installation-specific identifier, device model, operating system, app version, the technical error and IP address). The installation identifier helps associate crash reports with the same installation; it is not an advertising identifier. Gameplay usage analytics are switched off.</td><td>Find and fix crashes</td><td>Legitimate interest</td></tr>
@@ -37,6 +40,8 @@
 <p>Your <strong>username, avatar, level, XP, achievements and challenge results</strong> are visible to other players, for example in search, in the ranking and when you are challenged. Your e-mail address is never shown to other players.</p>
 
 <h2>5. Who receives data</h2>
+<p><strong>Online visibility has two audiences.</strong> Visibility to other players is off by default. When you send or accept a friend request, the app explains that accepted friends can see when you are online by default. You can switch off visibility to friends separately. Favourites are not friends. Presence is sent only while the signed-in app is active in the foreground; there is no location or background tracking or separate last-seen history. Status can take up to 45 seconds to disappear after a lost connection.</p>
+<p>Only participants see an invitation and its decision. Declining adds no played game, loss or XP change. Your declined total and block list are private. Blocking stops invitations and presence visibility in both directions, removes friendship and closes pending invitations without a result. Unblocking does not restore friendship. Accepted game results can remain in game history.</p>
 <ul>
 <li><strong>Hetzner Online GmbH</strong> – server hosting and database, located in Germany (EU).</li>
 <li><strong>Brevo (Sendinblue SAS)</strong> – sends confirmation and password-reset e-mails (France).</li>
@@ -48,6 +53,10 @@
 <h2>6. How long we keep data</h2>
 <ul>
 <li>Account and game data: until you delete the account.</li>
+<li>Presence expires within 45 seconds without a heartbeat. Expired lease values are cleared on the next challenge refresh; no separate activity history is kept.</li>
+<li>Unaccepted friend requests, including refusals, expire after 7 days and are cleared on the next challenge refresh. Anti-spam counters keep the current or last one-hour window until the next request or account deletion.</li>
+<li>Declined, expired, blocked and withdrawn challenge invitations are removed after 30 days on the next challenge refresh. Accepted game results and the private declined total remain with your account.</li>
+<li>Friendships and privacy settings remain until changed or account deletion; block lists remain until unblocking or account deletion.</li>
 <li>Unconfirmed registrations: deleted automatically after 24 hours.</li>
 <li>Server logs: 30 days.</li>
 <li>Backups: a deleted account can remain in backups for up to 30 days until they are overwritten.</li>

@@ -3,9 +3,12 @@ import { User } from './user.entity';
 import { SprintResult } from '~modules/challenge/sprint-rules';
 export interface SprintLeg {
     game: string; seed: number; pacer: number; starts: { [user: string]: number };
+    ready?: { [user: string]: number }; liveStart?:number; progress?: { [user:string]: {ms:number;units:number} };
     results: { [user: string]: SprintResult }; winner: number | null;
 }
 export interface SprintBattleState {
+    endReason?:string;
+    invitation?: 'pending'|'accepted'|'declined'|'expired'|'blocked'|'withdrawn'; invitationExpires?:number; live?:boolean;
     version: number; mode: 'single' | 'match'; tier: number; legs: SprintLeg[];
     chooser: number | null; winner: number | null; done: boolean;
 }

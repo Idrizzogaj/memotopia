@@ -3,6 +3,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 [InitializeOnLoad] public static class SprintPlayReview {
  static SprintPlayReview(){EditorApplication.playModeStateChanged+=Changed;EditorApplication.update+=Watch;}
+ public static void RunLive(){SessionState.SetBool("SprintLiveOnly",true);Run();}
  public static void Run(){
   SessionState.SetBool("SprintPlayOldOptionsEnabled",EditorSettings.enterPlayModeOptionsEnabled);SessionState.SetInt("SprintPlayOldOptions",(int)EditorSettings.enterPlayModeOptions);
   EditorSettings.enterPlayModeOptionsEnabled=true;EditorSettings.enterPlayModeOptions=EnterPlayModeOptions.DisableDomainReload;

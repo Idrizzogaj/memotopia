@@ -11,7 +11,7 @@ let connection;
  assert.equal((await request('/sprints')).status,401);
  const session=await request('/auth/session',a,{});assert.equal(session.status,201);const decoded=jwt.verify(session.body.accessToken,process.env.JWT_SECRET);assert.equal(decoded.exp-decoded.iat,365*86400);
  const profile=await request('/achievements/users/'+users[0].id+'/count',a);assert.equal(profile.status,200);assert.equal(profile.body.count,1);
- const created=await request('/sprints',a,{recipientId:users[1].id,game:'Chain',tier:6,mode:'single'});assert.equal(created.status,201);const id=created.body.id;assert.equal(created.body.legs[0].ownerPlayed,false);assert.equal(created.body.legs[0].ownerResult,null);
+ const created=await request('/sprints',a,{recipientId:users[1].id,game:'Chain',tier:6,mode:'single',version:2});assert.equal(created.status,201);const id=created.body.id;assert.equal(created.body.legs[0].ownerPlayed,false);assert.equal(created.body.legs[0].ownerResult,null);assert.equal((await request('/sprints/'+id+'/respond',b,{accept:true})).status,201);
  assert.equal((await request('/sprints/'+id+'/start',b,{})).status,409);assert.equal((await request('/sprints/'+id+'/start',a,{})).status,201);
  async function expire(user){const [record]=await connection.query('SELECT state FROM sprint_battle WHERE id=$1',[id]);record.state.legs[0].starts[user]=Date.now()-90001;await connection.query('UPDATE sprint_battle SET state=$1::jsonb WHERE id=$2',[JSON.stringify(record.state),id]);}
  await expire(users[0].id);const first=await request('/sprints/'+id+'/result',a,{legIndex:0,result:empty});assert.equal(first.status,201);assert.equal(first.body.legs[0].ownerPlayed,true);assert.equal(first.body.legs[0].recipientPlayed,false);

@@ -543,6 +543,7 @@ public class ChallengeNavigation : MonoBehaviour
     private int profileRequest;
     public void goToUserProfileScreen(User user, bool isFavorite)
     {
+        if(LiveChallenges.Current!=null)LiveChallenges.Current.Profile(challengeUserProfileScreen.transform,user.ID);
         challengeHomeScreen.SetActive(false);
         challengeRandomScreen.SetActive(false);
         challengeGameScreen.SetActive(false);
@@ -752,7 +753,7 @@ public class ChallengeNavigation : MonoBehaviour
             Button[] buttons = item.GetComponentsInChildren<Button>();
             Image[] images = item.GetComponentsInChildren<Image>();
             images[0].sprite = Resources.Load<Sprite>("Memotopia_UI/AccountAndSettings/" + obj.users[i].Avatar);
-            texts[0].text = obj.users[i].Username;
+            LiveChallenges.Watch(texts[0],obj.users[i].ID,obj.users[i].Username);
             texts[1].text = "Level " + obj.users[i].userStatistics.level.ToString()  + " / " + obj.users[i].userStatistics.xp.ToString() + "xp";
             texts[1].color = Color.grey;
             buttons[0].onClick.AddListener(() => goToUserProfileScreen(user, true));
@@ -786,7 +787,7 @@ public class ChallengeNavigation : MonoBehaviour
             Button[] buttons = item.GetComponentsInChildren<Button>();
             Image[] images = item.GetComponentsInChildren<Image>();
             images[0].sprite = Resources.Load<Sprite>("Memotopia_UI/AccountAndSettings/" + obj.users[i].Avatar);
-            texts[0].text = obj.users[i].Username;
+            LiveChallenges.Watch(texts[0],obj.users[i].ID,obj.users[i].Username);
             texts[1].text = "Level " + obj.users[i].userStatistics.level.ToString() + " / " + obj.users[i].userStatistics.xp.ToString() + "xp";
             buttons[1].onClick.AddListener(() => {
                 UserConstants.s_challengeUser = user;

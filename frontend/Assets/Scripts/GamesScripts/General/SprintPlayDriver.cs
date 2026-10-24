@@ -21,13 +21,14 @@ public sealed class SprintPlayDriver : MonoBehaviour {
  private void Log(string message,string stack,LogType type){if(type==LogType.Exception)Exit(1,"PLAY_EXCEPTION: "+message+" "+stack);}
  private void SceneLoaded(Scene scene,LoadSceneMode mode){if(scene.name=="GameMenu")foreach(var root in scene.GetRootGameObjects())foreach(var behaviour in root.GetComponentsInChildren<MonoBehaviour>(true))if(behaviour!=null && !(behaviour is UnityEngine.EventSystems.UIBehaviour))behaviour.enabled=false;}
  private void Transport(string path,string payload,Action<string> success,Action<string> fail){
-  if(path.EndsWith("/start")){battle.serverTime=100000;battle.legs[0].ownerStart=100000;success(JsonUtility.ToJson(battle));return;}
+  if(path.EndsWith("/start")){Debug.Log("Mock start live="+battle.live+" now="+now);battle.serverTime=100000;battle.legs[0].ownerStart=battle.live?104000:100000;if(battle.live){battle.legs[0].liveStart=104000;battle.legs[0].recipientStart=104000;}success(JsonUtility.ToJson(battle));return;}
+  if(path.EndsWith("/progress")){battle.legs[0].recipientUnits=2;success(JsonUtility.ToJson(battle));return;}
   if(path.EndsWith("/result")){lastResult=payload;resultAttempts++;if(resultAttempts==1)fail("Test offline retry");else{battle.done=true;success(JsonUtility.ToJson(battle));}return;}
   if(path=="" && payload==null){success(JsonUtility.ToJson(new SprintBattleList{battles=new[]{battle}}));return;}
   fail("Unexpected test request "+path);
  }
  private void Check(bool valid,string message){if(!valid)throw new Exception(message);}
- private IEnumerator Wait(Func<bool> valid,string description){float deadline=Time.realtimeSinceStartup+35;while(!valid()){if(Time.realtimeSinceStartup>deadline)throw new Exception("Timed out: "+description);yield return null;}}
+ private IEnumerator Wait(Func<bool> valid,string description){float deadline=Time.realtimeSinceStartup+35;while(!valid()){if(Time.realtimeSinceStartup>deadline){Debug.Log("Wait diagnostic: "+description+" scene="+SceneManager.GetActiveScene().name+" active="+SprintRuntime.Active+" account="+GameManager.AchievementUserId+" state="+(SprintRuntime.Active&&SprintRuntime.Current.State!=null)+" intro="+(SprintRuntime.Active?Field(SprintRuntime.Current,"introStarting"):null)+" chain="+FindObjectOfType<ChainGame>());throw new Exception("Timed out: "+description);}yield return null;}}
  private object Field(object instance,string name){return instance.GetType().GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).GetValue(instance);}
  private void ContentCases(){
   var missing=SprintAPI.Decode<SprintBattleView>("{\"legs\":[{\"game\":\"Pairs\",\"ownerPlayed\":false,\"recipientPlayed\":false,\"ownerResult\":null,\"recipientResult\":null}]}");
@@ -47,7 +48,7 @@ public sealed class SprintPlayDriver : MonoBehaviour {
  }
  private IEnumerator Cases(){
   ContentCases();
-  foreach(var game in ChallengeSprintRules.Games){
+  foreach(var game in SessionState.GetBool("SprintLiveOnly",false)?new string[0]:ChallengeSprintRules.Games){
    now=0;battle=new SprintBattleView{id=1,version=1,ownerId=1999999963,recipientId=2,mode="single",tier=18,legs=new[]{new SprintLegView{game=game,seed=12345}}};
    SprintRuntime.Begin(battle,null);yield return Wait(()=>SprintRuntime.Current!=null && SprintRuntime.Current.Ready,game+" intro");
    Check(SprintRuntime.Current.ClockText=="90","Intro must be outside play time");
@@ -90,12 +91,23 @@ public sealed class SprintPlayDriver : MonoBehaviour {
    }
    SprintRuntime.Current.Close();yield return null;
   }
+  if(SessionState.GetBool("SprintLiveOnly",false)){
+  resultAttempts=2;
+  if(SceneManager.GetActiveScene().name!="GameMenu")SceneManager.LoadSceneAsync("GameMenu");
+  yield return Wait(()=>SceneManager.GetActiveScene().name=="GameMenu" && FindObjectOfType<MenuNavigation>()!=null,"Menu before live case");yield return null;yield return null;
+  now=0;battle=new SprintBattleView{id=7,version=2,live=true,invitation="accepted",ownerId=1999999963,recipientId=2,mode="single",tier=6,legs=new[]{new SprintLegView{game="Chain",seed=12345}}};
+  SprintRuntime.Begin(battle,null);yield return Wait(()=>battle.legs[0].liveStart>0,"Live readiness receipt");
+  Check(SprintRuntime.Current.State==null,"Live countdown cannot start gameplay early");now=4000;
+  yield return Wait(()=>SprintRuntime.Current!=null && SprintRuntime.Current.Ready,"Live shared start");Check(SprintRuntime.Current.ClockText=="90","Shared start has90seconds");
+  now=5000;yield return new WaitForSecondsRealtime(1.2f);Check(((Text)Field(SprintRuntime.Current,"status")).text=="Behind -2","Live opponent progress reaches the original HUD");
+  now=94000;yield return Wait(()=>!SprintRuntime.Active,"Shared deadline submits live receipt");Debug.Log("LIVE_SPRINT_PLAY_PASSED: future start gates originals, common90seconds, live lead bar, deadline receipt");
+  }
   yield return Wait(()=>SceneManager.GetActiveScene().name=="GameMenu" && FindObjectOfType<MenuNavigation>()!=null,"Return to menu");
   var menu=FindObjectOfType<MenuNavigation>();var navigation=menu.GetComponent<ChallengeNavigation>();TrainingHubLayout.ApplyChallenge(navigation);
   menu.challengeScreen.SetActive(false);menu.GoToNotification();Check(menu.challengeScreen.activeSelf,"Bell activates Challenge before API request");
   var lobby=navigation.GetComponent<SprintLobby>();Check(Field(lobby,"panel")!=null,"Bell opens sprint inbox");Check(navigation.challengeGameScreen.transform.Find("Chain challenge")!=null,"Chain shares Challenge selection");
   Debug.Log("SPRINT_MENU_VALIDATION_PASSED");Exit(0,"SPRINT_PLAY_VALIDATION_PASSED");
  }
- private void Exit(int code,string message){if(exiting)return;exiting=true;SessionState.SetBool("SprintPlayRunning",false);PlayerPrefs.SetString("token",SessionState.GetString("SprintPlayPriorToken",""));PlayerPrefs.Save();Application.logMessageReceived-=Log;SceneManager.sceneLoaded-=SceneLoaded;SprintAPI.EditorTransport=null;SprintRuntime.EditorNow=null;EditorApplication.ExecuteMenuItem("SprintReview/Restore");Debug.Log(message);EditorApplication.Exit(code);}
+ private void Exit(int code,string message){if(exiting)return;exiting=true;SessionState.SetBool("SprintLiveOnly",false);SessionState.SetBool("SprintPlayRunning",false);PlayerPrefs.SetString("token",SessionState.GetString("SprintPlayPriorToken",""));PlayerPrefs.Save();Application.logMessageReceived-=Log;SceneManager.sceneLoaded-=SceneLoaded;SprintAPI.EditorTransport=null;SprintRuntime.EditorNow=null;EditorApplication.ExecuteMenuItem("SprintReview/Restore");Debug.Log(message);EditorApplication.Exit(code);}
 }
 #endif

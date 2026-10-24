@@ -55,7 +55,7 @@ export class UserStatisticsService {
         const statistics = await this.getByUser(user);
         // All-time count, not the inbox's latest100records. Settled forfeits follow existing counters.
         const rows = await this.userStatisticsRepository.query(
-            `SELECT s."numberOfChallenges" AS games, s."numberOfLossChallenges" AS losses, s."numberOfDrawChallenges" AS draws, (SELECT COUNT(*)::int FROM "sprint_battle" WHERE ("ownerId"=$1 OR "recipientId"=$1) AND state->>'done'='true' AND state->>'mode'='match') AS matches FROM "user_statistics" s WHERE s."userId"=$1`,
+            `SELECT s."numberOfChallenges" AS games, s."numberOfLossChallenges" AS losses, s."numberOfDrawChallenges" AS draws, (SELECT COUNT(*)::int FROM "sprint_battle" WHERE ("ownerId"=$1 OR "recipientId"=$1) AND state->>'done'='true' AND state->>'mode'='match' AND (NOT state ? 'invitation' OR state->>'invitation'='accepted')) AS matches FROM "user_statistics" s WHERE s."userId"=$1`,
             [user.id],
         );
         const matches = Number(rows[0].matches);

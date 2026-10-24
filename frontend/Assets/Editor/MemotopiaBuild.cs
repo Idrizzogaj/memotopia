@@ -1,3 +1,4 @@
+#if UNITY_IOS
 using UnityEditor;
 using UnityEngine;
 using UnityEditor.Build.Reporting;
@@ -13,8 +14,8 @@ public class MemotopiaBuild
         PlayerSettings.iOS.appleEnableAutomaticSigning = true;
         PlayerSettings.iOS.appleDeveloperTeamID = "E838WX6KF8";
         PlayerSettings.iOS.targetOSVersionString = "15.0";
-        PlayerSettings.bundleVersion = "1.0.56";
-        PlayerSettings.iOS.buildNumber = "2026102302";
+        PlayerSettings.bundleVersion = "1.0.58";
+        PlayerSettings.iOS.buildNumber = "2026102402";
 
         MajorSystemValidation.Validate();
         ChainValidation.ValidateLogic();
@@ -78,3 +79,4 @@ public class MemotopiaBuild
         File.WriteAllText(symbolsPath, "#!/bin/sh\necho 'Skipping legacy Unity symbol uploader; Xcode dSYMs retained.'\nexit 0\n");
     }
 }
+#endif

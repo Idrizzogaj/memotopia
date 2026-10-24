@@ -40,44 +40,7 @@ export class ChallengeService {
     ) {}
 
     async create(createChallengeDto: CreateChallengeDto, user: User): Promise<ChallengeResDto> {
-        const { level, challengerId, gameName } = createChallengeDto;
-        const game = await this.gameRepository.findOne({ gameName });
-
-        if (!game) throw new NotFoundException(`Game with name "${gameName}" not found!`);
-
-        const challenge = new Challenge();
-
-        challenge.level = level;
-        challenge.game = game;
-
-        try {
-            await this.challengeRepository.save(challenge);
-        } catch (error) {
-            throw new InternalServerErrorException('Challenge failed to be created.');
-        }
-
-        const challenger = await this.userService.getById(challengerId);
-        const participant1 = new Participant();
-        const participant2 = new Participant();
-
-        participant1.user = user;
-        participant1.challenge = challenge;
-
-        participant2.user = challenger as User;
-        participant2.challenge = challenge;
-
-        let participants;
-
-        try {
-            participants = await this.participantRepository.save([participant1, participant2]);
-        } catch (error) {
-            throw new InternalServerErrorException('Participant failed to be created.');
-        }
-
-        return {
-            challenge,
-            participants,
-        };
+        throw new ConflictException('Update Memotopia to send invitations');
     }
 
     async update(updateChallengeDto: UpdateChallengeDto, user: User): Promise<ChallengeResDto> {

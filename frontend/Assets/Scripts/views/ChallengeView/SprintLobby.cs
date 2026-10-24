@@ -23,6 +23,7 @@ public sealed class SprintLobby : MonoBehaviour {
   var row=ChainGame.Panel(navigation.challengeGameScreen.transform,"Single or Match",new Vector2(.1f,.84f),new Vector2(.9f,.89f),Color.clear);
   singleButton=SprintUi.Button(row.transform,"Single",Vector2.zero,new Vector2(.49f,1),()=>SetMode(false));singleLabel=singleButton.GetComponentInChildren<Text>();
   matchButton=SprintUi.Button(row.transform,"Match!",new Vector2(.51f,0),Vector2.one,()=>SetMode(true));matchLabel=matchButton.GetComponentInChildren<Text>();SetMode(false);
+  LiveChallenges.Attach(navigation);
   SprintUi.Button(navigation.challengeHomeScreen.transform,"Challenges",new Vector2(.12f,.83f),new Vector2(.88f,.88f),Open);
  }
  private void SetMode(bool value){match=value;StyleMode(singleButton,singleLabel,!value);StyleMode(matchButton,matchLabel,value);}
@@ -31,7 +32,7 @@ public sealed class SprintLobby : MonoBehaviour {
  }
  public void Create(string game,int tier,int opponent){
   if(creating || !CanStart())return;creating=true;
-  api.Request<SprintBattleView>("",JsonUtility.ToJson(new SprintCreate{game=game,tier=tier,recipientId=opponent,mode=match?"match":"single"}),battle=>{creating=false;SprintRuntime.Begin(battle,null);},error=>{creating=false;Message(error);});
+  api.Request<SprintBattleView>("",JsonUtility.ToJson(new SprintCreate{game=game,tier=tier,recipientId=opponent,mode=match?"match":"single",live=LiveChallenges.Visible}),battle=>{creating=false;OpenBattle(battle);},error=>{creating=false;Message(error);});
  }
  private void Start(){RetryPending();refreshAt=Time.unscaledTime;if(Latest!=null){var battle=Latest;Latest=null;Open();ShowBattle(battle);}}
  private bool CanStart(){
@@ -46,11 +47,11 @@ public sealed class SprintLobby : MonoBehaviour {
  }
  private void Update(){
   if(panel!=null && Input.GetKeyDown(KeyCode.Escape)){Back();return;}
-  if(Time.unscaledTime>=refreshAt){refreshAt=Time.unscaledTime+20;Refresh();if(panel!=null)LoadEarlier();}
+  if(Time.unscaledTime>=refreshAt){refreshAt=Time.unscaledTime+2;Refresh();if(panel!=null)LoadEarlier();}
  }
  public void Open(){
   selectedId=0;legacyDetail=null;requestVersion++;if(panel!=null){panel.SetActive(false);CardFaces.DestroyGenerated(panel);}
-  BuildPanel();RenderCurrent();refreshAt=Time.unscaledTime+20;Refresh();LoadEarlier();
+  BuildPanel();RenderCurrent();refreshAt=Time.unscaledTime+2;Refresh();LoadEarlier();
  }
  private void BuildPanel(){
   var root=navigation.challengeGameScreen.GetComponentInParent<Canvas>().rootCanvas.transform;
@@ -82,10 +83,10 @@ public sealed class SprintLobby : MonoBehaviour {
   navigation.challengeAPIController.GetHistory(response=>{if(owner==GameManager.AchievementUserId)history=response.history??new History[0];finish();},error=>finish());
  }
  private bool Actionable(SprintBattleView battle){
-  int user=GameManager.AchievementUserId;if(battle.done)return false;if(battle.chooser==user)return true;if(battle.chooser!=0 || battle.legs==null || battle.legs.Length==0)return false;
+  int user=GameManager.AchievementUserId;if(battle.done)return false;if(battle.invitation=="pending")return battle.recipientId==user;if(battle.chooser==user)return true;if(battle.chooser!=0 || battle.legs==null || battle.legs.Length==0)return false;
   var leg=battle.legs.Last();int pacer=leg.pacer==0?battle.ownerId:leg.pacer;
   bool played=user==battle.ownerId?leg.ownerResult!=null:leg.recipientResult!=null;bool pace=pacer==battle.ownerId?leg.ownerResult!=null:leg.recipientResult!=null;
-  return !played && (user==pacer || pace);
+  return !played && (battle.live || user==pacer || pace);
  }
  private void RenderCurrent(){
   if(panel==null || list==null)return;
@@ -111,8 +112,8 @@ public sealed class SprintLobby : MonoBehaviour {
  private static void RestoreScroll(ScrollRect scroll,float position){Canvas.ForceUpdateCanvases();scroll.Rebuild(CanvasUpdate.PostLayout);scroll.verticalNormalizedPosition=Mathf.Clamp01(position);}
  private void Toggle(string key){if(!expanded.Add(key))expanded.Remove(key);RenderCurrent();}
  private string Contestants(SprintBattleView battle){return battle.ownerName+"  vs  "+battle.recipientName;}
- private string Outcome(SprintBattleView battle){return !battle.done?"Waiting":battle.winner==0?"Draw":(battle.winner==battle.ownerId?battle.ownerName:battle.recipientName)+" wins";}
- private int Verdict(SprintBattleView battle){return !battle.done || battle.winner==0?0:battle.winner==GameManager.AchievementUserId?1:-1;}
+ private string Outcome(SprintBattleView battle){return battle.invitation=="pending"?"Invitation":battle.invitation=="declined"?"Declined":battle.invitation=="expired"?"Expired":battle.invitation=="blocked"?"Unavailable":battle.invitation=="withdrawn"?"Withdrawn":!battle.done?"Waiting":battle.winner==0?"Draw":(battle.winner==battle.ownerId?battle.ownerName:battle.recipientName)+" wins";}
+ private int Verdict(SprintBattleView battle){return !battle.done || (battle.invitation!="accepted" && !string.IsNullOrEmpty(battle.invitation)) || battle.winner==0?0:battle.winner==GameManager.AchievementUserId?1:-1;}
  private void BattleRow(Transform parent,SprintBattleView battle){
   string key="sprint:"+battle.id;bool open=expanded.Contains(key);
   var card=Row(parent,key,Contestants(battle),Outcome(battle),Verdict(battle),open,()=>{if(battle.done)Toggle(key);else ShowBattle(battle);},()=>Toggle(key));
@@ -158,6 +159,7 @@ public sealed class SprintLobby : MonoBehaviour {
   return result.roundMs==null || result.roundMs.Length==0?"—":string.Join(", ",result.roundMs.Select(ms=>(ms/1000f).ToString("0.#",System.Globalization.CultureInfo.InvariantCulture)).ToArray())+" s";
  }
  private static string Points(SprintBattleView battle){float a=0,b=0;foreach(var leg in battle.legs){if(leg.ownerResult==null || leg.recipientResult==null)continue;if(leg.winner==0){a+=.5f;b+=.5f;}else if(leg.winner==battle.ownerId)a++;else b++;}return a.ToString("0.#",System.Globalization.CultureInfo.InvariantCulture)+" – "+b.ToString("0.#",System.Globalization.CultureInfo.InvariantCulture);}
+ public void OpenBattle(SprintBattleView battle){ShowBattle(battle);}
  private void ShowBattle(SprintBattleView battle){
   if(panel==null)Open();SaveScroll();selectedId=battle.id;legacyDetail=null;detailPosition=1;
   var index=Array.FindIndex(battles,b=>b.id==battle.id);if(index<0)battles=new[]{battle}.Concat(battles).ToArray();else battles[index]=battle;
@@ -167,13 +169,19 @@ public sealed class SprintLobby : MonoBehaviour {
   ClearList();detailScroll=SprintUi.Scroll(list.transform,"Match scroll",Vector2.zero,Vector2.one);BattleRow(detailScroll.content,battle);
   if(!battle.done){
    int user=GameManager.AchievementUserId;
-   if(battle.chooser==user){
+   if(battle.invitation=="pending"){
+    if(user==battle.recipientId){
+     Consent(detailScroll.content,"Yes",()=>LiveChallenges.Current.Respond(battle,true));
+     Consent(detailScroll.content,"No",()=>LiveChallenges.Current.Respond(battle,false));
+    }else SprintUi.Note(detailScroll.content,"Invitation sent · Waiting for acceptance");
+   }else if(battle.chooser==user){
     var games=ChallengeSprintRules.Games.Where(g=>!battle.legs.Any(l=>l.game==g)).ToArray();GameChoices(detailScroll.content,games,game=>{if(creating)return;creating=true;api.Request<SprintBattleView>("/"+battle.id+"/game",JsonUtility.ToJson(new SprintChoose{game=game}),updated=>{creating=false;ShowBattle(updated);},error=>{creating=false;Message(error);});});
    }else if(Actionable(battle))GameChoices(detailScroll.content,new[]{battle.legs.Last().game},game=>{if(starting || !CanStart())return;starting=true;SprintRuntime.Begin(battle,null);});
    else SprintUi.Note(detailScroll.content,"Waiting for your opponent");
   }
   RestoreScroll(detailScroll,detailPosition);
  }
+ private static void Consent(Transform parent,string caption,UnityEngine.Events.UnityAction action){var row=ChainGame.Panel(parent,caption,Vector2.zero,Vector2.one,Color.clear);row.AddComponent<LayoutElement>().preferredHeight=90;SprintUi.Button(row.transform,caption,Vector2.zero,Vector2.one,action);}
  private static void GameChoices(Transform parent,string[] games,Action<string> choose){
   int rows=(games.Length+1)/2;var go=ChainGame.Panel(parent,"Games",Vector2.zero,Vector2.one,Color.clear);go.GetComponent<Image>().raycastTarget=false;go.AddComponent<LayoutElement>().preferredHeight=rows*270;
   for(int i=0;i<games.Length;i++){string game=games[i];float left=(i%2)*.51f,top=1-(i/2)/(float)rows;TrainingHubLayout.GameButton(go.transform,game,new Vector2(left,top-.96f/rows),new Vector2(left+.49f,top),()=>choose(game));}

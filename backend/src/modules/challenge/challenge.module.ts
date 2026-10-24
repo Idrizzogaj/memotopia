@@ -13,6 +13,8 @@ import { ChallengeService } from './challenge.service';
 import { ChallengeController } from './challenge.controller';
 import { ChallengeRepository } from './challenge.repository';
 import { ParticipantRepository } from './participant.repository';
+import { SocialService } from './social.service';
+import { SocialController } from './social.controller';
 import { SprintService } from './sprint.service';
 import { SprintController } from './sprint.controller';
 
@@ -32,7 +34,7 @@ import { SprintController } from './sprint.controller';
         UserStatisticsModule,
         AchievementsModule,
     ],
-    providers: [ChallengeService,SprintService],
-    controllers: [ChallengeController,SprintController],
+    providers: [ChallengeService,SprintService,SocialService],
+    controllers: [SocialController,ChallengeController,SprintController],
 })
 export class ChallengeModule {}

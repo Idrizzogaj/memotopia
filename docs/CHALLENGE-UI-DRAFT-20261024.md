@@ -12,7 +12,7 @@ Implements the approved visual changes; no player build, store upload or server 
 
 GET /user-statistics adds challengeFormatsAvailable, numberOfMatchChallenges and numberOfSingleChallenges. Match count uses all settled Sprint rows rather than the inbox's latest100; total/loss/draw counters and format count are read in the same SQL statement for a consistent snapshot. No schema migration or counter mutation is needed. Existing clients remain compatible. New clients show an em dash for format counts while connected to an older API, rather than inventing zeroes.
 
-The server change is prepared and committed but not deployed. Deploy it with the next authorised app release for real Matches/Single values. No native build was requested or made; Android internal-test AAB21 is unchanged.
+The server change was subsequently deployed for the user-authorised iOS1.0.57 test build: memotopia-backend:ui-draft-20261024 (image sha256:5fbfcefe3be4…). Exact SQL passed against an isolated disposable PostgreSQL database with fake records (both player roles, empty accounts and205matches beyond the inbox limit); the database was removed afterward. Docker production build, service format checks and HTTPS health/JWT guards passed. Source/image rollback is retained under /opt/memotopia/backups/ui-draft-20261024. Android internal-test AAB21 is unchanged.
 
 ## Checks
 

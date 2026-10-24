@@ -21,7 +21,8 @@ public sealed class SprintRuntime : MonoBehaviour {
  public bool Ready {get{return State!=null && !State.Finished && !transition && !ending && quitDialog==null;}}
  private GameObject stageRoot,stageTemplate,templateHolder;private ChainGame chainGame;
  private int owner;private bool transition,ending,introStarting,paced,cancelling;private SprintAPI api;private GameObject quitDialog;private Button retry;
- private Canvas hud;private Text timer,cue,status;private Image lead;private GameObject introCover;private float cueUntil;
+ private float progressAt;private bool progressBusy;private int liveUnits;
+ private Button waitingBack;private Canvas hud;private Text timer,cue,status;private Image lead;private GameObject introCover;private float cueUntil;
  private readonly HashSet<string> solved=new HashSet<string>();
  private SprintTrace[] opponent=new SprintTrace[0];private Action<SprintBattleView> finished;
 #if UNITY_EDITOR
@@ -54,6 +55,7 @@ public sealed class SprintRuntime : MonoBehaviour {
   var centre=ChainGame.Panel(track.transform,"Centre",new Vector2(.497f,-.4f),new Vector2(.503f,1.4f),ChainGame.Ink);centre.GetComponent<Image>().raycastTarget=false;track.GetComponent<Image>().raycastTarget=false;
   introCover=ChainGame.Panel(root.transform,"Original round intro cover",Vector2.zero,Vector2.one,Color.white);cue.transform.SetAsLastSibling();
   retry=SprintUi.Button(root.transform,"Retry",new Vector2(.25f,.20f),new Vector2(.75f,.29f),()=>{retry.gameObject.SetActive(false);if(cancelling)Cancel();else if(State==null)StartCoroutine(Intro());else StartCoroutine(Submit());});retry.gameObject.SetActive(false);
+  waitingBack=SprintUi.Back(root.transform,Quit);
  }
  private void SceneLoaded(Scene scene,LoadSceneMode mode){
   if(!Active || ending)return;
@@ -84,9 +86,22 @@ public sealed class SprintRuntime : MonoBehaviour {
   api.Request<SprintBattleView>("/"+Battle.id+"/start","{}",battle=>{Battle=battle;waiting=false;},error=>{failure=error;waiting=false;});
   while(waiting)yield return null;
   if(failure!=null){introStarting=false;Fail(failure);while(State==null && !ending)yield return null;yield break;}
+  if(Battle.live){
+   // Both originals must be loaded before the server schedules one common deadline.
+   while(Battle.legs[LegIndex].liveStart==0){
+    cue.text="Waiting for opponent";yield return new WaitForSecondsRealtime(1);
+    waiting=true;failure=null;api.Request<SprintBattleView>("/"+Battle.id,null,battle=>{Battle=battle;waiting=false;},error=>{failure=error;waiting=false;});
+    while(waiting)yield return null;
+    if(failure!=null){introStarting=false;Fail(failure);while(State==null && !ending)yield return null;yield break;}
+    if(Battle.done){Close();SceneManager.LoadSceneAsync("GameMenu");yield break;}
+   }
+  }
   long start=owner==Battle.ownerId?Battle.legs[LegIndex].ownerStart:Battle.legs[LegIndex].recipientStart;
-  State=new ChallengeSprintState(Game,Battle.tier,Now-Math.Max(0,Battle.serverTime-start));
+  long target=Now+(start-Battle.serverTime)-Battle.roundTripMs/2;
+  while(Battle.live && Now<target){cue.text=Mathf.CeilToInt((target-Now)/1000f).ToString();yield return null;}
+  State=new ChallengeSprintState(Game,Battle.tier,target);
   introCover.SetActive(false);
+  waitingBack.gameObject.SetActive(false);
   cue.text="GO!";cueUntil=Time.realtimeSinceStartup+.6f;
  }
  public static IEnumerator ReadyIntro(){if(Active)yield return Current.Intro();}
@@ -113,8 +128,15 @@ public sealed class SprintRuntime : MonoBehaviour {
   if(announcement!=null){cue.text=announcement;cueUntil=Time.realtimeSinceStartup+1;}
   if(Time.realtimeSinceStartup>cueUntil)cue.text="";
   int own=ChallengeSprintRules.Units(Game,State.Stage,State.Correct);
-  int gap=own-ChallengeSprintRules.OpponentAt(opponent,90000-remaining);
-  if(paced){float fraction=Mathf.Clamp(gap/20f,-1,1);lead.rectTransform.anchorMin=new Vector2(.5f+Mathf.Min(0,fraction)*.5f,0);lead.rectTransform.anchorMax=new Vector2(.5f+Mathf.Max(0,fraction)*.5f,1);lead.color=Color.Lerp(new Color(.65f,.65f,.65f),gap>=0?new Color(.05f,.7f,.25f):new Color(.9f,.1f,.15f),Mathf.Abs(fraction));status.text=gap==0?"Level":gap>0?"Ahead +"+gap:"Behind "+gap;}
+  if(Battle.live && !progressBusy && Time.unscaledTime>=progressAt){
+   progressAt=Time.unscaledTime+1;progressBusy=true;
+   api.Request<SprintBattleView>("/"+Battle.id+"/progress",JsonUtility.ToJson(new SprintProgress{legIndex=LegIndex,ms=90000-remaining,units=own}),value=>{
+    progressBusy=false;Battle=value;var leg=value.legs[LegIndex];liveUnits=owner==value.ownerId?leg.recipientUnits:leg.ownerUnits;
+    if(value.done && !ending){ending=true;SprintLobby.Latest=value;Close();SceneManager.LoadSceneAsync("GameMenu");}
+   },error=>{progressBusy=false;status.text="Reconnecting";});
+  }
+  int gap=own-(Battle.live?liveUnits:ChallengeSprintRules.OpponentAt(opponent,90000-remaining));
+  if(paced || Battle.live){float fraction=Mathf.Clamp(gap/20f,-1,1);lead.rectTransform.anchorMin=new Vector2(.5f+Mathf.Min(0,fraction)*.5f,0);lead.rectTransform.anchorMax=new Vector2(.5f+Mathf.Max(0,fraction)*.5f,1);lead.color=Color.Lerp(new Color(.65f,.65f,.65f),gap>=0?new Color(.05f,.7f,.25f):new Color(.9f,.1f,.15f),Mathf.Abs(fraction));status.text=gap==0?"Level":gap>0?"Ahead +"+gap:"Behind "+gap;}
   else status.text="Set the pace!";
   if(State.Finished){ending=true;StartCoroutine(Submit());}
  }

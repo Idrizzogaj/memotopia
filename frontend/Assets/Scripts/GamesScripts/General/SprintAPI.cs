@@ -3,10 +3,10 @@ using System.Collections;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
-[Serializable] public class SprintLegView {public string game;public int seed,pacer;public long ownerStart,recipientStart;public bool ownerPlayed,recipientPlayed;public SprintResult ownerResult,recipientResult;public int winner;}
-[Serializable] public class SprintBattleView {public int id,ownerId,recipientId,version,tier,chooser,winner;public long serverTime;public string mode,ownerName,recipientName;public bool done;public SprintLegView[] legs;}
+[Serializable] public class SprintLegView {public string game;public int seed,pacer;public long ownerStart,recipientStart,liveStart;public int ownerUnits,recipientUnits;public bool ownerPlayed,recipientPlayed;public SprintResult ownerResult,recipientResult;public int winner;}
+[Serializable] public class SprintBattleView {public int id,ownerId,recipientId,version,tier,chooser,winner;public long serverTime;public string mode,ownerName,recipientName,invitation,endReason;[NonSerialized]public long roundTripMs;public bool done,live;public SprintLegView[] legs;}
 [Serializable] public class SprintBattleList {public SprintBattleView[] battles;}
-[Serializable] public class SprintCreate {public int recipientId,tier;public string game,mode;}
+[Serializable] public class SprintCreate {public int recipientId,tier,version=2;public bool live;public string game,mode;}
 [Serializable] public class SprintSubmit {public int legIndex;public SprintResult result;}
 [Serializable] public class SprintChoose {public string game;}
 public class SprintAPI : MonoBehaviour {
@@ -22,7 +22,12 @@ public class SprintAPI : MonoBehaviour {
 #if UNITY_EDITOR
  public static Action<string,string,Action<string>,Action<string>> EditorTransport;
 #endif
- public void Request<T>(string path,string body,Action<T> success,Action<string> failure){StartCoroutine(Send(path,body,success,failure));}
+ public void Request<T>(string path,string body,Action<T> success,Action<string> failure){
+#if UNITY_EDITOR
+  if(EditorTransport!=null){EditorTransport(path,body,text=>success(Decode<T>(text)),failure);return;}
+#endif
+  StartCoroutine(Send(path,body,success,failure));
+ }
  private IEnumerator Send<T>(string path,string body,Action<T> success,Action<string> failure){
 #if UNITY_EDITOR
   if(EditorTransport!=null){EditorTransport(path,body,text=>success(Decode<T>(text)),failure);yield break;}
@@ -32,10 +37,12 @@ public class SprintAPI : MonoBehaviour {
   using(var request=new UnityWebRequest(root+"/sprints"+path,body==null?"GET":"POST")){
    request.downloadHandler=new DownloadHandlerBuffer();if(body!=null)request.uploadHandler=new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
    request.SetRequestHeader("Content-Type","application/json");request.SetRequestHeader("Authorization",token);request.timeout=20;
-   yield return request.SendWebRequest();
+   float sent=Time.realtimeSinceStartup;yield return request.SendWebRequest();
    if(GameManager.AchievementUserId!=account || string.IsNullOrEmpty(PlayerPrefs.GetString("token")))yield break;
+   if(PlayerPrefs.GetString("token")!=token){failure("Session refreshed. Please try again.");yield break;}
    if(request.isNetworkError || request.isHttpError){failure("Could not sync Challenge. Please try again. ("+request.responseCode+")");yield break;}
    T result;try{result=Decode<T>(request.downloadHandler.text);}catch(Exception){failure("Could not read Challenge response.");yield break;}
+   var timed=result as SprintBattleView;if(timed!=null)timed.roundTripMs=(long)((Time.realtimeSinceStartup-sent)*1000);
    success(result);
   }
  }
