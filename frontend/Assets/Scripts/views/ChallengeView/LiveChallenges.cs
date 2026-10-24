@@ -66,63 +66,99 @@ public sealed class LiveChallenges : MonoBehaviour {
   },error=>{polling=false;});
  }
  private Transform Root(){return navigation==null?null:navigation.challengeGameScreen.GetComponentInParent<Canvas>().rootCanvas.transform;}
+ private static readonly Color Paper=new Color32(246,243,252,255), Muted=new Color32(102,94,119,255), Danger=new Color32(234,24,100,255);
+ private static Button ActionButton(Transform parent,string caption,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,bool primary=false,bool danger=false){
+  var button=SprintUi.Button(parent,caption,min,max,action);button.image.color=primary?(danger?Danger:TrainingHubLayout.MemoryTone):(Color)new Color32(233,228,242,255);
+  foreach(var label in button.GetComponentsInChildren<Text>()){label.fontSize=28;label.resizeTextMaxSize=28;label.color=primary?Color.white:ChainGame.Ink;}
+  if(caption=="Challenge" && Current!=null && Current.navigation!=null && Current.navigation.challengeOnProfile!=null){
+   var original=Current.navigation.challengeOnProfile;var source=original.GetComponentsInChildren<Image>(true).FirstOrDefault(i=>i.transform!=original.transform && i.sprite!=null);
+   if(source==null && Current.navigation.challengeUserProfileScreen!=null)source=Current.navigation.challengeUserProfileScreen.GetComponentsInChildren<Image>(true).FirstOrDefault(i=>i.name=="TrainingImage" && i.sprite!=null);
+   if(source!=null){var icon=ChainGame.Panel(button.transform,"Original challenge icon",new Vector2(.04f,.16f),new Vector2(.21f,.84f),Color.white).GetComponent<Image>();icon.sprite=source.sprite;icon.preserveAspect=true;icon.raycastTarget=false;foreach(var label in button.GetComponentsInChildren<Text>())label.rectTransform.anchorMin=new Vector2(.22f,.08f);}
+  }
+  return button;
+ }
+ private static void Section(Transform parent,string caption,int count){
+  var bar=ChainGame.Panel(parent,caption+" section",Vector2.zero,Vector2.one,TrainingHubLayout.MemoryTone);bar.GetComponent<Image>().raycastTarget=false;bar.AddComponent<LayoutElement>().preferredHeight=40;
+  var title=ChainGame.Label(bar.transform,caption.ToUpperInvariant(),new Vector2(.035f,0),new Vector2(.85f,1),25,Color.white);title.alignment=TextAnchor.MiddleLeft;title.fontStyle=FontStyle.Bold;
+  ChainGame.Label(bar.transform,count.ToString(),new Vector2(.86f,0),new Vector2(.97f,1),23,Color.white);
+ }
+ private static RectTransform PlayerCard(Transform parent,SocialPlayer player,string status){
+  var card=ChainGame.Panel(parent,"Player "+player.id,Vector2.zero,Vector2.one,Paper);SprintUi.Edges(card.GetComponent<Image>());card.AddComponent<LayoutElement>().preferredHeight=150;
+  var name=ChainGame.Label(card.transform,player.username,new Vector2(.04f,.59f),new Vector2(.96f,.97f),31,ChainGame.Ink);name.alignment=TextAnchor.MiddleLeft;name.fontStyle=FontStyle.Bold;name.supportRichText=false;
+  var label=ChainGame.Label(card.transform,status,new Vector2(.04f,.38f),new Vector2(.96f,.60f),22,Muted);label.alignment=TextAnchor.MiddleLeft;
+  return (RectTransform)card.transform;
+ }
+ private static void Note(Transform parent,string caption,int height=54){
+  var label=ChainGame.Label(parent,caption,Vector2.zero,Vector2.one,22,Muted);label.gameObject.AddComponent<LayoutElement>().preferredHeight=height;
+ }
+ private void Audience(string name,bool on){
+  var button=panel.transform.Find(name).GetComponent<Button>();button.image.color=on?TrainingHubLayout.MemoryTone:(Color)new Color32(233,228,242,255);
+  var title=button.GetComponentInChildren<Text>();title.text=name;title.fontSize=30;title.resizeTextMaxSize=30;title.color=on?Color.white:ChainGame.Ink;title.rectTransform.anchorMin=new Vector2(.05f,.38f);title.rectTransform.anchorMax=new Vector2(.95f,.94f);
+  var status=button.transform.Find("Visibility state");if(status==null)status=ChainGame.Label(button.transform,"",new Vector2(.05f,.05f),new Vector2(.95f,.40f),20,Color.white).transform;
+  status.name="Visibility state";var text=status.GetComponent<Text>();text.text=on?"ON":"OFF";text.color=on?Color.white:Muted;
+ }
  public void Open(){
   if(navigation==null)return;HideInvite();Close();panel=ChainGame.Panel(Root(),"Online players",Vector2.zero,Vector2.one,Color.white);
-  SprintUi.Back(panel.transform,Close);ChainGame.Label(panel.transform,"Online",new Vector2(.2f,.90f),new Vector2(.85f,.97f),40,ChainGame.Purple);
-  SprintUi.Button(panel.transform,"Everyone",new Vector2(.62f,.83f),new Vector2(.94f,.89f),()=>{if(!busy && loaded){Heartbeat(!settings.visible);}});
-  SprintUi.Button(panel.transform,"Friends",new Vector2(.62f,.76f),new Vector2(.94f,.82f),()=>{if(!busy && loaded){settings.friendsVisible=!settings.friendsVisible;Heartbeat(settings.visible);}});
-  notice=ChainGame.Label(panel.transform,"",new Vector2(.06f,.76f),new Vector2(.60f,.89f),23,ChainGame.Ink);
-  content=SprintUi.Scroll(panel.transform,"Players",new Vector2(.06f,.07f),new Vector2(.94f,.74f)).content;Render();pollAt=0;
+  SprintUi.Back(panel.transform,Close);var title=ChainGame.Label(panel.transform,"ONLINE",new Vector2(.2f,.91f),new Vector2(.80f,.98f),40,TrainingHubLayout.MemoryTone);title.fontStyle=FontStyle.Bold;
+  var bar=ChainGame.Panel(panel.transform,"Visibility section",new Vector2(.06f,.855f),new Vector2(.94f,.88f),TrainingHubLayout.MemoryTone);bar.GetComponent<Image>().raycastTarget=false;ChainGame.Label(bar.transform,"VISIBILITY",Vector2.zero,Vector2.one,22,Color.white).fontStyle=FontStyle.Bold;
+  ActionButton(panel.transform,"Everyone",new Vector2(.06f,.765f),new Vector2(.49f,.845f),()=>{if(!busy && loaded)Heartbeat(!settings.visible);});
+  ActionButton(panel.transform,"Friends",new Vector2(.51f,.765f),new Vector2(.94f,.845f),()=>{if(!busy && loaded){settings.friendsVisible=!settings.friendsVisible;Heartbeat(settings.visible);}});
+  ChainGame.Label(panel.transform,"Choose who can see you online",new Vector2(.06f,.725f),new Vector2(.94f,.76f),22,Muted);
+  notice=ChainGame.Label(panel.transform,"",new Vector2(.06f,.025f),new Vector2(.94f,.065f),20,Muted);
+  content=SprintUi.Scroll(panel.transform,"Players",new Vector2(.06f,.085f),new Vector2(.94f,.715f)).content;Render();pollAt=0;
  }
  private void Render(){
-  if(content==null)return;for(int i=content.childCount-1;i>=0;i--){var child=content.GetChild(i).gameObject;child.SetActive(false);Remove(child);}
-  foreach(string audience in new[]{"Everyone","Friends"}){var button=panel.transform.Find(audience).GetComponent<Button>();bool on=audience=="Everyone"?settings.visible:settings.friendsVisible;button.image.color=on?TrainingHubLayout.MemoryTone:(Color)new Color32(236,232,244,255);foreach(var text in button.GetComponentsInChildren<Text>())text.color=on?Color.white:ChainGame.Ink;}
-  notice.text="Online · Everyone: "+(settings.visible?"ON":"OFF")+"\nFriends: "+(settings.friendsVisible?"ON":"OFF");
-  SprintUi.Note(content,"Declined: "+settings.declined+" · Only you can see this");
-  SprintUi.Note(content,"Friends share online status by default. You can turn it off above.");
-  foreach(var player in settings.friends??new SocialPlayer[0]){
-   var local=player;
-   var row=ChainGame.Panel(content,"Friend",Vector2.zero,Vector2.one,Color.clear);row.AddComponent<LayoutElement>().preferredHeight=120;
-   ChainGame.Label(row.transform,player.username+(IsOnline(player.id)?" · Online":"")+(player.accepted?" · Friend":player.requesterId==account?" · Sent":" · Friend request"),new Vector2(0,.5f),Vector2.one,24,ChainGame.Ink);
-   if(!player.accepted && player.requesterId!=account){SprintUi.Button(row.transform,"Yes",Vector2.zero,new Vector2(.48f,.48f),()=>Friend(local.id,"accept"));SprintUi.Button(row.transform,"No",new Vector2(.52f,0),new Vector2(1,.48f),()=>Friend(local.id,"decline"));}
-   else SprintUi.Button(row.transform,"Remove",Vector2.zero,new Vector2(1,.48f),()=>Friend(local.id,"remove"));
+  if(content==null)return;var scroll=content.GetComponentInParent<ScrollRect>();float position=content.childCount==0?1:scroll.verticalNormalizedPosition;
+  for(int i=content.childCount-1;i>=0;i--){var child=content.GetChild(i).gameObject;child.SetActive(false);Remove(child);}
+  Audience("Everyone",settings.visible);Audience("Friends",settings.friendsVisible);
+  notice.text="Declined: "+settings.declined+" · Only you can see this";
+  var friends=settings.friends??new SocialPlayer[0];var requests=friends.Where(p=>!p.accepted).ToArray();var accepted=friends.Where(p=>p.accepted).ToArray();
+  if(requests.Length>0){
+   Section(content,"Requests",requests.Length);Note(content,"Friends share online status by default. You can turn it off above.",72);
+   foreach(var player in requests){var local=player;bool incoming=player.requesterId!=account;var row=PlayerCard(content,player,incoming?"Friend request":"Request sent");
+    if(incoming){ActionButton(row,"Yes",new Vector2(.04f,.07f),new Vector2(.48f,.36f),()=>Friend(local.id,"accept"),true);ActionButton(row,"No",new Vector2(.52f,.07f),new Vector2(.96f,.36f),()=>Friend(local.id,"decline"));}
+    else ActionButton(row,"Remove",new Vector2(.52f,.07f),new Vector2(.96f,.36f),()=>Friend(local.id,"remove"));
+   }
   }
-  SprintUi.Note(content,"Online");
-  foreach(var player in online.players??new SocialPlayer[0]){
-   var item=ChainGame.Panel(content,"Player",Vector2.zero,Vector2.one,Color.clear);item.AddComponent<LayoutElement>().preferredHeight=100;
-   var local=player;
-   SprintUi.Button(item.transform,(player.favorite?"★ ":"")+player.username+" · Online",Vector2.zero,new Vector2(.76f,1),()=>{
-    Close();UserConstants.s_challengeUser=new User{id=local.id,username=local.username};navigation.GoToChallengeGame();
-   });
-   SprintUi.Button(item.transform,"Block",new Vector2(.78f,0),Vector2.one,()=>ConfirmBlock(local.id));
+  Section(content,"Friends",accepted.Length);
+  if(accepted.Length==0)Note(content,"Accept a friend request to connect");
+  foreach(var player in accepted){var local=player;var row=PlayerCard(content,player,IsOnline(player.id)?"Online":"Not showing online");ActionButton(row,"Remove",new Vector2(.52f,.07f),new Vector2(.96f,.36f),()=>Friend(local.id,"remove"));}
+  var players=online.players??new SocialPlayer[0];Section(content,"Online",players.Length);
+  if(players.Length==0)Note(content,"No players showing online");
+  foreach(var player in players){var local=player;var row=PlayerCard(content,player,player.friend?"Online · Friend":player.favorite?"Online · Favourite":"Online");
+   ActionButton(row,"Challenge",new Vector2(.04f,.07f),new Vector2(.61f,.36f),()=>{Close();UserConstants.s_challengeUser=new User{id=local.id,username=local.username};navigation.GoToChallengeGame();},true);
+   ActionButton(row,"Block",new Vector2(.65f,.07f),new Vector2(.96f,.36f),()=>ConfirmBlock(local.id));
   }
-  SprintUi.Note(content,"Blocked");
-  foreach(var player in settings.blocked??new SocialPlayer[0]){var local=player;var row=ChainGame.Panel(content,"Blocked player",Vector2.zero,Vector2.one,Color.clear);row.AddComponent<LayoutElement>().preferredHeight=90;SprintUi.Button(row.transform,player.username+" · Unblock",Vector2.zero,Vector2.one,()=>Block(local.id,false));}
+  var blocked=settings.blocked??new SocialPlayer[0];Section(content,"Blocked",blocked.Length);
+  if(blocked.Length==0)Note(content,"No blocked players");
+  foreach(var player in blocked){var local=player;var row=PlayerCard(content,player,"Blocked");ActionButton(row,"Unblock",new Vector2(.52f,.07f),new Vector2(.96f,.36f),()=>Block(local.id,false));}
+  Canvas.ForceUpdateCanvases();scroll.Rebuild(CanvasUpdate.PostLayout);scroll.verticalNormalizedPosition=Mathf.Clamp01(position);
  }
  private void Friend(int id,string action){if(acting)return;acting=true;api.Request<SocialSettings>("/social/friend",JsonUtility.ToJson(new SocialFriend{targetId=id,action=action}),value=>{acting=false;settings=value;if(panel==null)Open();else Render();},error=>{acting=false;if(notice!=null)notice.text=error;});}
  private Transform Dialog(string title){
   HideInvite();banner=ChainGame.Panel(Root(),title,Vector2.zero,Vector2.one,new Color(0,0,0,.55f));
-  var box=ChainGame.Panel(banner.transform,"Dialog",new Vector2(.06f,.30f),new Vector2(.94f,.70f),Color.white);SprintUi.Edges(box.GetComponent<Image>());return box.transform;
+  var box=ChainGame.Panel(banner.transform,"Dialog",new Vector2(.06f,.30f),new Vector2(.94f,.70f),Color.white);SprintUi.Edges(box.GetComponent<Image>());
+  var bar=ChainGame.Panel(box.transform,"Dialog heading",new Vector2(.03f,.84f),new Vector2(.97f,.97f),TrainingHubLayout.MemoryTone);bar.GetComponent<Image>().raycastTarget=false;ChainGame.Label(bar.transform,title.ToUpperInvariant(),Vector2.zero,Vector2.one,24,Color.white).fontStyle=FontStyle.Bold;return box.transform;
  }
  private void ConfirmFriend(int id){
   if(Root()==null)return;var box=Dialog("Friend request");showingInvite=-1;
-  ChainGame.Label(box,"Send a friend request?\nFriends can see when you are online. Turn off Friends visibility any time.",new Vector2(.06f,.38f),new Vector2(.94f,.94f),28,ChainGame.Ink);
-  SprintUi.Button(box,"No",new Vector2(.05f,.08f),new Vector2(.47f,.30f),HideInvite);
-  SprintUi.Button(box,"Send",new Vector2(.53f,.08f),new Vector2(.95f,.30f),()=>{HideInvite();Friend(id,"request");});
+  ChainGame.Label(box,"Send a friend request?\nFriends can see when you are online. Turn off Friends visibility any time.",new Vector2(.06f,.38f),new Vector2(.94f,.80f),28,ChainGame.Ink);
+  ActionButton(box,"No",new Vector2(.05f,.08f),new Vector2(.47f,.30f),HideInvite);
+  ActionButton(box,"Send",new Vector2(.53f,.08f),new Vector2(.95f,.30f),()=>{HideInvite();Friend(id,"request");},true);
  }
  private void ConfirmBlock(int id){
   if(Root()==null)return;var box=Dialog("Block player");showingInvite=-1;
-  ChainGame.Label(box,"Block this player?\nInvitations and online visibility stop both ways.",new Vector2(.06f,.40f),new Vector2(.94f,.94f),28,ChainGame.Ink);
-  SprintUi.Button(box,"No",new Vector2(.05f,.08f),new Vector2(.47f,.31f),HideInvite);
-  SprintUi.Button(box,"Block",new Vector2(.53f,.08f),new Vector2(.95f,.31f),()=>Block(id,true));
+  ChainGame.Label(box,"Block this player?\nInvitations and online visibility stop both ways.",new Vector2(.06f,.40f),new Vector2(.94f,.80f),28,ChainGame.Ink);
+  ActionButton(box,"No",new Vector2(.05f,.08f),new Vector2(.47f,.31f),HideInvite);
+  ActionButton(box,"Block",new Vector2(.53f,.08f),new Vector2(.95f,.31f),()=>Block(id,true),true,true);
  }
  private void Block(int id,bool blocked){if(acting)return;acting=true;api.Request<SocialSettings>("/social/block",JsonUtility.ToJson(new SocialBlock{targetId=id,blocked=blocked}),value=>{acting=false;settings=value;HideInvite();pollAt=0;if(panel!=null)Render();},error=>{acting=false;if(notice!=null)notice.text=error;});}
  private void ShowInvite(SprintBattleView battle){
   var box=Dialog("Challenge invitation");showingInvite=battle.id;
-  ChainGame.Label(box,battle.ownerName+"\n"+(battle.live?"Live · ":"")+battle.legs[0].game+" · "+(battle.mode=="match"?"Match!":"Single"),new Vector2(.05f,.52f),new Vector2(.95f,.95f),32,ChainGame.Purple);
-  SprintUi.Button(box,"No",new Vector2(.05f,.25f),new Vector2(.47f,.47f),()=>Respond(battle,false));
-  SprintUi.Button(box,"Yes",new Vector2(.53f,.25f),new Vector2(.95f,.47f),()=>Respond(battle,true));
-  SprintUi.Button(box,"Block",new Vector2(.30f,.03f),new Vector2(.70f,.20f),()=>ConfirmBlock(battle.ownerId));
+  ChainGame.Label(box,battle.ownerName+"\n"+(battle.live?"Live · ":"")+battle.legs[0].game+" · "+(battle.mode=="match"?"Match!":"Single"),new Vector2(.05f,.52f),new Vector2(.95f,.80f),30,ChainGame.Ink);
+  ActionButton(box,"No",new Vector2(.05f,.25f),new Vector2(.47f,.47f),()=>Respond(battle,false));
+  ActionButton(box,"Yes",new Vector2(.53f,.25f),new Vector2(.95f,.47f),()=>Respond(battle,true),true);
+  ActionButton(box,"Block",new Vector2(.30f,.03f),new Vector2(.70f,.20f),()=>ConfirmBlock(battle.ownerId));
  }
  public void Respond(SprintBattleView battle,bool accept){if(acting)return;acting=true;api.Request<SprintBattleView>("/"+battle.id+"/respond",JsonUtility.ToJson(new SprintResponse{accept=accept}),value=>{acting=false;HideInvite();if(accept){var lobby=SprintLobby.Attach(navigation);lobby.OpenBattle(value);}pollAt=0;},error=>{acting=false;if(notice!=null)notice.text=error;});}
  private static void Remove(GameObject value){if(value!=null){value.SetActive(false);CardFaces.DestroyGenerated(value);}}

@@ -37,8 +37,12 @@ public static class LiveSocialValidation {
    var yes=panel.GetComponentsInChildren<Button>().First(b=>b.name=="Yes");tap(yes);Check(requests.Any(r=>r.Contains("/social/friend")&&r.Contains("accept")),"Accept friend request reaches API");
    var block=panel.GetComponentsInChildren<Button>().First(b=>b.name=="Block");tap(block);var modal=(GameObject)Get(live,"banner");Check(modal!=null && modal.GetComponent<Image>().raycastTarget,"Blocking modal shields screen");tap(modal.GetComponentsInChildren<Button>().First(b=>b.name=="No"));
    Check(Get(live,"banner")==null,"No dismisses block without sending");
+   // Preview the same Unity hierarchy in phone and iPad proportions, with the normal friend default.
+   state.friendsVisible=true;Set(live,"settings",state);typeof(LiveChallenges).GetMethod("Render",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(live,null);
    canvas.renderMode=RenderMode.WorldSpace;canvas.transform.position=Vector3.zero;canvas.transform.localScale=Vector3.one;((RectTransform)canvas.transform).sizeDelta=new Vector2(800,2048*800f/945);canvas.GetComponent<CanvasScaler>().enabled=false;camera.orthographic=true;camera.cullingMask=1<<30;
-   typeof(ChainReuseValidation).GetMethod("Capture",BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,new object[]{canvas.gameObject,camera,"challenge-online-friends",945,2048});
+   typeof(ChainReuseValidation).GetMethod("Capture",BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,new object[]{canvas.gameObject,camera,"challenge-online-polished-phone",945,2048});
+   ((RectTransform)canvas.transform).sizeDelta=new Vector2(800,1366*800f/1024);Canvas.ForceUpdateCanvases();
+   typeof(ChainReuseValidation).GetMethod("Capture",BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,new object[]{canvas.gameObject,camera,"challenge-online-polished-ipad",1024,1366});
    camera.cullingMask=-1;camera.orthographic=false;canvas.renderMode=RenderMode.ScreenSpaceCamera;canvas.worldCamera=camera;canvas.planeDistance=1;camera.targetTexture=texture;
    tap(panel.transform.Find("Original back").GetComponent<Button>());
    nav.NoChallenge.SetActive(false);
