@@ -43,8 +43,8 @@ public sealed class ChainOriginalPresentation {
   foreach(var button in Root.GetComponentsInChildren<Button>(true).Where(b=>b.name=="Exact Quit"))foreach(var image in button.GetComponentsInChildren<Image>(true))image.material=theme;
   foreach(var image in Root.GetComponentsInChildren<Image>(true).Where(i=>i.name.StartsWith("Exact heart "))){image.color=Color.white;image.material=theme;}
  }
- public void ShowRecallClock(int seconds){
-  if(recallClock==null)return;recallClock.color=ChainGame.Purple;recallClock.text=Mathf.Max(0,seconds).ToString();
+ public void ShowRecallClock(int seconds,bool untimed=false){
+  if(recallClock==null)return;recallClock.color=ChainGame.Purple;recallClock.text=untimed?"∞":Mathf.Max(0,seconds).ToString();
   if(timerCaption!=null)timerCaption.gameObject.SetActive(true);
  }
  public void Hearts(int remaining){for(int i=0;i<5;i++){var t=Root.GetComponentsInChildren<Transform>(true).FirstOrDefault(x=>x.name=="Exact heart "+i);if(t!=null)t.gameObject.SetActive(i<remaining);}}

@@ -83,12 +83,12 @@ public class BoxesManager : GamesScript, IGameable
     private void Update()
     {
         if(SprintRuntime.Active){countDownText.text=SprintRuntime.Current.ClockText;return;}
-        if (shouldCountTime && countdownTime > 0)
+        if (shouldCountTime && (countdownTime > 0 || PracticeMode.Untimed))
         {
             countdownTime -= Time.deltaTime;
-            countDownText.text = Mathf.Round(countdownTime).ToString();
+            countDownText.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
         }
-        else if(shouldCountTime && countdownTime <= 0)
+        else if(shouldCountTime && countdownTime <= 0 && !PracticeMode.Untimed)
         {
             shouldCountTime = false;
             TimeUp();

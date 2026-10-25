@@ -15,6 +15,7 @@ public sealed class SprintPlayDriver : MonoBehaviour {
  void Start(){
   priorToken=PlayerPrefs.GetString("token");if(priorToken=="Bearer editor-sprint-test")priorToken="";SessionState.SetString("SprintPlayPriorToken",priorToken);PlayerPrefs.SetString("token","Bearer editor-sprint-test");
   UserConstants.s_user=new User{id=1999999963,username="Sprint test",userStatistics=new UserStatistics{xp=1000,level=10}};
+  MemorySettings.Practice=true; // Every competitive case must remain timed even with Practice selected.
   SprintRuntime.EditorNow=()=>now;SprintAPI.EditorTransport=Transport;
   Application.logMessageReceived+=Log;SceneManager.sceneLoaded+=SceneLoaded;StartCoroutine(Cases());
  }
@@ -144,6 +145,6 @@ public sealed class SprintPlayDriver : MonoBehaviour {
    for(int i=0;i<canvases.Length;i++){canvases[i].renderMode=modes[i];canvases[i].worldCamera=cameras[i];rects[i].position=positions[i];rects[i].localScale=scales[i];rects[i].sizeDelta=sizes[i];if(scalers[i]!=null)scalers[i].enabled=enabled[i];}for(int i=0;i<transforms.Length;i++)transforms[i].gameObject.layer=layers[i];DestroyImmediate(camera.gameObject);Canvas.ForceUpdateCanvases();
   }
  }
- private void Exit(int code,string message){if(exiting)return;exiting=true;SessionState.SetBool("SprintLiveOnly",false);SessionState.SetBool("SprintPlayRunning",false);PlayerPrefs.SetString("token",SessionState.GetString("SprintPlayPriorToken",""));PlayerPrefs.Save();Application.logMessageReceived-=Log;SceneManager.sceneLoaded-=SceneLoaded;SprintAPI.EditorTransport=null;SprintRuntime.EditorNow=null;EditorApplication.ExecuteMenuItem("SprintReview/Restore");Debug.Log(message);EditorApplication.Exit(code);}
+ private void Exit(int code,string message){if(exiting)return;exiting=true;PlayerPrefs.DeleteKey("memory.settings.v1.1999999963.practice");SessionState.SetBool("SprintLiveOnly",false);SessionState.SetBool("SprintPlayRunning",false);PlayerPrefs.SetString("token",SessionState.GetString("SprintPlayPriorToken",""));PlayerPrefs.Save();Application.logMessageReceived-=Log;SceneManager.sceneLoaded-=SceneLoaded;SprintAPI.EditorTransport=null;SprintRuntime.EditorNow=null;EditorApplication.ExecuteMenuItem("SprintReview/Restore");Debug.Log(message);EditorApplication.Exit(code);}
 }
 #endif

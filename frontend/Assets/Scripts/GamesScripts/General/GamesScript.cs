@@ -311,7 +311,7 @@ public class GamesScript : MonoBehaviour
     public void LevelCompleted(string timeText, GameLevel[] gameLevels, string game)
     {
         int score;
-        if (!int.TryParse(timeText, out score)) return;
+        if(PracticeMode.Untimed)score=0;else if (!int.TryParse(timeText, out score)) return;
         if (MemoryAthlete.IsRound) {if(TrainingAthleteTile.IsRound)TrainingAthleteTile.Complete(game);return;} // Separate completion; never send21 as an ordinary level.
         int stars = setStars(score);
         int level = LevelScript._selectedLevel;

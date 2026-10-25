@@ -93,12 +93,12 @@ public class FlashManager : GamesScript, IGameable
         if(shouldCountPreGameTime)
             preGameTimeSpent += Time.deltaTime;
 
-        if (shouldCountTime && countdownTime > 0)
+        if (shouldCountTime && (countdownTime > 0 || PracticeMode.Untimed))
         {
             countdownTime -= Time.deltaTime;
-            timerText.text = Mathf.Round(countdownTime).ToString();
+            timerText.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
         }
-        else if (shouldCountTime && countdownTime <= 0)
+        else if (shouldCountTime && countdownTime <= 0 && !PracticeMode.Untimed)
         {
             shouldCountTime = false;
             TimeUp();
