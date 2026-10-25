@@ -25,6 +25,7 @@ public sealed class SprintLobby : MonoBehaviour {
   matchButton=SprintUi.Button(row.transform,"Match!",new Vector2(.51f,0),Vector2.one,()=>SetMode(true));matchLabel=matchButton.GetComponentInChildren<Text>();SetMode(false);
   LiveChallenges.Attach(navigation);
   SprintUi.Button(navigation.challengeHomeScreen.transform,"Challenges",new Vector2(.12f,.83f),new Vector2(.88f,.88f),Open);
+  ArenaHomeLayout.Apply(navigation);
  }
  private void SetMode(bool value){match=value;StyleMode(singleButton,singleLabel,!value);StyleMode(matchButton,matchLabel,value);}
  private static void StyleMode(Button button,Text label,bool selected){
