@@ -67,30 +67,26 @@ public static class TipsEnhancer
 
         // The native tips list has fixed-position cards on older iOS scenes. Put every
         // card in a scrolling layout, so new guides cannot sit outside the content bounds.
-        var listLayout=content.GetComponent<VerticalLayoutGroup>();
-        if(listLayout==null) {
-            foreach(Transform child in content) {
-                var rt=child as RectTransform;if(rt==null)continue;
-                var sizing=child.GetComponent<LayoutElement>();if(sizing==null)sizing=child.gameObject.AddComponent<LayoutElement>();
-                sizing.preferredHeight=Mathf.Max(180f,rt.rect.height);
-            }
-            listLayout=content.gameObject.AddComponent<VerticalLayoutGroup>();
-            listLayout.spacing=22;listLayout.padding=new RectOffset(20,20,20,40);
-            listLayout.childControlWidth=true;listLayout.childControlHeight=true;listLayout.childForceExpandHeight=false;listLayout.childForceExpandWidth=true;
-            var fit=content.GetComponent<ContentSizeFitter>();if(fit==null)fit=content.gameObject.AddComponent<ContentSizeFitter>();fit.verticalFit=ContentSizeFitter.FitMode.PreferredSize;
-        }
+        Canvas.ForceUpdateCanvases();
+        foreach(Transform child in content){var rt=child as RectTransform;if(rt==null)continue;var sizing=child.GetComponent<LayoutElement>();if(sizing==null){sizing=child.gameObject.AddComponent<LayoutElement>();sizing.preferredHeight=Mathf.Max(180,rt.rect.height);}}
+        var listLayout=content.GetComponent<VerticalLayoutGroup>()??content.gameObject.AddComponent<VerticalLayoutGroup>();
+        listLayout.spacing=22;listLayout.padding=new RectOffset(20,20,20,40);listLayout.childControlWidth=listLayout.childControlHeight=listLayout.childForceExpandWidth=true;listLayout.childForceExpandHeight=false;
+        var fit=content.GetComponent<ContentSizeFitter>()??content.gameObject.AddComponent<ContentSizeFitter>();fit.verticalFit=ContentSizeFitter.FitMode.PreferredSize;
+        var listRect=(RectTransform)content;listRect.anchorMin=new Vector2(0,1);listRect.anchorMax=Vector2.one;listRect.pivot=new Vector2(.5f,1);listRect.offsetMin=new Vector2(0,listRect.offsetMin.y);listRect.offsetMax=new Vector2(0,listRect.offsetMax.y);
         var deck=screens.Find("DeckGuidePage");
         if(deck==null)deck=BuildMajorSystemPage(screens,menu,true).transform;
         var link=screens.Find("LinkGuidePage");
         if(link==null)link=BuildMajorSystemPage(screens,menu,false,true).transform;
         deck.gameObject.SetActive(false);link.gameObject.SetActive(false);
-        GuideCard(content,"TheDeckGuide","The Deck • 52 images",deck,0);
+        GuideCard(content,"TheDeckGuide","The Deck",deck,0);
         var originalLink=content.Find("LinkMethod");
         if(originalLink!=null && originalLink.GetComponent<Button>()!=null) {
             originalLink.GetComponent<Button>().onClick=new Button.ButtonClickedEvent();
             originalLink.GetComponent<Button>().onClick.AddListener(()=>{link.gameObject.SetActive(true);link.SetAsLastSibling();});
             originalLink.SetSiblingIndex(1);
         } else GuideCard(content,"TheLinkGuide","The Link Method",link,1);
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(listRect);var tipList=content.GetComponentInParent<ScrollRect>();if(tipList!=null){tipList.horizontal=false;tipList.vertical=true;tipList.verticalNormalizedPosition=1;}
 
         // an "I have read this" box on every page
         foreach (Transform page in screens)
@@ -107,11 +103,11 @@ public static class TipsEnhancer
     }
 
     private static void GuideCard(Transform content,string name,string title,Transform page,int order) {
-        var existing=content.Find(name);if(existing!=null)return;
+        var existing=content.Find(name);if(existing!=null){existing.gameObject.SetActive(true);existing.SetSiblingIndex(order);return;}
         var card=new GameObject(name,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement));card.transform.SetParent(content,false);card.transform.SetSiblingIndex(order);
         card.GetComponent<Image>().sprite=ContentSelectorBar.Rounded();card.GetComponent<Image>().type=Image.Type.Sliced;card.GetComponent<Image>().color=new Color32(238,234,255,255);
         card.GetComponent<LayoutElement>().preferredHeight=180;
-        card.GetComponent<Button>().onClick.AddListener(()=>{page.gameObject.SetActive(true);page.SetAsLastSibling();});
+        card.GetComponent<Button>().onClick.AddListener(()=>{page.parent.gameObject.SetActive(true);page.gameObject.SetActive(true);page.SetAsLastSibling();});
         var label=MakeText(card.transform,"Title",title,46,FontStyle.Bold,Purple,TextAnchor.MiddleCenter);Stretch(label.rectTransform);
     }
 
@@ -270,9 +266,9 @@ public static class TipsEnhancer
             AddParagraph(cr,"Clubs uses hard C/K (7). Diamonds uses D (1). Spades uses S (0). Hearts uses H as a visual cue; H is silent in the numerical Major code. For example: Diamond 5 is D + L = DOLL (15).",36,false);
             AddParagraph(cr,"Ace = 1; 2-9 keep their Major sounds; 10 = 0. Court cards are explicit exceptions: Jack = 11, Queen = 12, King = 13. Hearts King uses ATOM (13); the H is only a suit cue. These are English starter associations, not a universal card system.",36,false);
             AddParagraph(cr,"Practise in Pairs, Boxes, Flash and Chain",44,true);
-            AddParagraph(cr,"Choose The Deck in Settings or Training to play with cards only. This setting applies to your next training round. Challenges keep their existing picture rules.",36,false);
+            AddParagraph(cr,"Choose The Deck in Settings or Training to play with cards only. This setting applies to your next training round. Challenge content follows the selected tier. Memory Athlete can mix cards with pictures, words and numbers.",36,false);
             AddParagraph(cr,"All 52 card associations",44,true);
-            AddParagraph(cr,"Open a rank below to see its four cards, words and mnemonic illustrations. Tick the read box after reading the tip to earn Deck Decoder.",36,false);
+            AddParagraph(cr,"Open one of the four suits below to see all thirteen cards, words, Major codes and mnemonic illustrations. Tick the read box after reading the tip to earn Deck Decoder.",36,false);
             AddCatalog(cr,true);
         }
         else
@@ -316,11 +312,11 @@ public static class TipsEnhancer
     private static void AddCatalog(RectTransform content, bool deck)
     {
         string[] suits={"Clubs","Diamonds","Hearts","Spades"};
-        int groups=deck?13:10;
+        int groups=deck?4:10;
         for (int group=0;group<groups;group++)
         {
             int captured=group;
-            string caption=deck?new[]{"Ace","2","3","4","5","6","7","8","9","10","Jack","Queen","King"}[group]:(group*10).ToString("D2")+"-"+(group*10+9).ToString("D2");
+            string caption=deck?suits[group]:(group*10).ToString("D2")+"-"+(group*10+9).ToString("D2");
             var header=new GameObject("Expand "+caption,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement));
             header.transform.SetParent(content,false);header.GetComponent<Image>().color=new Color32(238,234,255,255);
             header.GetComponent<LayoutElement>().preferredHeight=95;
@@ -333,10 +329,10 @@ public static class TipsEnhancer
             header.GetComponent<Button>().onClick.AddListener(()=>{
                 if (!populated)
                 {
-                    int count=deck?4:10;
+                    int count=deck?13:10;
                     for(int j=0;j<count;j++)
                     {
-                        int index=deck ? j*13+captured : captured*count+j;
+                        int index=deck ? captured*13+j : captured*count+j;
                         if (!deck) AddExample((RectTransform)body.transform,index,CardFaces.SoundLetters(index+1),CardFaces.ImageWord(index+1));
                         else AddDeckRow((RectTransform)body.transform,index);
                     }

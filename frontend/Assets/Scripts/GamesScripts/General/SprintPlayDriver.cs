@@ -58,9 +58,9 @@ public sealed class SprintPlayDriver : MonoBehaviour {
    Check(reactionBar.gameObject.activeSelf && reactions.GetComponentsInChildren<Image>().Count(i=>i.name.StartsWith("Emoji ") && i.gameObject.activeInHierarchy)==6,"Six persistent reaction icons during "+game);
    if(game!="Flash"){
     var nextButton=FindObjectsOfType<Button>().Where(b=>!b.transform.IsChildOf(reactions.transform) && (b.name.ToLowerInvariant().Contains("next")||b.name.ToLowerInvariant().Contains("recall"))).OrderBy(b=>b.transform.position.y).FirstOrDefault();
-    Check(nextButton!=null,"Original study control for reaction placement");var corners=new Vector3[4];((RectTransform)nextButton.transform).GetWorldCorners(corners);var canvas=nextButton.GetComponentInParent<Canvas>().rootCanvas;float nextTop=RectTransformUtility.WorldToScreenPoint(canvas.renderMode==RenderMode.ScreenSpaceOverlay?null:canvas.worldCamera,corners[1]).y;reactionBar.GetWorldCorners(corners);Check(corners[0].y>=nextTop,"Reaction bar above original Next/Recall in "+game);
+    Check(nextButton!=null,"Original study control for reaction placement");var corners=new Vector3[4];((RectTransform)nextButton.transform).GetWorldCorners(corners);var canvas=nextButton.GetComponentInParent<Canvas>().rootCanvas;float nextBottom=RectTransformUtility.WorldToScreenPoint(canvas.renderMode==RenderMode.ScreenSpaceOverlay?null:canvas.worldCamera,corners[0]).y;reactionBar.GetWorldCorners(corners);Check(corners[1].y<nextBottom,"Compact reaction dock below original Next/Recall in "+game);
    }
-   Debug.Log("REACTION_BAR_LAYOUT_PASSED: "+game);
+   Debug.Log("REACTION_BAR_LAYOUT_PASSED: "+game);CaptureReactionLayout(game.ToLowerInvariant()+"-compact-reactions");
    if(game=="Pairs"){
     var manager=FindObjectOfType<PairsManager>();Check(manager!=null,"Original PairsManager");for(int i=0;i<3;i++)manager.NextPair();
     Check(manager.gameScreen.activeSelf,"Original Pairs recall");
@@ -75,7 +75,8 @@ public sealed class SprintPlayDriver : MonoBehaviour {
     var sequence=(int[])Field(manager,"imagesNumberForRecallNoShuffle");Check(sequence.Length==5,"Flash starts5");
     foreach(int id in sequence){now+=500;manager.recallPanel.GetComponentsInChildren<Button>(true).First(b=>b.name==id.ToString()).onClick.Invoke();}
    }else if(game=="Boxes"){
-    var manager=FindObjectOfType<BoxesManager>();Check(manager.spawnNumber==5,"Boxes starts5");manager.recallBtn.GetComponent<Button>().onClick.Invoke();yield return null;
+    var manager=FindObjectOfType<BoxesManager>();Check(manager.spawnNumber==5,"Boxes starts5");manager.recallBtn.GetComponent<Button>().onClick.Invoke();yield return new WaitForSecondsRealtime(.3f);
+    var trayCorners=new Vector3[4];((RectTransform)manager.bottomIconsContainer.transform).GetWorldCorners(trayCorners);var trayCanvas=manager.bottomIconsContainer.GetComponentInParent<Canvas>().rootCanvas;float trayBottom=RectTransformUtility.WorldToScreenPoint(trayCanvas.worldCamera,trayCorners[0]).y;reactionBar.GetWorldCorners(trayCorners);Check(trayBottom>trayCorners[1].y,"Boxes tray must stay above reaction dock");CaptureReactionLayout("boxes-compact-reactions-recall");
     var items=manager.scrollViewContent.GetComponentsInChildren<DragAndDropItem>().ToArray();Check(items.Length==5,"Five tray items");
     var wrongCell=FindObjectsOfType<DragAndDropCell>().First(c=>c.name.EndsWith(" Number"));string cellName=wrongCell.name,itemName=items[0].name;wrongCell.name="10 Number";items[0].name="1";
     var wrongData=new PointerEventData(EventSystem.current);items[0].OnBeginDrag(wrongData);wrongCell.OnDrop(wrongData);items[0].OnEndDrag(wrongData);
@@ -122,6 +123,26 @@ public sealed class SprintPlayDriver : MonoBehaviour {
   menu.challengeScreen.SetActive(false);menu.GoToNotification();Check(menu.challengeScreen.activeSelf,"Bell activates Challenge before API request");
   var lobby=navigation.GetComponent<SprintLobby>();Check(Field(lobby,"panel")!=null,"Bell opens sprint inbox");Check(navigation.challengeGameScreen.transform.Find("Chain challenge")!=null,"Chain shares Challenge selection");
   Debug.Log("SPRINT_MENU_VALIDATION_PASSED");Exit(0,"SPRINT_PLAY_VALIDATION_PASSED");
+ }
+ // Immediate offscreen capture: ScreenCapture is deferred and does not produce files in batch play mode.
+ private void CaptureReactionLayout(string name){
+  var canvases=FindObjectsOfType<Canvas>().Where(c=>c.isRootCanvas&&c.gameObject.activeInHierarchy).ToArray();
+  var modes=canvases.Select(c=>c.renderMode).ToArray();var cameras=canvases.Select(c=>c.worldCamera).ToArray();var rects=canvases.Select(c=>(RectTransform)c.transform).ToArray();var positions=rects.Select(r=>r.position).ToArray();var scales=rects.Select(r=>r.localScale).ToArray();var sizes=rects.Select(r=>r.sizeDelta).ToArray();var scalers=canvases.Select(c=>c.GetComponent<CanvasScaler>()).ToArray();var enabled=scalers.Select(s=>s!=null&&s.enabled).ToArray();
+  var transforms=canvases.SelectMany(c=>c.GetComponentsInChildren<Transform>(true)).Distinct().ToArray();var layers=transforms.Select(t=>t.gameObject.layer).ToArray();
+  var layoutRects=transforms.OfType<RectTransform>().ToArray();var mins=layoutRects.Select(r=>r.anchorMin).ToArray();var maxs=layoutRects.Select(r=>r.anchorMax).ToArray();var layoutSizes=layoutRects.Select(r=>r.sizeDelta).ToArray();var layoutPositions=layoutRects.Select(r=>r.anchoredPosition3D).ToArray();
+  var camera=new GameObject("Reaction review camera",typeof(Camera)).GetComponent<Camera>();camera.transform.position=new Vector3(0,0,-20);camera.orthographic=true;camera.nearClipPlane=.1f;camera.farClipPlane=1000;camera.cullingMask=1<<30;camera.clearFlags=CameraClearFlags.SolidColor;camera.backgroundColor=Color.white;
+  try{
+   for(int i=0;i<canvases.Length;i++){if(scalers[i]!=null)scalers[i].enabled=false;canvases[i].renderMode=RenderMode.WorldSpace;canvases[i].worldCamera=camera;rects[i].position=Vector3.zero;rects[i].localScale=Vector3.one;}
+   foreach(var t in transforms)t.gameObject.layer=30;
+   foreach(bool tablet in new[]{false,true}){
+    for(int i=0;i<layoutRects.Length;i++){layoutRects[i].anchorMin=mins[i];layoutRects[i].anchorMax=maxs[i];layoutRects[i].sizeDelta=layoutSizes[i];layoutRects[i].anchoredPosition3D=layoutPositions[i];}
+    foreach(var rect in rects)rect.sizeDelta=tablet?new Vector2(800,1067):new Vector2(800,1734);Canvas.ForceUpdateCanvases();camera.orthographicSize=(tablet?1067:1734)/2f;
+    var rt=new RenderTexture(800,tablet?1067:1734,24);camera.targetTexture=rt;foreach(var reactions in FindObjectsOfType<SprintReactions>())reactions.SendMessage("LateUpdate");Canvas.ForceUpdateCanvases();camera.Render();var previous=RenderTexture.active;RenderTexture.active=rt;var texture=new Texture2D(rt.width,rt.height,TextureFormat.RGBA32,false);texture.ReadPixels(new Rect(0,0,rt.width,rt.height),0,0);texture.Apply();System.IO.File.WriteAllBytes("../ChainReuseFix/"+name+(tablet?"-ipad":"-phone")+".png",texture.EncodeToPNG());RenderTexture.active=previous;camera.targetTexture=null;DestroyImmediate(texture);DestroyImmediate(rt);
+   }
+  }finally{
+   for(int i=0;i<layoutRects.Length;i++){layoutRects[i].anchorMin=mins[i];layoutRects[i].anchorMax=maxs[i];layoutRects[i].sizeDelta=layoutSizes[i];layoutRects[i].anchoredPosition3D=layoutPositions[i];}
+   for(int i=0;i<canvases.Length;i++){canvases[i].renderMode=modes[i];canvases[i].worldCamera=cameras[i];rects[i].position=positions[i];rects[i].localScale=scales[i];rects[i].sizeDelta=sizes[i];if(scalers[i]!=null)scalers[i].enabled=enabled[i];}for(int i=0;i<transforms.Length;i++)transforms[i].gameObject.layer=layers[i];DestroyImmediate(camera.gameObject);Canvas.ForceUpdateCanvases();
+  }
  }
  private void Exit(int code,string message){if(exiting)return;exiting=true;SessionState.SetBool("SprintLiveOnly",false);SessionState.SetBool("SprintPlayRunning",false);PlayerPrefs.SetString("token",SessionState.GetString("SprintPlayPriorToken",""));PlayerPrefs.Save();Application.logMessageReceived-=Log;SceneManager.sceneLoaded-=SceneLoaded;SprintAPI.EditorTransport=null;SprintRuntime.EditorNow=null;EditorApplication.ExecuteMenuItem("SprintReview/Restore");Debug.Log(message);EditorApplication.Exit(code);}
 }
