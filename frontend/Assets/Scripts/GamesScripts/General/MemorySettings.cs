@@ -7,6 +7,7 @@ public enum DeckDisplay { Cards, Words, Decode, Random, Images }
 
 public static class MemorySettings
 {
+    public static bool Practice {get{return PlayerPrefs.GetInt(Key("practice"),0)==1;}set{PlayerPrefs.SetInt(Key("practice"),value?1:0);PlayerPrefs.Save();}}
     public static DeckDisplay DeckMode {
         get { return (DeckDisplay)Mathf.Clamp(PlayerPrefs.GetInt(Key("deckMode"),0),0,4); }
         set { PlayerPrefs.SetInt(Key("deckMode"),(int)value); PlayerPrefs.Save(); }
@@ -27,6 +28,11 @@ public static class MemorySettings
         get { return PlayerPrefs.GetInt(Key("wordNumbers"), 0) == 1; }
         set { PlayerPrefs.SetInt(Key("wordNumbers"), value ? 1 : 0); PlayerPrefs.Save(); }
     }
+}
+
+public static class PracticeMode {
+    // Competitive entry points always override the saved training preference.
+    public static bool Untimed {get{return MemorySettings.Practice&&!SprintRuntime.Active&&!Assets.Script.Constants.ChallengeConstants.s_isChallenge;}}
 }
 
 public static class MajorWordCatalog

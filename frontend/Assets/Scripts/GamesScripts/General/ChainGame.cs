@@ -143,6 +143,7 @@ public sealed class ChainGame : GamesScript
     }
     private void TickTrainingClock(float elapsed){
         if(SprintRuntime.Active || !recall || state==null || state.Finished || originalGame==null || quitDialog!=null)return;
+        if(PracticeMode.Untimed){originalGame.ShowRecallClock(0,true);return;}
         recallSeconds=Mathf.Max(0,recallSeconds-elapsed);originalGame.ShowRecallClock(Mathf.CeilToInt(recallSeconds));
         if(recallSeconds<=0){state.Expire();EndRound();}
     }
@@ -256,7 +257,7 @@ public sealed class ChainGame : GamesScript
     private void ShowRecall() {
         recall=true;ClearBody();ClearOriginalGame();safe.gameObject.SetActive(false);
         originalGame=new ChainOriginalPresentation(overlay,false,Back,NextCard,exactTheme);
-        if(!SprintRuntime.Active){recallSeconds=180;originalGame.ShowRecallClock(180);}
+        if(!SprintRuntime.Active){recallSeconds=180;originalGame.ShowRecallClock(180,PracticeMode.Untimed);}
         int[] shuffled=(int[])state.Sequence.Clone();Shuffle(shuffled);
         foreach(int id in shuffled){int captured=id;
             var tile=UnityEngine.Object.Instantiate(originalGame.Cell,originalGame.Grid,false);tile.name="Recall "+id;

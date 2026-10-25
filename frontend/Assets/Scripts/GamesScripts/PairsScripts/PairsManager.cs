@@ -87,17 +87,17 @@ public class PairsManager : GamesScript, IGameable
             firstCountDownIpad.text = firstCountDown.text;
         }
 
-        if (shouldCountTime && countdownTime > 0)
+        if (shouldCountTime && (countdownTime > 0 || PracticeMode.Untimed))
         {
             countdownTime -= Time.deltaTime;
 
             if (firstCountDown != null)
-                firstCountDown.text = Mathf.Round(countdownTime).ToString();
+                firstCountDown.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
             if (secondCountDown != null)
-                secondCountDown.text = Mathf.Round(countdownTime).ToString();
+                secondCountDown.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
         }
 
-        else if (shouldCountTime && countdownTime <= 0)
+        else if (shouldCountTime && countdownTime <= 0 && !PracticeMode.Untimed)
         {
             shouldCountTime = false;
             TimeUp();
