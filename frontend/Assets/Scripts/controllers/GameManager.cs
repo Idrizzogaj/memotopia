@@ -86,6 +86,7 @@ public class GameManager : MonoBehaviour
 
     public static bool UnlockAchievement(string key)
     {
+        if(PracticeMode.BlockAchievements)return false;
         if (string.IsNullOrEmpty(key) || AchievementUserId <= 0 || completedAchievements.Contains(key)) return false;
         achievementSave.pending.Add(key);
         SaveAchievements();

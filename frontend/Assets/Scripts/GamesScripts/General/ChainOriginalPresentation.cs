@@ -47,6 +47,7 @@ public sealed class ChainOriginalPresentation {
   if(recallClock==null)return;recallClock.color=ChainGame.Purple;recallClock.text=untimed?"∞":Mathf.Max(0,seconds).ToString();
   if(timerCaption!=null)timerCaption.gameObject.SetActive(true);
  }
+ public void ShowPracticeClock(string value){var text=recallClock??Root.GetComponentsInChildren<Text>(true).FirstOrDefault(t=>t.name=="Exact study timer");if(text==null)return;text.gameObject.SetActive(true);text.text=value;if(timerCaption!=null)timerCaption.gameObject.SetActive(true);}
  public void Hearts(int remaining){for(int i=0;i<5;i++){var t=Root.GetComponentsInChildren<Transform>(true).FirstOrDefault(x=>x.name=="Exact heart "+i);if(t!=null)t.gameObject.SetActive(i<remaining);}}
  public void FitOverflow(int count){
   Canvas.ForceUpdateCanvases();var layout=Grid.GetComponent<GridLayoutGroup>();

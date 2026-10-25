@@ -92,9 +92,9 @@ public class PairsManager : GamesScript, IGameable
             countdownTime -= Time.deltaTime;
 
             if (firstCountDown != null)
-                firstCountDown.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
+                firstCountDown.text = PracticeMode.Untimed?PracticeSession.Clock(this):Mathf.Round(countdownTime).ToString();
             if (secondCountDown != null)
-                secondCountDown.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
+                secondCountDown.text = PracticeMode.Untimed?PracticeSession.Clock(this):Mathf.Round(countdownTime).ToString();
         }
 
         else if (shouldCountTime && countdownTime <= 0 && !PracticeMode.Untimed)
@@ -133,6 +133,7 @@ public class PairsManager : GamesScript, IGameable
     {
         yield return StartCoroutine(ShowRSG(rsg));
         countdownTime = preGameTimeAllocation;
+        PracticeSession.Begin(this, "Memory.Pairs", LevelScript._selectedLevel);
         shouldCountTime = true;
     }
 
@@ -206,7 +207,7 @@ public class PairsManager : GamesScript, IGameable
             MakeButtonsInteractable(false);
             if (pairs[firstBtn.name] == secondBtn.name || pairs[secondBtn.name] == firstBtn.name)
             {
-                gameOverCount -= 2;
+                gameOverCount -= 2; PracticeSession.Get(this)?.Progress(LevelScript._selectedLevel);
                 if(SprintRuntime.Active)SprintRuntime.Current.Solve(firstBtn.name);
 
                 //If all pairs are found. Game won or challenge completed

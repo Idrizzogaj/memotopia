@@ -14,7 +14,7 @@ public static class TrainingAthleteTile
  public static bool TakePopup(string game){if(popupOwner!=GameManager.AchievementUserId || pendingPopup!=game)return false;pendingPopup=null;return true;}
  public static bool Eligible(string game){if(game=="Chain")return ChainProgress.Completed(20);var levels=LevelProgress.Get(game);return levels!=null && Array.Exists(levels,l=>l.level==20 && l.stars>0);}
  public static bool Complete(string game){
-  if(!Eligible(game) || GameManager.AchievementUserId<=0)return false;
+  if(PracticeMode.Untimed || !Eligible(game) || GameManager.AchievementUserId<=0)return false;
   PlayerPrefs.SetInt(Key(game),1);PlayerPrefs.Save();
   bool fresh=GameManager.UnlockAchievement(Badge(game));pendingPopup=fresh?game:null;popupOwner=GameManager.AchievementUserId;return fresh;
  }

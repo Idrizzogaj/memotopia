@@ -96,7 +96,7 @@ public class FlashManager : GamesScript, IGameable
         if (shouldCountTime && (countdownTime > 0 || PracticeMode.Untimed))
         {
             countdownTime -= Time.deltaTime;
-            timerText.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
+            timerText.text = PracticeMode.Untimed?PracticeSession.Clock(this):Mathf.Round(countdownTime).ToString();
         }
         else if (shouldCountTime && countdownTime <= 0 && !PracticeMode.Untimed)
         {
@@ -248,6 +248,7 @@ public class FlashManager : GamesScript, IGameable
         yield return StartCoroutine(ShowRSG(rsg));
         ShouldAnimationGetTriggered();
         shouldCountPreGameTime = true;
+        PracticeSession.Begin(this, "Memory.Flash", LevelScript._selectedLevel);
     }
 
     /// <summary>
@@ -386,7 +387,7 @@ public class FlashManager : GamesScript, IGameable
         if(SprintRuntime.Active && !SprintRuntime.Current.Ready)return;
         if (int.Parse(newRecallImageCellBtn.name) == imagesNumberForRecallNoShuffle[correctSelected])
         {
-            correctSelected++;
+            correctSelected++; PracticeSession.Get(this)?.Progress(LevelScript._selectedLevel);
             if(SprintRuntime.Active)SprintRuntime.Current.Solve(newRecallImageCellBtn.name);
             newRecallImageCellBtn.SetActive(false);
         }

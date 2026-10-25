@@ -251,6 +251,7 @@ public class GamesScript : MonoBehaviour
 
     private void initLoadingAndStart()
     {
+        var practice=PracticeSession.Get(this);if(practice!=null)practice.Stop();
         _loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
         _loadingScreen.StartLoading();
     }
@@ -301,6 +302,7 @@ public class GamesScript : MonoBehaviour
         GameObject thisAchievementsPanelPrefab, List<Achievement> thisAchievementsList, AchievementsController achievementsController,
         int correct, float secondsLeft)
     {
+        var practice=PracticeSession.Get(this);if(practice!=null)practice.Stop();
         if (ChallengeConstants.s_isChallenge)
             ChallangeFinished("0", challengeFirstPlayPanel, challengeLossPanel, challengeWinPanel, challengeDrawPanel,
                 thisGame, thisAchievementsPanelPrefab, thisAchievementsList, achievementsController, correct, secondsLeft, false);
@@ -311,7 +313,7 @@ public class GamesScript : MonoBehaviour
     public void LevelCompleted(string timeText, GameLevel[] gameLevels, string game)
     {
         int score;
-        if(PracticeMode.Untimed)score=0;else if (!int.TryParse(timeText, out score)) return;
+        if(PracticeMode.Untimed){var practice=PracticeSession.Get(this);if(practice!=null){practice.Progress(LevelScript._selectedLevel);practice.Stop();}score=0;}else if (!int.TryParse(timeText, out score)) return;
         if (MemoryAthlete.IsRound) {if(TrainingAthleteTile.IsRound)TrainingAthleteTile.Complete(game);return;} // Separate completion; never send21 as an ordinary level.
         int stars = setStars(score);
         int level = LevelScript._selectedLevel;

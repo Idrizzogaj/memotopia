@@ -66,6 +66,7 @@ public class AchievementsController : MonoBehaviour
 
     private void CheckProgress()
     {
+        if(PracticeMode.BlockAchievements)return;
         if(!isChallange && TrainingAthleteTile.IsRound){
             string key=TrainingAthleteTile.Badge(game);
             if(!finished && TrainingAthleteTile.TakePopup(game)) {
