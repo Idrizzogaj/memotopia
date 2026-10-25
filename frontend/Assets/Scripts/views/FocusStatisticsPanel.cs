@@ -23,10 +23,11 @@ public static class FocusStatisticsPanel {
    Label(card.transform,record.hasBest?"Start L"+record.bestStart+" · "+FocusStats.Accuracy(record.bestCorrect,record.bestErrors):"Finish 90s to set a record",new Vector2(.04f,.15f),new Vector2(.96f,.28f),19,Color.white);
    Label(card.transform,record.sessions+(record.sessions==1?" session · ":" sessions · ")+FocusStats.Accuracy(record.correct,record.errors)+" accuracy",new Vector2(.04f,.02f),new Vector2(.96f,.15f),18,Color.white);
   }
+  var practice=Block(root.transform,"Practice records",0,Paper);float practiceHeight=PracticeStatisticsPanel.Draw(practice.transform);practice.GetComponent<LayoutElement>().preferredHeight=practiceHeight;
   var history=Block(root.transform,"Recent",54,Teal);Label(history.transform,"RECENT",Vector2.zero,Vector2.one,27,Color.white);float historyHeight=0;
   foreach(var run in data.recent.Take(4)){var row=Block(root.transform,"Session",64,Color.white);string progress=run.ended?run.score+" pts · L"+run.start+"→"+run.highest:"Interrupted · result unavailable";string result=run.ended?(run.completed?"90s finished":"Ended early · "+Mathf.RoundToInt(run.seconds)+"s"):"";Label(row.transform,FocusRules.Names[run.kind]+" · "+progress+"\n"+result,Vector2.zero,Vector2.one,22,ChainGame.Ink);historyHeight+=78;}
   if(data.recent.Count==0){var empty=Block(root.transform,"No history",70,Color.white);Label(empty.transform,"Play Focus to create your first record",Vector2.zero,Vector2.one,23,ChainGame.Ink);historyHeight=84;}
-  sizing.preferredHeight=40+58+38+86+gridHeight+54+5*14+historyHeight;
+  sizing.preferredHeight=40+58+38+86+gridHeight+practiceHeight+54+6*14+historyHeight;
   var fit=parent.GetComponent<ContentSizeFitter>();if(fit!=null)fit.verticalFit=ContentSizeFitter.FitMode.PreferredSize;LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)root.transform);LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)parent);
  }
 }

@@ -1,0 +1,13 @@
+using System;using System.Linq;using UnityEngine;using Assets.Script.Constants;using Assets.Script.Models;
+public static class PracticeRecordValidation {
+ static void Check(bool okay,string message){if(!okay)throw new Exception(message);}
+ public static void Review(){
+  const int owner=1999999922;var prior=UserConstants.s_user;bool challenge=ChallengeConstants.s_isChallenge;GameObject root=null;
+  try{
+   UserConstants.s_user=new User{id=owner,username="Practice records review"};ChallengeConstants.s_isChallenge=false;MemorySettings.Practice=true;PlayerPrefs.DeleteKey("practice.records.v1."+owner);
+   PracticeStats.Save(owner,"Focus.Pairs",1,3,120);PracticeStats.Save(owner,"Focus.Pairs",1,2,10);PracticeStats.Save(owner,"Focus.Pairs",1,3,150);var r=PracticeStats.Read(owner).records.Single();Check(r.level==3&&r.seconds==120,"Higher level first, slower tie not better");PracticeStats.Save(owner,"Focus.Pairs",1,3,110);PracticeStats.Save(owner,"Focus.Pairs",1,4,300);r=PracticeStats.Read(owner).records.Single();Check(r.level==4&&r.seconds==300,"Higher level beats a faster lower level");Check(PracticeStats.Read(owner+100).records.Count==0,"Records isolated by account");Check(PracticeStats.Time(3661)=="1:01:01","Long count-up format");
+   root=new GameObject("Practice record guard");var source=root.AddComponent<FocusGame>();var run=PracticeSession.Begin(source,"Memory.Boxes",2,true);run.Tick(125);run.Progress(2);Check(PracticeMode.BlockAchievements&&!GameManager.UnlockAchievement("focus-first"),"Central practice achievement guard");run.Stop();run.Stop();Check(PracticeStats.Read(owner).records.Single(x=>x.game=="Memory.Boxes").sessions==1,"Finish cannot save twice");Check(PracticeMode.BlockAchievements,"Result screen retains achievement guard");ChallengeConstants.s_isChallenge=true;Check(!PracticeMode.BlockAchievements,"Challenge awards remain normal");ChallengeConstants.s_isChallenge=false;PracticeSession.Release(source);Check(!PracticeMode.BlockAchievements,"Practice checkbox alone must not block Tips awards");
+   PracticeValidation.Review();Debug.Log("PRACTICE_RECORD_VALIDATION_PASSED: rank by level/time, long durations, account isolation, no duplicate saves, no awards in practice/results, challenges and Tips unaffected; all game clocks verified");
+  }finally{if(root!=null)UnityEngine.Object.DestroyImmediate(root);foreach(var key in new[]{"practice.records.v1.","achievements.pending.v2.","achievements.verified.v2."})PlayerPrefs.DeleteKey(key+owner);PlayerPrefs.DeleteKey("memory.settings.v1."+owner+".practice");UserConstants.s_user=prior;ChallengeConstants.s_isChallenge=challenge;}
+ }
+}

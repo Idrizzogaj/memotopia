@@ -10,7 +10,7 @@ public sealed class FocusGame : MonoBehaviour {
  public static readonly Color Teal=new Color32(0,112,122,255),Green=new Color32(22,131,84,255),Red=new Color32(206,56,88,255);
  readonly System.Random random=new System.Random();readonly List<string> earned=new List<string>();
  GameObject overlay,body,popup;Text clock,levelText,scoreText,message,rule,answerText,questionText,roundText;Button start,minus,plus,help;
- int owner,runOwner,flashPart;string runId;int kind,level,startLevel=1,score,correct,errors,streak,cursor,questionIndex,priorFrameRate;float remaining=90,last,messageUntil;bool practice,playing,transition,flashWatching;float flashRemaining;string answer="";
+ int owner,runOwner,flashPart;string runId;int kind,level,startLevel=1,score,correct,errors,streak,cursor,questionIndex,priorFrameRate;float remaining=90,last,messageUntil;PracticeSession practiceRun;bool practice,playing,transition,flashWatching;float flashRemaining;string answer="";
  FocusRules.Sum sum;int[] sequence;readonly List<Arena> arenas=new List<Arena>();
  sealed class NativeBall {public FocusRules.Ball State;public Image Image,Halo;}
  sealed class Arena {public int Target;public RectTransform Box;public List<NativeBall> Balls=new List<NativeBall>();public Image[] Walls=new Image[4];public Text Count;}
@@ -18,7 +18,7 @@ public sealed class FocusGame : MonoBehaviour {
  Text Label(Transform parent,string value,Vector2 min,Vector2 max,int size,Color color){var text=ChainGame.Label(parent,value,min,max,size,color);text.fontStyle=FontStyle.Bold;text.raycastTarget=false;return text;}
  Button Button(Transform parent,string caption,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction click){var button=SprintUi.Button(parent,caption,min,max,click);button.image.color=new Color32(254,191,75,255);return button;}
  void Show(int index){
-  if(SprintRuntime.Active)return;Close();owner=GameManager.AchievementUserId;priorFrameRate=Application.targetFrameRate;Application.targetFrameRate=60;kind=index;practice=MemorySettings.Practice;startLevel=level=1;flashPart=0;score=correct=errors=streak=0;remaining=90;
+  if(SprintRuntime.Active)return;Close();Assets.Script.Constants.ChallengeConstants.s_isChallenge=false;owner=GameManager.AchievementUserId;priorFrameRate=Application.targetFrameRate;Application.targetFrameRate=60;kind=index;practice=MemorySettings.Practice;startLevel=level=1;flashPart=0;score=correct=errors=streak=0;remaining=90;
   overlay=ChainGame.Panel(transform,"Native Focus "+FocusRules.Names[kind],Vector2.zero,Vector2.one,Teal);
   // Reuse the actual Flash header frame, not a lookalike drawn for Focus.
   var template=Resources.Load<GameObject>("Prefabs/ExactFlashChainRecall");var source=template.GetComponentsInChildren<RectTransform>(true).First(t=>t.name=="Exact recall header");
@@ -42,10 +42,10 @@ public sealed class FocusGame : MonoBehaviour {
  void SelectLevel(int delta){if(playing)return;startLevel=level=Mathf.Clamp(startLevel+delta,1,FocusRules.Maximum(kind));flashPart=0;Prepare();}
  void Primary(){if(playing&&practice)Finish();else StartWithGuide();}
  public void StartWithGuide(){if(overlay==null||playing)return;if(FocusHowTo.Needed(owner,kind))FocusHowTo.Open(overlay.transform,owner,kind,Begin);else Begin();}
- public void Begin(){if(overlay==null)return;SaveRun(false);flashPart=0;runOwner=owner;practice=MemorySettings.Practice;runId=practice?null:FocusStats.Begin(runOwner,kind,startLevel);StopAllCoroutines();Remove(popup);popup=null;level=startLevel;score=correct=errors=streak=0;remaining=90;playing=true;transition=false;last=Time.realtimeSinceStartup;start.gameObject.SetActive(practice);start.GetComponentInChildren<Text>().text=practice?"Finish":"START";help.gameObject.SetActive(false);minus.interactable=plus.interactable=false;Earn("focus-first");Earn(FocusAchievements.First[kind]);Prepare();Feedback("GO!");}
- void Update(){if(overlay!=null && owner!=GameManager.AchievementUserId){Close();return;}float now=Time.realtimeSinceStartup;if(playing && popup==null)Tick(Mathf.Max(0,now-last));last=now;if(message!=null && now>messageUntil)message.text="";}
+ public void Begin(){if(overlay==null)return;SaveRun(false);flashPart=0;runOwner=owner;practice=MemorySettings.Practice;if(practice)earned.Clear();practiceRun=practice?PracticeSession.Begin(this,"Focus."+FocusRules.Names[kind],startLevel,true):null;runId=practice?null:FocusStats.Begin(runOwner,kind,startLevel);StopAllCoroutines();Remove(popup);popup=null;level=startLevel;score=correct=errors=streak=0;remaining=90;playing=true;transition=false;last=Time.realtimeSinceStartup;start.gameObject.SetActive(practice);start.GetComponentInChildren<Text>().text=practice?"Finish":"START";help.gameObject.SetActive(false);minus.interactable=plus.interactable=false;Earn("focus-first");Earn(FocusAchievements.First[kind]);Prepare();Feedback("GO!");}
+ void Update(){if(overlay!=null && owner!=GameManager.AchievementUserId){Close();return;}float now=Time.realtimeSinceStartup;if(playing){if(popup==null)Tick(Mathf.Max(0,now-last));else if(practiceRun!=null)practiceRun.Tick(Mathf.Max(0,now-last));}last=now;if(message!=null && now>messageUntil)message.text="";}
  public void Tick(float elapsed){
-  if(!playing)return;if(!practice)remaining=Mathf.Max(0,remaining-elapsed);if(!practice&&remaining<=0){Finish();return;}
+  if(!playing)return;if(practiceRun!=null)practiceRun.Tick(elapsed);if(!practice)remaining=Mathf.Max(0,remaining-elapsed);if(!practice&&remaining<=0){Finish();return;}
   if(kind==2 && flashWatching){flashRemaining=Mathf.Max(0,flashRemaining-elapsed);if(flashRemaining<=0)HideFlashNumbers();}
   if(kind==1 && !transition)foreach(var arena in arenas)foreach(var ball in arena.Balls){
    bool armed=ball.State.Armed;int wall=ball.State.Step(Mathf.Min(elapsed,.06f));
@@ -54,15 +54,15 @@ public sealed class FocusGame : MonoBehaviour {
   }
   Hud();
  }
- void Hud(){if(clock==null)return;clock.text=practice?"∞":Mathf.CeilToInt(remaining).ToString();clock.color=!practice&&remaining<=10?Red:Teal;levelText.text=level.ToString();scoreText.text=score.ToString();roundText.text=(practice?"Practice · ":"")+"Level "+(playing?level:startLevel)+(kind==2?" · "+(flashPart+1)+"/3":"");}
+ void Hud(){if(clock==null)return;clock.text=practice?PracticeSession.Clock(this):Mathf.CeilToInt(remaining).ToString();clock.color=!practice&&remaining<=10?Red:Teal;levelText.text=level.ToString();scoreText.text=score.ToString();roundText.text=(practice?"Practice · ":"")+"Level "+(playing?level:startLevel)+(kind==2?" · "+(flashPart+1)+"/3":"");}
  void Feedback(string value){if(message!=null)message.text=value;messageUntil=Time.realtimeSinceStartup+1.2f;}
- void Award(bool right){if(right){score++;correct++;streak=0;Feedback("+1");}else{errors++;streak++;if(kind==1)score--;Feedback(kind==1?"−1":"Try again");}Hud();}
+ void Award(bool right){if(right){if(practiceRun!=null)practiceRun.Progress(level);score++;correct++;streak=0;Feedback("+1");}else{errors++;streak++;if(kind==1)score--;Feedback(kind==1?"−1":"Try again");}Hud();}
  void Prepare(){
   transition=false;flashWatching=false;arenas.Clear();for(int i=body.transform.childCount-1;i>=0;i--)Remove(body.transform.GetChild(i).gameObject);Hud();
   if(kind==0){MathBoard();return;}if(kind==1){BoxesBoard();return;}NumbersBoard();
  }
  void NextLevel(){if(transition)return;transition=true;Feedback(kind==2 && flashPart<2?"Round complete!":"Level complete!");StartCoroutine(Advance());}
- IEnumerator Advance(){yield return new WaitForSecondsRealtime(.4f);if(!playing)yield break;if(kind==2 && flashPart<2){flashPart++;Prepare();yield break;}flashPart=0;int before=level;level=Mathf.Min(level+1,FocusRules.Maximum(kind));Earn(FocusAchievements.Reached(kind,startLevel,before,level));Prepare();}
+ IEnumerator Advance(){yield return new WaitForSecondsRealtime(.4f);if(!playing)yield break;if(kind==2 && flashPart<2){flashPart++;Prepare();yield break;}flashPart=0;int before=level;level=Mathf.Min(level+1,FocusRules.Maximum(kind));if(practiceRun!=null)practiceRun.Progress(level);Earn(FocusAchievements.Reached(kind,startLevel,before,level));Prepare();}
  void MathBoard(){
   questionIndex=0;questionText=Label(body.transform,"",new Vector2(.03f,.76f),new Vector2(.97f,.96f),68,ChainGame.Ink);answerText=Label(body.transform,"?",new Vector2(.12f,.62f),new Vector2(.88f,.78f),52,Teal);
   var keys=new[]{"1","2","3","4","5","6","7","8","9","Clear","0","OK"};for(int i=0;i<keys.Length;i++){string key=keys[i];int col=i%3,row=i/3;var button=Button(body.transform,key,new Vector2(.04f+col*.31f,.04f+(3-row)*.14f),new Vector2(.32f+col*.31f,.165f+(3-row)*.14f),()=>MathKey(key));if(key!="OK")button.image.color=new Color32(237,245,245,255);}NewQuestion();
@@ -150,11 +150,11 @@ public sealed class FocusGame : MonoBehaviour {
   var prompt=content.GetComponentsInChildren<Text>(true).Where(t=>!t.transform.IsChildOf(content.GetChild(2)) && !t.transform.IsChildOf(content.GetChild(3))).ToArray();if(prompt.Length>0)prompt[0].text=prompt.Length==1?first+"\n"+second:first;if(prompt.Length>1)prompt[1].text=second;
   var a=content.GetChild(2).GetComponent<Button>();var b=content.GetChild(3).GetComponent<Button>();a.onClick=new Button.ButtonClickedEvent();b.onClick=new Button.ButtonClickedEvent();a.GetComponentInChildren<Text>().text=left;b.GetComponentInChildren<Text>().text=right;a.onClick.AddListener(no);b.onClick.AddListener(yes);
  }
- void Earn(string key){if(!string.IsNullOrEmpty(key) && GameManager.AchievementUserId>0 && GameManager.UnlockAchievement(key))earned.Add(key);}
- void SaveRun(bool complete){if(string.IsNullOrEmpty(runId))return;FocusStats.End(runOwner,runId,level,score,correct,errors,90-remaining,complete);runId=null;}
- void Finish(){SaveRun(true);playing=false;transition=false;StopAllCoroutines();Hud();Dialog(practice?"Practice complete":"BRAINS OUT!","Score "+score+"\n"+correct+" correct · "+errors+" errors","Home","Replay",Close,Begin);if(Application.isPlaying){foreach(string key in earned)BadgePopup.ShowFor(this,key);earned.Clear();if(!string.IsNullOrEmpty(PlayerPrefs.GetString("token")))ProgressSync.Instance.GetApi<Assets.Script.Controllers.AchievementsAPIController>().FlushPending();}}
+ void Earn(string key){if(!practice&&!string.IsNullOrEmpty(key) && GameManager.AchievementUserId>0 && GameManager.UnlockAchievement(key))earned.Add(key);}
+ void SaveRun(bool complete){if(practiceRun!=null)practiceRun.Stop();if(string.IsNullOrEmpty(runId))return;FocusStats.End(runOwner,runId,level,score,correct,errors,90-remaining,complete);runId=null;}
+ void Finish(){SaveRun(true);playing=false;transition=false;StopAllCoroutines();Hud();Dialog(practice?"Practice complete":"BRAINS OUT!","Score "+score+"\n"+correct+" correct · "+errors+" errors","Home","Replay",Close,Begin);if(Application.isPlaying&&!practice){foreach(string key in earned)BadgePopup.ShowFor(this,key);earned.Clear();if(!string.IsNullOrEmpty(PlayerPrefs.GetString("token")))ProgressSync.Instance.GetApi<Assets.Script.Controllers.AchievementsAPIController>().FlushPending();}}
  void Quit(){if(!playing){Close();return;}if(popup!=null)return;Dialog("Are you sure you","want to quit?","No","Yes",()=>{Remove(popup);popup=null;last=Time.realtimeSinceStartup;},Close);}
- public void Close(){SaveRun(false);bool wasOpen=overlay!=null;playing=false;StopAllCoroutines();Remove(overlay);overlay=body=popup=null;arenas.Clear();if(wasOpen)Application.targetFrameRate=priorFrameRate;}
+ public void Close(){SaveRun(false);PracticeSession.Release(this);practiceRun=null;bool wasOpen=overlay!=null;playing=false;StopAllCoroutines();Remove(overlay);overlay=body=popup=null;arenas.Clear();if(wasOpen)Application.targetFrameRate=priorFrameRate;}
  static void Remove(GameObject value){if(value!=null){value.SetActive(false);CardFaces.DestroyGenerated(value);}}
  void OnDisable(){Close();}
 }

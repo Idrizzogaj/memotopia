@@ -15,7 +15,7 @@ public class MemotopiaBuild
         PlayerSettings.iOS.appleDeveloperTeamID = "E838WX6KF8";
         PlayerSettings.iOS.targetOSVersionString = "15.0";
         PlayerSettings.bundleVersion = "2.1.0";
-        PlayerSettings.iOS.buildNumber = "2026102503";
+        PlayerSettings.iOS.buildNumber = "2026102504";
 
         ReactionAssetImporter.Repair();
         SaysNativeValidation.Validate();
