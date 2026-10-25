@@ -6,6 +6,7 @@ using UnityEngine;
 // User's handwritten Focus specification; shared by native UI and editor checks.
 public static class FocusRules {
  public static readonly string[] Names={"Pairs","Boxes","Flash","Chain"};
+ public static float FlashSeconds(int count){return count<=3?1:count<7?2:3;}
  public static int Maximum(int kind){return new[]{8,9,15,13}[kind];}
  public static int NumberCount(int kind,int level){
   if(kind==2)return level<=8?new[]{3,3,5,5,7,7,9,9}[level-1]:new[]{3,5,7,9,12,15,15}[Mathf.Min(level-9,6)];

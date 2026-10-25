@@ -281,6 +281,13 @@ public static class CardFaces
         MajorSystemImages.SetVisibleSize(result,Vector2.one);cache[key]=result;return result;
     }
 
+    // Says has exactly ten fixed keys, independent of the two/three-digit setting.
+    public static Sprite SingleDigit(int digit) {
+        if(digit<0 || digit>9)throw new ArgumentOutOfRangeException("digit");
+        string key="single-digit-"+digit;Sprite sprite;
+        if(!cache.TryGetValue(key,out sprite)){sprite=BuildCard(digit.ToString(),null,PurpleInk,GreyInk,true);cache[key]=sprite;}
+        return sprite;
+    }
     private static Sprite NumberCard(int id)
     {
         string number = NumberText(id);

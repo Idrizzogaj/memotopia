@@ -12,13 +12,17 @@ public static class TrainingHubLayout
         foreach(var label in new[]{"MEMORY section","Memory section","FOCUS section","Focus PAIRS","Focus BOXES","Focus FLASH","Focus CHAIN"}) {
             var prior=screen.Find(label);if(prior!=null)CardFaces.DestroyGenerated(prior.gameObject);
         }
+        var says=screen.Find("Says preview") as RectTransform;
+        if(says==null){var go=ChainGame.Panel(screen,"Says preview",Vector2.zero,Vector2.one,MemoryTone);says=(RectTransform)go.transform;go.AddComponent<Button>().onClick.AddListener(()=>SaysGame.Open(screen));}
+        if(!memory.Contains(says))memory.Add(says);
         float width=screen.rect.width*.90f, gap=width*.04f;
-        float side=Mathf.Min((width-gap)/2f,(top-screen.rect.yMin-390f-3*gap)/4f);
+        int memoryRows=Mathf.CeilToInt(memory.Count/2f);
+        float side=Mathf.Min((width-gap)/2f,(top-screen.rect.yMin-390f-(memoryRows+1)*gap)/(memoryRows+2));
         float start=top-238f;
         Header(screen,"Memory",top,width);
         for(int i=0;i<memory.Count;i++) Tile(memory[i],i,false,screen,side,gap,start);
         if(!ShowFocus)return;
-        float focusTop=start-2*(side+gap)-12f;
+        float focusTop=start-memoryRows*(side+gap)-12f;
         Header(screen,"FOCUS",focusTop,width);
         for(int i=0;i<4;i++) {
             var go=ChainGame.Panel(screen,"Focus "+Names[i],Vector2.zero,Vector2.one,Color.white);
@@ -26,8 +30,8 @@ public static class TrainingHubLayout
             Tile((RectTransform)go.transform,i,true,screen,side,gap,focusTop-66f);
         }
     }
-    private static readonly string[] Names={"PAIRS","BOXES","FLASH","CHAIN"};
-    private static readonly Color[] GameTones={new Color32(36,189,224,255),new Color32(234,24,100,255),new Color32(254,191,75,255),new Color32(123,31,255,255)};
+    private static readonly string[] Names={"PAIRS","BOXES","FLASH","CHAIN","SAYS"};
+    private static readonly Color[] GameTones={new Color32(36,189,224,255),new Color32(234,24,100,255),new Color32(254,191,75,255),new Color32(123,31,255,255),new Color32(106,28,225,255)};
     public static readonly Color MemoryTone=new Color32(106,28,225,255), FocusTone=new Color32(0,112,122,255);
     private static void Header(RectTransform screen,string caption,float top,float width) {
         var go=ChainGame.Panel(screen,caption+" section",Vector2.zero,Vector2.one,caption=="FOCUS"?FocusTone:MemoryTone);
@@ -43,7 +47,7 @@ public static class TrainingHubLayout
     }
     private static void DrawTileContents(RectTransform tile,int index,bool focus){
         var art=new GameObject("Flat game symbol",typeof(RectTransform));art.transform.SetParent(tile,false);var ar=(RectTransform)art.transform;ar.anchorMin=new Vector2(.22f,.35f);ar.anchorMax=new Vector2(.78f,.87f);ar.offsetMin=ar.offsetMax=Vector2.zero;
-        Canvas.ForceUpdateCanvases();TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white,false);
+        Canvas.ForceUpdateCanvases();if(index==4){var image=ChainGame.Panel(art.transform,"Existing elephant",Vector2.zero,Vector2.one,Color.white).GetComponent<Image>();image.sprite=Resources.Load<Sprite>("GamesResources/Loading/Untitled-3-01");image.preserveAspect=true;image.raycastTarget=false;}else TrainingGameSymbol.Draw((RectTransform)art.transform,index,Color.white,false);
         var label=ChainGame.Label(tile,Names[index],new Vector2(.05f,.10f),new Vector2(.95f,.32f),46,Color.white);label.fontStyle=FontStyle.Bold;
         if(focus)ChainGame.Label(tile,"90 s",new Vector2(.04f,.02f),new Vector2(.96f,.12f),20,Color.white);
     }

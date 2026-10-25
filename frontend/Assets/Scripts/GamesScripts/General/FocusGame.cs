@@ -10,7 +10,7 @@ public sealed class FocusGame : MonoBehaviour {
  public static readonly Color Teal=new Color32(0,112,122,255),Green=new Color32(22,131,84,255),Red=new Color32(206,56,88,255);
  readonly System.Random random=new System.Random();
  GameObject overlay,body,popup;Text clock,levelText,scoreText,message,rule,answerText,questionText,roundText;Button start,minus,plus;
- int kind,level,startLevel=1,score,correct,errors,streak,cursor,questionIndex,priorFrameRate;float remaining=90,last,messageUntil;bool playing,transition;string answer="";
+ int kind,level,startLevel=1,score,correct,errors,streak,cursor,questionIndex,priorFrameRate;float remaining=90,last,messageUntil;bool playing,transition,flashWatching;float flashRemaining;string answer="";
  FocusRules.Sum sum;int[] sequence;readonly List<Arena> arenas=new List<Arena>();
  sealed class NativeBall {public FocusRules.Ball State;public Image Image;}
  sealed class Arena {public int Target;public List<NativeBall> Balls=new List<NativeBall>();public Image[] Walls=new Image[4];public Text Count;}
@@ -44,6 +44,7 @@ public sealed class FocusGame : MonoBehaviour {
  void Update(){float now=Time.realtimeSinceStartup;if(playing && popup==null)Tick(Mathf.Max(0,now-last));last=now;if(message!=null && now>messageUntil)message.text="";}
  public void Tick(float elapsed){
   if(!playing)return;remaining=Mathf.Max(0,remaining-elapsed);if(remaining<=0){Finish();return;}
+  if(kind==2 && flashWatching){flashRemaining=Mathf.Max(0,flashRemaining-elapsed);if(flashRemaining<=0)HideFlashNumbers();}
   if(kind==1 && !transition)foreach(var arena in arenas)foreach(var ball in arena.Balls){
    bool armed=ball.State.Armed;int wall=ball.State.Step(Mathf.Min(elapsed,.06f));
    if(wall>=0){if(!armed && ball.State.Hits<arena.Target){Award(false);Flash(arena.Walls[wall],Red);}ball.State.Armed=false;}
@@ -55,7 +56,7 @@ public sealed class FocusGame : MonoBehaviour {
  void Feedback(string value){if(message!=null)message.text=value;messageUntil=Time.realtimeSinceStartup+1.2f;}
  void Award(bool right){if(right){score++;correct++;streak=0;Feedback("+1");}else{errors++;streak++;if(kind==1)score--;Feedback(kind==1?"−1":"Try again");}Hud();}
  void Prepare(){
-  transition=false;arenas.Clear();for(int i=body.transform.childCount-1;i>=0;i--)Remove(body.transform.GetChild(i).gameObject);Hud();
+  transition=false;flashWatching=false;arenas.Clear();for(int i=body.transform.childCount-1;i>=0;i--)Remove(body.transform.GetChild(i).gameObject);Hud();
   if(kind==0){MathBoard();return;}if(kind==1){BoxesBoard();return;}NumbersBoard();
  }
  void NextLevel(){if(transition)return;transition=true;Feedback("Level complete!");StartCoroutine(Advance());}
@@ -79,14 +80,26 @@ public sealed class FocusGame : MonoBehaviour {
  }}
  Button Token(int key,Vector2 centre,float diameter,bool circle){
   Color colour=key>1000?Red:Green;var go=ChainGame.Panel(body.transform,"Token "+key,centre,centre,colour);var rect=(RectTransform)go.transform;rect.sizeDelta=new Vector2(diameter,diameter);var image=go.GetComponent<Image>();image.sprite=circle?Circle:ContentSelectorBar.Rounded();image.type=circle?Image.Type.Simple:Image.Type.Sliced;image.pixelsPerUnitMultiplier=4;
-  var inner=ChainGame.Panel(go.transform,"White centre",Vector2.zero,Vector2.one,Color.white).GetComponent<Image>();inner.rectTransform.offsetMin=new Vector2(3,3);inner.rectTransform.offsetMax=new Vector2(-3,-3);inner.sprite=image.sprite;inner.type=image.type;inner.pixelsPerUnitMultiplier=4;inner.raycastTarget=false;
+  var inner=ChainGame.Panel(go.transform,"White centre",Vector2.zero,Vector2.one,Color.white).GetComponent<Image>();inner.rectTransform.offsetMin=new Vector2(6,6);inner.rectTransform.offsetMax=new Vector2(-6,-6);inner.sprite=image.sprite;inner.type=image.type;inner.pixelsPerUnitMultiplier=4;inner.raycastTarget=false;
   var text=Label(go.transform,(key%1000).ToString(),Vector2.zero,Vector2.one,Mathf.RoundToInt(diameter*.42f),colour);var button=go.AddComponent<Button>();button.transition=Selectable.Transition.None;button.onClick.AddListener(()=>Choose(key,button,text));return button;
  }
  void NumbersBoard(){
   sequence=FocusRules.Sequence(kind,level);cursor=0;int mode=FocusRules.NumberMode(kind,level),n=FocusRules.NumberCount(kind,level);rule.text=mode==0?"Green ↑":mode==1?"Red ↓":mode==2?"Green ↑ first. Then red ↓":"Alternate: Green ↑, Red ↓";Canvas.ForceUpdateCanvases();var size=((RectTransform)body.transform).rect.size;
   if(kind==2){
-   var keys=sequence.OrderBy(_=>random.Next()).ToArray();var places=Enumerable.Range(0,keys.Length).OrderBy(_=>random.Next()).ToArray();int columns=keys.Length>18?5:keys.Length>9?4:3,rows=Mathf.CeilToInt(keys.Length/(float)columns);float diameter=Mathf.Min(100,size.x*.78f/columns,size.y*.82f/rows);
-   for(int i=0;i<keys.Length;i++){int spot=places[i];float x=.1f+(spot%columns)*.8f/(columns-1),y=rows==1?.5f:.12f+(spot/columns)*.76f/(rows-1);Token(keys[i],new Vector2(x,y),diameter,keys[i]<1000 || mode<2);}
+   var keys=sequence.OrderBy(_=>random.Next()).ToArray();var positions=new List<Vector3>();
+   float baseSize=Mathf.Min(105,Mathf.Sqrt(size.x*size.y/keys.Length)*.52f);
+   foreach(int key in keys){
+    float diameter=baseSize*(.76f+(float)random.NextDouble()*.45f);Vector2 point=Vector2.zero;bool placed=false;
+    for(int attempt=0;attempt<2500;attempt++){
+     point=new Vector2(diameter*.6f+(float)random.NextDouble()*(size.x-diameter*1.2f),diameter*.6f+(float)random.NextDouble()*(size.y-diameter*1.2f));
+     if(positions.All(p=>Vector2.Distance(point,new Vector2(p.x,p.y))>(diameter+p.z)*.5f+10)){placed=true;break;}
+    }
+    if(!placed){diameter*=.75f;for(int attempt=0;attempt<2500;attempt++){point=new Vector2(diameter*.6f+(float)random.NextDouble()*(size.x-diameter*1.2f),diameter*.6f+(float)random.NextDouble()*(size.y-diameter*1.2f));if(positions.All(p=>Vector2.Distance(point,new Vector2(p.x,p.y))>(diameter+p.z)*.5f+6)){placed=true;break;}}}
+    if(!placed)throw new InvalidOperationException("Could not place non-overlapping Focus circles");
+    positions.Add(new Vector3(point.x,point.y,diameter));Token(key,new Vector2(point.x/size.x,point.y/size.y),diameter,true);
+   }
+   flashWatching=true;flashRemaining=FocusRules.FlashSeconds(keys.Length);rule.text="Memorise · "+flashRemaining+"s";
+
   }else{
    var colours=mode==0?new[]{false}:mode==1?new[]{true}:new[]{false,true};int columns=n==15?5:6,rows=Mathf.CeilToInt(n/(float)columns);float band=colours.Length==1?.7f:.38f,diameter=Mathf.Min(size.x*.84f/columns,size.y*band/rows)*.86f;
    for(int group=0;group<colours.Length;group++){
@@ -95,7 +108,8 @@ public sealed class FocusGame : MonoBehaviour {
    }
   }
  }
- public void Choose(int key,Button button,Text text){if(!playing || transition || !button.interactable)return;
+ void HideFlashNumbers(){flashWatching=false;foreach(var button in body.GetComponentsInChildren<Button>())if(button.name.StartsWith("Token ")){var text=button.GetComponentInChildren<Text>();if(text!=null)text.text="";}rule.text="Recall · "+(FocusRules.NumberMode(kind,level)==0?"Green ↑":FocusRules.NumberMode(kind,level)==1?"Red ↓":"Alternate Green ↑, Red ↓");}
+ public void Choose(int key,Button button,Text text){if(!playing || transition || flashWatching || !button.interactable)return;
   if(sequence[cursor]==key){text.text="";button.interactable=false;var color=button.image.color;color.a=.25f;button.image.color=color;cursor++;Award(true);if(cursor==sequence.Length)NextLevel();}
   else{Award(false);if(kind==2 && streak>=5){level=Mathf.Max(1,level-1);streak=0;Prepare();Feedback("Five errors · Level "+level);}}
  }
@@ -106,10 +120,10 @@ public sealed class FocusGame : MonoBehaviour {
    var arena=new Arena{Target=spec[2]};arenas.Add(arena);Vector2 centre=spec[0]==1?new Vector2(.5f,.52f):a==2?new Vector2(.5f,.26f):new Vector2(a==0?.26f:.74f,spec[0]==3?.74f:.56f);
    var box=ChainGame.Panel(body.transform,"Box "+(a+1),centre,centre,new Color32(249,252,252,255));((RectTransform)box.transform).sizeDelta=new Vector2(side,side);
    for(int s=0;s<4;s++){
-    int wall=s;Vector2 min=s==0?new Vector2(0,.98f):s==1?new Vector2(.98f,0):Vector2.zero,max=s==0?Vector2.one:s==1?Vector2.one:s==2?new Vector2(1,.02f):new Vector2(.02f,1);
+    int wall=s;Vector2 min=s==0?new Vector2(0,.95f):s==1?new Vector2(.95f,0):Vector2.zero,max=s==0?Vector2.one:s==1?Vector2.one:s==2?new Vector2(1,.05f):new Vector2(.05f,1);
     var visible=ChainGame.Panel(box.transform,"Wall "+s,min,max,new Color32(192,215,217,255)).GetComponent<Image>();visible.raycastTarget=false;arena.Walls[s]=visible;
-    float hit=Mathf.Clamp(84f/side,.12f,.38f);min=s==0?new Vector2(hit,1-hit):s==1?new Vector2(1-hit,hit):s==2?new Vector2(hit,0):new Vector2(0,hit);max=s==0?new Vector2(1-hit,1):s==1?new Vector2(1,1-hit):s==2?new Vector2(1-hit,hit):new Vector2(hit,1-hit);
-    var target=ChainGame.Panel(box.transform,"Tap wall "+s,min,max,Color.clear);var button=target.AddComponent<Button>();button.transition=Selectable.Transition.None;button.onClick.AddListener(()=>Wall(arena,wall));
+    float hit=Mathf.Clamp(120f/side,.22f,.45f);min=s==0?new Vector2(0,1-hit):s==1?new Vector2(1-hit,0):Vector2.zero;max=s==0||s==1?Vector2.one:s==2?new Vector2(1,hit):new Vector2(hit,1);
+    var target=ChainGame.Panel(box.transform,"Tap wall "+s,min,max,Color.clear);var hitTarget=target.AddComponent<FocusWallTarget>();hitTarget.Tap=position=>{var r=(RectTransform)box.transform;Vector2 local;var canvas=box.GetComponentInParent<Canvas>();RectTransformUtility.ScreenPointToLocalPointInRectangle(r,position,canvas.renderMode==RenderMode.ScreenSpaceOverlay?null:canvas.worldCamera,out local);var p=local-r.rect.min;float[] distances={r.rect.height-p.y,r.rect.width-p.x,p.y,p.x};int nearest=Array.IndexOf(distances,distances.Min());Wall(arena,nearest);};
    }
    for(int b=0;b<spec[1];b++){
     float angle=(25+(float)random.NextDouble()*40)*Mathf.Deg2Rad;var state=new FocusRules.Ball{Position=new Vector2(.22f+b*.21f,.35f+b*.14f),Velocity=new Vector2(Mathf.Cos(angle)*(b%2==0?1:-1),Mathf.Sin(angle)*(b%3==0?1:-1))*.25f};
