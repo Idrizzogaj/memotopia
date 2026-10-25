@@ -29,7 +29,7 @@ public sealed class SaysGame : MonoBehaviour {
  }
  public void StartLevel(int value){if(!challenge && (value==21?!Complete(20):!Unlocked(value)))return;level=value;position=0;hearts=value==21?1:5;watching=input=false;elapsed=0;clock=180;ClearBoard();if(levels!=null){CardFaces.DestroyGenerated(levels);levels=null;}CardFaces.BeginSession();
   int count=challenge?ChallengeCount(round):Count(value);sequence=new int[count];for(int n=0;n<count;n++){int key;do{key=UnityEngine.Random.Range(0,10);}while(n>0 && key==sequence[n-1]);sequence[n]=key;}
-  board=new ChainOriginalPresentation(overlay.transform,false,Quit,()=>{},theme);board.Hearts(challenge?0:hearts);board.ShowRecallClock(challenge?Mathf.CeilToInt(deadline-Time.realtimeSinceStartup):180);
+  board=new ChainOriginalPresentation(overlay.transform,false,Quit,()=>{},theme);board.Hearts(challenge?0:hearts);board.ShowRecallClock(challenge?Mathf.CeilToInt(deadline-Time.realtimeSinceStartup):180,!challenge&&PracticeMode.Untimed);
   int[] pool=Enumerable.Range(1,CardFaces.ContentCount).Where(id=>!faceIds.Contains(id)).ToArray();for(int n=pool.Length-1;n>0;n--){int other=UnityEngine.Random.Range(0,n+1),picked=pool[n];pool[n]=pool[other];pool[other]=picked;}faceIds=pool.Take(10).ToArray();
   var gridLayout=board.Grid.GetComponent<GridLayoutGroup>();if(gridLayout!=null)gridLayout.enabled=false;board.Grid.SetParent(board.Root.transform,false);board.Grid.anchorMin=new Vector2(.08f,.16f);board.Grid.anchorMax=new Vector2(.92f,.77f);board.Grid.offsetMin=board.Grid.offsetMax=Vector2.zero;Canvas.ForceUpdateCanvases();
   float side=Mathf.Min((board.Grid.rect.width-32)/3,(board.Grid.rect.height-48)/4);
@@ -50,7 +50,7 @@ public sealed class SaysGame : MonoBehaviour {
   if(wrongRemaining>0){wrongRemaining=Mathf.Max(0,wrongRemaining-dt);if(wrongRemaining<=0){wrongKey=-1;if(pendingFailure){pendingFailure=false;Finish(false);return;}}}
   float strength=0;
   if(watching){elapsed+=dt;float phase=elapsed-2;int show=phase>=0 && phase<sequence.Length*2.25f && phase%2.25f<2?sequence[Mathf.Min(sequence.Length-1,(int)(phase/2.25f))]:-1;Highlight(show);if(show>=0){float t=phase%2.25f;strength=Mathf.SmoothStep(0,1,Mathf.Clamp01(Mathf.Min(t/.18f,(2-t)/.18f)));}if(phase>=sequence.Length*2.25f+.7f){watching=false;input=true;Highlight(-1);cue.text="Recall";}}
-  else if(input&&!challenge){clock=Mathf.Max(0,clock-dt);board.ShowRecallClock(Mathf.CeilToInt(clock));if(clock<=0){Finish(false);return;}}
+  else if(input&&!challenge&&PracticeMode.Untimed){board.ShowRecallClock(0,true);}else if(input&&!challenge){clock=Mathf.Max(0,clock-dt);board.ShowRecallClock(Mathf.CeilToInt(clock));if(clock<=0){Finish(false);return;}}
   AnimateKeys(strength);
  }
  void Highlight(int value){highlighted=value;}
