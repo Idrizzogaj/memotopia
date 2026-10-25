@@ -23,7 +23,7 @@ public sealed class SprintRuntime : MonoBehaviour {
  private GameObject stageRoot,stageTemplate,templateHolder;private ChainGame chainGame;
  private int owner;private bool transition,ending,introStarting,paced,cancelling,closed;private SprintAPI api;private GameObject quitDialog;private Button retry;
  private float progressAt;private bool progressBusy;private int liveUnits;
- private Button waitingBack;private Canvas hud;private Text timer,cue,status;private Image lead;private GameObject introCover;private float cueUntil;
+ private Button waitingBack;private Canvas hud;private Text timer,cue,status;private Image lead;private RectTransform paceTrack,paceCentre;private bool verticalPace;private GameObject introCover;private float cueUntil;
  private readonly HashSet<string> solved=new HashSet<string>();
  private SprintTrace[] opponent=new SprintTrace[0];private Action<SprintBattleView> finished;
 #if UNITY_EDITOR
@@ -53,8 +53,10 @@ public sealed class SprintRuntime : MonoBehaviour {
   status=ChainGame.Label(root.transform,"",new Vector2(.1f,.86f),new Vector2(.9f,.90f),22,ChainGame.Ink);
   cue=ChainGame.Label(root.transform,"",new Vector2(.05f,.40f),new Vector2(.95f,.63f),72,ChainGame.Ink);cue.fontStyle=FontStyle.Bold;
   var track=ChainGame.Panel(root.transform,"Opponent pace",new Vector2(.18f,.90f),new Vector2(.82f,.908f),new Color(.8f,.8f,.8f));
+  paceTrack=(RectTransform)track.transform;
   lead=ChainGame.Panel(track.transform,"Lead",new Vector2(.5f,0),new Vector2(.5f,1),Color.green).GetComponent<Image>();lead.raycastTarget=false;
   var centre=ChainGame.Panel(track.transform,"Centre",new Vector2(.497f,-.4f),new Vector2(.503f,1.4f),ChainGame.Ink);centre.GetComponent<Image>().raycastTarget=false;track.GetComponent<Image>().raycastTarget=false;
+  paceCentre=(RectTransform)centre.transform;
   introCover=ChainGame.Panel(root.transform,"Original round intro cover",Vector2.zero,Vector2.one,Color.white);cue.transform.SetAsLastSibling();
   retry=SprintUi.Button(root.transform,"Retry",new Vector2(.25f,.20f),new Vector2(.75f,.29f),()=>{retry.gameObject.SetActive(false);if(cancelling)Cancel();else if(State==null)StartCoroutine(Intro());else StartCoroutine(Submit());});retry.gameObject.SetActive(false);
   waitingBack=SprintUi.Back(root.transform,Quit);
@@ -155,9 +157,16 @@ public sealed class SprintRuntime : MonoBehaviour {
    },error=>{if(this==null || closed)return;progressBusy=false;SetConnecting(true);},3);
   }
   int gap=own-(Battle.live?liveUnits:ChallengeSprintRules.OpponentAt(opponent,90000-remaining));
-  if(paced || Battle.live){float fraction=Mathf.Clamp(gap/20f,-1,1);lead.rectTransform.anchorMin=new Vector2(.5f+Mathf.Min(0,fraction)*.5f,0);lead.rectTransform.anchorMax=new Vector2(.5f+Mathf.Max(0,fraction)*.5f,1);lead.color=Color.Lerp(new Color(.65f,.65f,.65f),gap>=0?new Color(.05f,.7f,.25f):new Color(.9f,.1f,.15f),Mathf.Abs(fraction));status.text=gap==0?"Level":gap>0?"Ahead +"+gap:"Behind "+gap;}
+  if(paced || Battle.live){float fraction=Mathf.Clamp(gap/20f,-1,1);lead.rectTransform.anchorMin=verticalPace?new Vector2(0,.5f+Mathf.Min(0,fraction)*.5f):new Vector2(.5f+Mathf.Min(0,fraction)*.5f,0);lead.rectTransform.anchorMax=verticalPace?new Vector2(1,.5f+Mathf.Max(0,fraction)*.5f):new Vector2(.5f+Mathf.Max(0,fraction)*.5f,1);lead.color=Color.Lerp(new Color(.65f,.65f,.65f),gap>=0?new Color(.05f,.7f,.25f):new Color(.9f,.1f,.15f),Mathf.Abs(fraction));status.text=gap==0?"Level":gap>0?"Ahead +"+gap:"Behind "+gap;}
   else status.text="Set the pace!";
   if(State.Finished){if(connecting)Cancel(true);else{ending=true;StartCoroutine(Submit());}}
+ }
+ private void LateUpdate(){
+  if(hud==null || paceTrack==null || status==null)return;var space=(RectTransform)hud.transform;bool vertical=space.rect.height<space.rect.width*1.6f;
+  if(vertical!=verticalPace){var a=lead.rectTransform.anchorMin;var b=lead.rectTransform.anchorMax;lead.rectTransform.anchorMin=new Vector2(a.y,a.x);lead.rectTransform.anchorMax=new Vector2(b.y,b.x);verticalPace=vertical;}
+  var label=status.rectTransform;
+  if(vertical){paceTrack.anchorMin=new Vector2(.98f,.32f);paceTrack.anchorMax=new Vector2(.99f,.78f);paceCentre.anchorMin=new Vector2(-.4f,.497f);paceCentre.anchorMax=new Vector2(1.4f,.503f);label.anchorMin=label.anchorMax=new Vector2(.95f,.55f);label.sizeDelta=new Vector2(330,24);label.anchoredPosition=Vector2.zero;label.localRotation=Quaternion.Euler(0,0,90);status.fontSize=20;status.color=Game=="Flash"?ChainGame.Ink:Color.white;}
+  else{paceTrack.anchorMin=new Vector2(.18f,.90f);paceTrack.anchorMax=new Vector2(.82f,.908f);paceCentre.anchorMin=new Vector2(.497f,-.4f);paceCentre.anchorMax=new Vector2(.503f,1.4f);label.localRotation=Quaternion.identity;label.anchorMin=new Vector2(.1f,.86f);label.anchorMax=new Vector2(.9f,.90f);label.offsetMin=label.offsetMax=Vector2.zero;status.fontSize=22;status.color=ChainGame.Ink;}
  }
  private int lastRemaining=90000;
  private IEnumerator Submit(){

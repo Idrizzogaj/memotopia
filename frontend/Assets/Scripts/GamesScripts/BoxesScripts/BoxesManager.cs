@@ -95,6 +95,8 @@ public class BoxesManager : GamesScript, IGameable
         }
     }
 
+    public void FitAbove(GameObject lowerControl){BoxesBoardFit.Fit(panelLvl,lowerControl,topPanel);}
+
     public void InitializeGame()
     {
         InitializeGameScript();
