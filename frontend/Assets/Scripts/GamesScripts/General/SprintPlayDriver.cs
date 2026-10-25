@@ -53,6 +53,14 @@ public sealed class SprintPlayDriver : MonoBehaviour {
    now=0;battle=new SprintBattleView{id=1,version=1,ownerId=1999999963,recipientId=2,mode="single",tier=18,legs=new[]{new SprintLegView{game=game,seed=12345}}};
    SprintRuntime.Begin(battle,null);yield return Wait(()=>SprintRuntime.Current!=null && SprintRuntime.Current.Ready,game+" intro");
    Check(SprintRuntime.Current.ClockText=="90","Intro must be outside play time");
+   yield return null;yield return null;
+   var reactions=SprintRuntime.Current.GetComponentInChildren<SprintReactions>();var reactionBar=(RectTransform)reactions.transform.Find("Six reactions");
+   Check(reactionBar.gameObject.activeSelf && reactions.GetComponentsInChildren<Image>().Count(i=>i.name.StartsWith("Emoji ") && i.gameObject.activeInHierarchy)==6,"Six persistent reaction icons during "+game);
+   if(game!="Flash"){
+    var nextButton=FindObjectsOfType<Button>().Where(b=>!b.transform.IsChildOf(reactions.transform) && (b.name.ToLowerInvariant().Contains("next")||b.name.ToLowerInvariant().Contains("recall"))).OrderBy(b=>b.transform.position.y).FirstOrDefault();
+    Check(nextButton!=null,"Original study control for reaction placement");var corners=new Vector3[4];((RectTransform)nextButton.transform).GetWorldCorners(corners);var canvas=nextButton.GetComponentInParent<Canvas>().rootCanvas;float nextTop=RectTransformUtility.WorldToScreenPoint(canvas.renderMode==RenderMode.ScreenSpaceOverlay?null:canvas.worldCamera,corners[1]).y;reactionBar.GetWorldCorners(corners);Check(corners[0].y>=nextTop,"Reaction bar above original Next/Recall in "+game);
+   }
+   Debug.Log("REACTION_BAR_LAYOUT_PASSED: "+game);
    if(game=="Pairs"){
     var manager=FindObjectOfType<PairsManager>();Check(manager!=null,"Original PairsManager");for(int i=0;i<3;i++)manager.NextPair();
     Check(manager.gameScreen.activeSelf,"Original Pairs recall");
