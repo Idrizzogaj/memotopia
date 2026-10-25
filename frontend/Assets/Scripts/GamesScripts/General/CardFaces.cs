@@ -282,6 +282,12 @@ public static class CardFaces
     }
 
     // Says has exactly ten fixed keys, independent of the two/three-digit setting.
+    public static Sprite SaysFace(int id,int digit) {
+        if(KindOf(id)==CardKind.Number)return SingleDigit(digit);
+        // Image selection in Says means clean motifs; only explicit Help adds a code.
+        if(KindOf(id)==CardKind.Image && !deck)return help?HelpImage(id):MajorSystemImages.Load(id);
+        return SmallFace(id);
+    }
     public static Sprite SingleDigit(int digit) {
         if(digit<0 || digit>9)throw new ArgumentOutOfRangeException("digit");
         string key="single-digit-"+digit;Sprite sprite;

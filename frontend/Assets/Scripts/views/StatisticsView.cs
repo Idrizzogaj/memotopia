@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Assets.Script.Constants;
 using Assets.Script.Controllers;
 using UnityEngine;
@@ -148,6 +149,23 @@ public class StatisticsView : MonoBehaviour
         string[] captions={"Games","Matches","Single","Losses","Draw"};
         for(int i=0;i<captions.Length;i++)fields.Find(captions[i]+"/Value").GetComponent<Text>().text=values[i];
     }
+    public void ApplyFocusStatistics(){
+        if(!TrainingHubLayout.ShowFocus || challengeStatsPanel==null)return;
+        // The original Statistics screen was a fixed-height layout, not a scroll view.
+        // Keep its real header/back button fixed and move the original panels into a viewport.
+        var root=statisticsGameObject.transform;
+        if(root.Find("Statistics scroll")==null){
+            var original=root.Cast<Transform>().ToArray();
+            var oldLayout=root.GetComponent<VerticalLayoutGroup>();if(oldLayout!=null)oldLayout.enabled=false;
+            var header=(RectTransform)original[0];header.anchorMin=new Vector2(.03f,.89f);header.anchorMax=new Vector2(.97f,.985f);header.offsetMin=header.offsetMax=Vector2.zero;
+            var caption=ChainGame.Label(header,"Statistics",new Vector2(.18f,0),new Vector2(.90f,1),40,ChainGame.Ink);caption.fontStyle=FontStyle.Bold;
+            var scroll=SprintUi.Scroll(root,"Statistics scroll",new Vector2(.02f,.025f),new Vector2(.98f,.875f));var layout=scroll.content.GetComponent<VerticalLayoutGroup>();layout.spacing=24;layout.padding=new RectOffset(16,16,16,30);
+            foreach(var panel in original.Skip(1))panel.SetParent(scroll.content,false);
+            scroll.verticalNormalizedPosition=1;
+        }
+        FocusStatisticsPanel.Apply(challengeStatsPanel.transform);
+    }
+
     private void RefreshChallengeCounters()
     {
         int request=++challengeRequest, owner=GameManager.AchievementUserId;

@@ -164,6 +164,7 @@ public class MenuNavigation : MonoBehaviour
     {
         homeScreen.SetActive(false);
         statisticsScreen.SetActive(true);
+        statisticsView.ApplyFocusStatistics();
         statisticsView.CallLevelsAvg();
         statisticsView.TimePlayed();
     }

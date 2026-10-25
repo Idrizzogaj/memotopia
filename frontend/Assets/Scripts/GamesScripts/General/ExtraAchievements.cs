@@ -16,6 +16,15 @@ public static class ExtraAchievements
 
     public static readonly Def[] All =
     {
+        new Def("focus-first", "First time focus!", "Start your first Focus game."),
+        new Def("focus-pairs-first", "Beginner class", "Start Focus Pairs for the first time."),
+        new Def("focus-pairs-professor", "Professor", "Reach the highest Focus Pairs level in one run starting at level 1."),
+        new Def("focus-boxes-first", "First catch", "Start Focus Boxes for the first time."),
+        new Def("focus-boxes-max", "Ball breaker", "Reach the highest Focus Boxes level, or complete it."),
+        new Def("focus-flash-first", "Fast eyes", "Start Focus Flash for the first time."),
+        new Def("focus-flash-vision", "Vision", "Reach level 12 in Focus Flash, or complete it."),
+        new Def("focus-chain-first", "In line", "Start Focus Chain for the first time."),
+        new Def("focus-chain-max", "First in line", "Reach the highest Focus Chain level, or complete it."),
         new Def("chain-first", "First chain!", "Start your first Chain round."),
         new Def("athlete-one-heart-boxes", "Memory Athlete: Boxes", "Clear the extra Boxes level with one heart. 500 XP, once."),
         new Def("athlete-one-heart-flash", "Memory Athlete: Flash", "Clear the extra Flash level with one heart. 500 XP, once."),
