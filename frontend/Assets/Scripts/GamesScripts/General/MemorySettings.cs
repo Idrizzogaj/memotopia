@@ -31,6 +31,7 @@ public static class MemorySettings
 }
 
 public static class PracticeMode {
+    public static bool BlockAchievements {get{return PracticeSession.BlocksAchievements&&!SprintRuntime.Active&&!Assets.Script.Constants.ChallengeConstants.s_isChallenge;}}
     // Competitive entry points always override the saved training preference.
     public static bool Untimed {get{return MemorySettings.Practice&&!SprintRuntime.Active&&!Assets.Script.Constants.ChallengeConstants.s_isChallenge;}}
 }

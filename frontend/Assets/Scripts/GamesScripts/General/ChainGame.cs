@@ -139,11 +139,12 @@ public sealed class ChainGame : GamesScript
     private void Update() {
         if(overlay!=null && GameManager.AchievementUserId!=owner){Close();return;}
         if(overlay!=null && Input.GetKeyDown(KeyCode.Escape))Back();
+        if(PracticeMode.Untimed&&originalGame!=null)originalGame.ShowPracticeClock(PracticeSession.Clock(this));
         TickTrainingClock(Time.deltaTime);
     }
     private void TickTrainingClock(float elapsed){
         if(SprintRuntime.Active || !recall || state==null || state.Finished || originalGame==null || quitDialog!=null)return;
-        if(PracticeMode.Untimed){originalGame.ShowRecallClock(0,true);return;}
+        if(PracticeMode.Untimed){originalGame.ShowPracticeClock(PracticeSession.Clock(this));return;}
         recallSeconds=Mathf.Max(0,recallSeconds-elapsed);originalGame.ShowRecallClock(Mathf.CeilToInt(recallSeconds));
         if(recallSeconds<=0){state.Expire();EndRound();}
     }
@@ -161,6 +162,7 @@ public sealed class ChainGame : GamesScript
     }
     private void ClearOriginalGame(){if(originalGame!=null){originalGame.Destroy();originalGame=null;}if(quitDialog!=null){CardFaces.DestroyGenerated(quitDialog);quitDialog=null;}if(countdownPanel!=null){CardFaces.DestroyGenerated(countdownPanel);countdownPanel=null;}if(resultPanel!=null){CardFaces.DestroyGenerated(resultPanel);resultPanel=null;}}
     private void Close() {
+        PracticeSession.Release(this);
         ClearOriginalGame();
         if(exactTheme!=null){CardFaces.DestroyGenerated(exactTheme);exactTheme=null;}
         StopAllCoroutines();CardFaces.EndSession();state=null;
@@ -221,7 +223,7 @@ public sealed class ChainGame : GamesScript
         if(exactTheme!=null){CardFaces.DestroyGenerated(exactTheme);exactTheme=null;}
         if(owner!=GameManager.AchievementUserId){Close();return;}
         Assets.Script.Constants.ChallengeConstants.s_isChallenge=SprintRuntime.Active;
-        StopAllCoroutines();level=value;recall=false;studyIndex=0;
+        StopAllCoroutines();if(PracticeMode.Untimed)firstEarned=false;level=value;recall=false;studyIndex=0;
         CardFaces.BeginSession();
         int[] pool=Enumerable.Range(1,CardFaces.ContentCount).ToArray();Shuffle(pool);
         state=new ChainState(pool.Take(SprintRuntime.Active?SprintRuntime.Current.Size:ChainState.CountForLevel(level==MemoryAthlete.Level?20:level)).ToArray(),level==MemoryAthlete.Level?1:5);
@@ -239,6 +241,7 @@ public sealed class ChainGame : GamesScript
     }
     private bool firstEarned;
     private void ShowStudy() {
+        PracticeSession.Begin(this,"Memory.Chain",level);
         ClearBody();ClearOriginalGame();safe.gameObject.SetActive(false);
         if(exactTheme==null){exactTheme=new Material(Resources.Load<Shader>("MemotopiaTheme"));exactTheme.SetColor("_ThemeColor",Purple);}
         originalGame=new ChainOriginalPresentation(overlay,true,Back,NextCard,exactTheme);
@@ -277,7 +280,7 @@ public sealed class ChainGame : GamesScript
         if(quitDialog!=null || !recall || state==null || state.Finished)return;
         int oldHearts=state.Hearts;
         bool correct=state.Choose(id);
-        if(correct) {
+        if(correct) {var practice=PracticeSession.Get(this);if(practice!=null)practice.Progress(level);
             if(SprintRuntime.Active)SprintRuntime.Current.Solve(id.ToString());
             var tile=tiles.Find(t=>t.name=="Recall "+id);
             if(tile!=null){tile.interactable=false;var hidden=tile.gameObject.AddComponent<CanvasGroup>();hidden.alpha=0;hidden.blocksRaycasts=false;}
@@ -288,6 +291,7 @@ public sealed class ChainGame : GamesScript
     }
     private void UpdateProgress() {if(originalGame!=null)originalGame.Hearts(SprintRuntime.Active?0:state.Hearts);}
     private void EndRound() {
+        var practice=PracticeSession.Get(this);if(practice!=null)practice.Stop();
         if(SprintRuntime.Active)return;
         ClearOriginalGame();safe.gameObject.SetActive(true);
         recall=false;

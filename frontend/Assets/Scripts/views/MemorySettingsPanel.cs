@@ -66,7 +66,7 @@ public class MemorySettingsPanel : MonoBehaviour
         for (int i=content.childCount-1;i>=0;i--) { var old=content.GetChild(i).gameObject;old.SetActive(false);Destroy(old); }
         var practice=Button(content,(MemorySettings.Practice?"[x] ":"[ ] ")+"Practice",()=>{MemorySettings.Practice=!MemorySettings.Practice;Rebuild();},86);
         practice.image.color=MemorySettings.Practice?(Color)new Color32(254,191,75,255):(Color)new Color32(238,234,255,255);
-        Label(content,"Training without a countdown. Challenges always stay timed. Practice does not set timed records.",28,110);
+        Label(content,"Practice counts time upwards and saves Level + Time. No achievements. Challenges always stay timed.",28,110);
         Label(content,"Major System",40,62);
         Button(content,(MemorySettings.Digits==2?"[x] ":"[ ] ")+"2 numbers (00-99)",()=>SetDigits(2),82);
         var three=Button(content,(MemorySettings.Digits==3?"[x] ":"[ ] ")+"3 numbers (000-999)",()=>SetDigits(3),82);

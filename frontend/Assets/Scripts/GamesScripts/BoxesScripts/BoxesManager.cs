@@ -86,7 +86,7 @@ public class BoxesManager : GamesScript, IGameable
         if (shouldCountTime && (countdownTime > 0 || PracticeMode.Untimed))
         {
             countdownTime -= Time.deltaTime;
-            countDownText.text = PracticeMode.Untimed?"∞":Mathf.Round(countdownTime).ToString();
+            countDownText.text = PracticeMode.Untimed?PracticeSession.Clock(this):Mathf.Round(countdownTime).ToString();
         }
         else if(shouldCountTime && countdownTime <= 0 && !PracticeMode.Untimed)
         {
@@ -115,6 +115,7 @@ public class BoxesManager : GamesScript, IGameable
     {
         yield return StartCoroutine(ShowRSG(rsg));
         countdownTime = preGameTimeAllocation;
+        PracticeSession.Begin(this, "Memory.Boxes", LevelScript._selectedLevel);
         shouldCountTime = true;
     }
 

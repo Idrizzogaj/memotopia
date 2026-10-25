@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System.Collections;
@@ -184,7 +184,7 @@ public class DragAndDropCell : MonoBehaviour, IDropHandler
 
             if (Matches(this.name,item.name) && !this.name.Contains("Prefabe"))
             {
-                boxesManager.countForWin++;
+                boxesManager.countForWin++; PracticeSession.Get(boxesManager)?.Progress(LevelScript._selectedLevel);
                 if(SprintRuntime.Active)SprintRuntime.Current.Solve(item.name);
 
                 if(boxesManager.countForWin >= boxesManager.spawnNumber) {
@@ -549,7 +549,7 @@ public class DragAndDropCell : MonoBehaviour, IDropHandler
 
                 if (Matches(firstCell.name,secondItem.name) && !firstCell.name.Contains("Prefabe"))
                 {
-                    boxesManager.countForWin++;
+                    boxesManager.countForWin++; PracticeSession.Get(boxesManager)?.Progress(LevelScript._selectedLevel);
                     if(SprintRuntime.Active)SprintRuntime.Current.Solve(secondItem.name);
 
                     if(boxesManager.countForWin >= boxesManager.spawnNumber) {
