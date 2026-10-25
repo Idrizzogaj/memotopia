@@ -1,4 +1,7 @@
 export const achievementConstants: string[] = [
+    'focus-first', 'focus-pairs-first', 'focus-pairs-professor',
+    'focus-boxes-first', 'focus-boxes-max', 'focus-flash-first',
+    'focus-flash-vision', 'focus-chain-first', 'focus-chain-max',
     'athlete-one-heart-boxes', 'athlete-one-heart-flash', 'athlete-one-heart-chain',
     'chain-first', 'chain-all', 'tip-the-deck',
     'in-the-box', // first game boxes
