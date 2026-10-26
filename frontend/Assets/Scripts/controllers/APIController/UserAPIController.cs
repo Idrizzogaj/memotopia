@@ -6,6 +6,7 @@ using Assets.Script.Models;
 using Assets.Script.Models.ResponseModels;
 using Assets.Script.Models.RequestModels;
 using UnityEngine;
+using UnityEngine.Networking;
 using System.Text;
 
 namespace Assets.Script.Controllers
@@ -24,49 +25,42 @@ namespace Assets.Script.Controllers
         #region User
         public void GetUser(Action<User> onSuccess, Action<AlertMessageContainer> onFailure)
         {
-            WWWForm form = new WWWForm();
-            Dictionary<string, string> headers = form.headers;
-            headers["Content-Type"] = "application/json";
-            headers["Authorization"] = _dataController.Token;
-            WWW request = new WWW(_apiConstants.GetUserRoute, null, headers);
-
-            StartCoroutine(GetUserRequest(request, onSuccess, onFailure));
+            StartCoroutine(GetUserRequest(_dataController.Token, onSuccess, onFailure));
         }
 
-        private IEnumerator GetUserRequest(WWW request, Action<User> onSuccess, Action<AlertMessageContainer> onFailure)
+        private IEnumerator GetUserRequest(string original, Action<User> onSuccess, Action<AlertMessageContainer> onFailure)
         {
-            yield return request;
-
-            if (request == null)
+            using (var request = UnityWebRequest.Get(_apiConstants.GetUserRoute))
             {
-                if (onFailure != null) onFailure(ReturnAlertMessageType("Request was null", "CLIENT_ERROR"));
-                yield break;
+                request.SetRequestHeader("Authorization", original);
+                request.timeout = 12;
+                yield return request.SendWebRequest();
+                ApplyUserResponse(original, request.responseCode, request.isNetworkError || request.isHttpError,
+                    request.downloadHandler.text, onSuccess, onFailure);
             }
+        }
 
-            if (String.IsNullOrEmpty(request.error))
+        private void ApplyUserResponse(string original, long status, bool failed, string body,
+            Action<User> onSuccess, Action<AlertMessageContainer> onFailure)
+        {
+            // A response from before logout/account switching must never restore that old account.
+            if (string.IsNullOrEmpty(original) || PlayerPrefs.GetString("token") != original) return;
+            if (!failed)
             {
-                if (String.IsNullOrEmpty(request.text))
+                User user = null;
+                try { user = JsonUtility.FromJson<User>(body); } catch (ArgumentException) { }
+                if (user != null && user.ID > 0 && !string.IsNullOrEmpty(user.Username))
                 {
-                    if (onFailure != null) onFailure(ReturnAlertMessageType("Empty response", "EMPTY_RESPONSE"));
-                    yield break;
+                    UserConstants.s_user = user;
+                    if (onSuccess != null) onSuccess(user);
+                    return;
                 }
-
-                var responseObject = JsonUtility.FromJson<User>(request.text);
-                UserConstants.s_user = responseObject;
-                if (onSuccess != null) onSuccess(responseObject);
-                yield break;
             }
-
-            ErrorResponsePayload errorPayload = null;
-            if (!String.IsNullOrEmpty(request.text))
-            {
-                try { errorPayload = JsonUtility.FromJson<ErrorResponsePayload>(request.text); } catch(ArgumentException) { }
-            }
-
-            var message = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Message)) ? errorPayload.Message : request.error;
-            var code = (errorPayload != null && !String.IsNullOrEmpty(errorPayload.Code)) ? errorPayload.Code : "HTTP_ERROR";
-            if(request.responseHeaders!=null && request.responseHeaders.ContainsKey("STATUS") && request.responseHeaders["STATUS"].Contains("401"))code="401";
-            if (onFailure != null) onFailure(ReturnAlertMessageType(message, code));
+            // Only an actual HTTP 401 requires credentials again. Network/5xx/bad responses retain the token.
+            if (onFailure != null) onFailure(new AlertMessageContainer {
+                ErrorMessage = status == 401 ? "Please sign in again." : "Connection unavailable.",
+                StatusCode = status == 401 ? "401" : "RETRY"
+            });
         }
 
 
