@@ -763,8 +763,10 @@ public class ChallengeNavigation : MonoBehaviour
                 GoToChallengeGame();
             });
             item.transform.SetParent(favoriteContent, false);
+            ArenaHomeLayout.Track(item.transform,texts[0],buttons[1],user.ID);
         }
 
+        ArenaHomeLayout.RefreshPlayers(favoriteContent);
         if (obj.users.Length >= 1)
         {
             NoFavoritesScreen.SetActive(false);
@@ -807,8 +809,10 @@ public class ChallengeNavigation : MonoBehaviour
             buttons[0].onClick.AddListener(() => goToUserProfileScreen(user, isFavorite));
             buttons[2].onClick.AddListener(() => AddFavorite(user.ID.ToString(), buttons[2].gameObject) );
             item.transform.SetParent(favoriteContent, false);
+            ArenaHomeLayout.Track(item.transform,texts[0],buttons[1],user.ID);
         }
 
+        ArenaHomeLayout.RefreshPlayers(favoriteContent);
         if (obj.users.Length >= 1)
         {
             NoFavoritesScreen.SetActive(false);
@@ -837,8 +841,10 @@ public class ChallengeNavigation : MonoBehaviour
 
     private void DeleteFavorites()
     {
+        ArenaHomeLayout.Forget(favoriteContent);
         foreach (Transform child in favoriteContent)
         {
+            child.gameObject.SetActive(false);
             Destroy(child.gameObject);
         }
     }

@@ -31,12 +31,14 @@ export class SprintService {
         return this.connection.transaction(async manager=>{
             await this.social.lock(manager,user,body.recipientId);await this.social.allowed(manager,user,body.recipientId);
             // Per sender and per pair limits are protected by the same database locks as blocking.
+            const pending=await manager.query(`SELECT id FROM sprint_battle WHERE (("ownerId"=$1 AND "recipientId"=$2) OR ("ownerId"=$2 AND "recipientId"=$1)) AND state->>'done'='false' AND state->>'invitation'='pending' AND (state->>'invitationExpires')::bigint>$3 ORDER BY id DESC LIMIT 1`,[user,body.recipientId,Date.now()]);
+            if(pending.length)return manager.getRepository(SprintBattle).findOne(pending[0].id);
+            const active=await manager.query(`SELECT id FROM sprint_battle WHERE (("ownerId"=$1 AND "recipientId"=$2) OR ("ownerId"=$2 AND "recipientId"=$1)) AND state->>'done'='false' AND state->>'invitation'='accepted' ORDER BY id DESC LIMIT 1`,[user,body.recipientId]);
+            if(active.length)return manager.getRepository(SprintBattle).findOne(active[0].id);
+            // Completed/declined/withdrawn invitations must never lock out a rematch.
+            // Keep the sender rate limit, but only charge it for genuinely new invitations.
             const recent=await manager.query(`SELECT COUNT(*)::int AS n FROM sprint_battle WHERE "ownerId"=$1 AND "createdAt">now()-interval '1 minute'`,[user]);
             if(Number(recent[0].n)>=5)throw new ConflictException('Please wait before inviting again');
-            const pending=await manager.query(`SELECT id FROM sprint_battle WHERE (("ownerId"=$1 AND "recipientId"=$2) OR ("ownerId"=$2 AND "recipientId"=$1)) AND state->>'invitation'='pending' AND (state->>'invitationExpires')::bigint>$3 ORDER BY id DESC LIMIT 1`,[user,body.recipientId,Date.now()]);
-            if(pending.length)return manager.getRepository(SprintBattle).findOne(pending[0].id);
-            const pair=await manager.query(`SELECT 1 FROM sprint_battle WHERE (("ownerId"=$1 AND "recipientId"=$2) OR ("ownerId"=$2 AND "recipientId"=$1)) AND "createdAt">now()-interval '1 minute'`,[user,body.recipientId]);
-            if(pair.length)throw new ConflictException('An invitation already exists or was recently sent');
             // Older clients keep their recorded-pace flow. Version2 always requires consent.
             if(body.version===2){battle.state.version=2;battle.state.invitation='pending';battle.state.invitationExpires=Date.now()+86400000;
                 battle.state.live=!!body.live && await this.social.isOnline(manager,user,body.recipientId) && await this.social.isOnline(manager,body.recipientId,user);

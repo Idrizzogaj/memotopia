@@ -9,7 +9,7 @@ using UnityEngine.UI;
 // One inbox for ongoing and completed games. Original game rules and receipts stay unchanged.
 public sealed class SprintLobby : MonoBehaviour {
  public static SprintBattleView Latest;
- private ChallengeNavigation navigation;private SprintAPI api;private bool match,creating,refreshing,starting,legacyRefreshing,recovering;
+ private ChallengeNavigation navigation;private SprintAPI api;private bool match,creating,refreshing,legacyRefreshing,recovering;
  private GameObject panel,list;private Text errorLabel;private Button singleButton,matchButton;private Text singleLabel,matchLabel;
  private float refreshAt;private int selectedId,requestVersion;private float activePosition=1,historyPosition=1,detailPosition=1;
  private ScrollRect activeScroll,historyScroll,detailScroll;
@@ -198,7 +198,7 @@ public sealed class SprintLobby : MonoBehaviour {
     }else SprintUi.Note(detailScroll.content,"Invitation sent · Waiting for acceptance");
    }else if(battle.chooser==user){
     var games=ChallengeSprintRules.Games.Where(g=>!battle.legs.Any(l=>l.game==g)).ToArray();GameChoices(detailScroll.content,games,game=>{if(creating)return;creating=true;api.Request<SprintBattleView>("/"+battle.id+"/game",JsonUtility.ToJson(new SprintChoose{game=game}),updated=>{creating=false;ShowBattle(updated);},error=>{creating=false;Message(error);});});
-   }else if(Actionable(battle))GameChoices(detailScroll.content,new[]{battle.legs.Last().game},game=>{if(starting || !CanStart())return;starting=true;SprintRuntime.Begin(battle,null);});
+   }else if(Actionable(battle))GameChoices(detailScroll.content,new[]{battle.legs.Last().game},game=>{if(SprintRuntime.Active || !CanStart())return;SprintRuntime.Begin(battle,null);});
    else SprintUi.Note(detailScroll.content,"Waiting for your opponent");
    if(battle.invitation!="pending" || user==battle.ownerId)Consent(detailScroll.content,battle.invitation=="pending"?"Withdraw":"Give up",()=>ConfirmGiveUp(battle));
   }

@@ -66,7 +66,7 @@ public sealed class LiveChallenges : MonoBehaviour {
  private void OnApplicationFocus(bool value){focused=value;LeaseChanged();}
  private void LeaseChanged(){if(api!=null && loaded && account==GameManager.AchievementUserId && !busy)Heartbeat(settings.visible);beatAt=0;pollAt=0;}
  private void Poll(){
-  polling=true;api.Request<OnlinePlayers>("/social/online",null,value=>{online=value;labels.RemoveAll(p=>p.label==null);foreach(var p in labels){p.label.text=Status(p.id,p.name);PresenceIndicator.Set(p.label,IsOnline(p.id));}if(panel!=null)Render();},error=>{});
+  polling=true;api.Request<OnlinePlayers>("/social/online",null,value=>{online=value;labels.RemoveAll(p=>p.label==null);foreach(var p in labels){p.label.text=Status(p.id,p.name);PresenceIndicator.Set(p.label,IsOnline(p.id));}if(navigation!=null)ArenaHomeLayout.RefreshPlayers(navigation.favoriteContent);if(panel!=null)Render();},error=>{});
   api.Request<SprintBattleList>("",null,value=>{
    polling=false;
    var invite=(value.battles??new SprintBattleView[0]).FirstOrDefault(b=>!b.done&&b.invitation=="pending"&&b.recipientId==account);
