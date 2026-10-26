@@ -41,9 +41,34 @@ public class AuthView : MonoBehaviour
     UserAPIController _userAPIController;
     string aToken;
     private bool _appleLoginPending;
+    private SavedSessionView savedSessionView;
+    private float sessionRetryDelay;
+
+    private void ShowSavedSession()
+    {
+        logInScreen.SetActive(false);
+        signUpScreen.SetActive(false);
+        forgotPasswordScreen.SetActive(false);
+        if (savedSessionView == null)
+            savedSessionView = SavedSessionView.Show(logInScreen.transform.parent, getUser, UseAnotherAccount);
+        savedSessionView.Pending();
+    }
+
+    private void UseAnotherAccount()
+    {
+        retrySavedSession = restoringSession = false;
+        PlayerPrefs.DeleteKey("token");
+        PlayerPrefs.Save();
+        UserConstants.s_user = null;
+        if (savedSessionView != null) savedSessionView.Hide();
+        savedSessionView = null;
+        goToScreen("logIn");
+    }
 
     void Awake()
     {
+        // Hide credential forms before the first rendered frame, on both iOS and Android.
+        if (!String.IsNullOrEmpty(PlayerPrefs.GetString("token"))) ShowSavedSession();
         // Facebook SDK disabled for iOS/TestFlight stability.
 #if UNITY_IPHONE
         iOSSocialLogin.SetActive(true);
@@ -79,6 +104,11 @@ public class AuthView : MonoBehaviour
     }
 
     void Update() {
+        if (retrySavedSession && !restoringSession)
+        {
+            sessionRetryDelay -= Time.unscaledDeltaTime;
+            if (sessionRetryDelay <= 0) getUser();
+        }
         if (usernameLogIn.isFocused || passwordLogIn.isFocused && errorLogin.active)
             errorLogin.SetActive(false);
 
@@ -233,33 +263,48 @@ public class AuthView : MonoBehaviour
     public void getUser()
     {
         if(restoringSession)return;
+        string original = _dataController.Token;
+        if (String.IsNullOrEmpty(original)) return;
+        ShowSavedSession();
         restoringSession=true;retrySavedSession=false;
         try
         {
             _userAPIController.GetUser(
                 (OnSuccess) =>
                 {
+                    if (_dataController.Token != original) return;
                     ProgressSync.Instance.GetApi<AuthAPIController>().RenewSavedSession();
-                    restoringSession=false;
+                    // Keep the opaque restoring view until the menu has actually replaced this scene.
                     _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
                 },
                 (OnFailure) =>
                 {
-                    restoringSession=false;
-                    _loadingScreen.EndLoadingWithDelay();
-                    if(OnFailure.StatusCode=="401")HandleConditionWithAlertMessages(OnFailure);
-                    else {
-                        retrySavedSession=true;
-                        errorLogin.GetComponent<Text>().text="Connection unavailable. Your sign-in is saved. Return to the app to retry.";
-                        errorLogin.SetActive(true);
-                    }
+                    RestoreFailed(original, OnFailure);
                 }
             );
         }
         catch (UserException e)
         {
-            restoringSession=false;
-            Debug.Log(e.Message);
+            RestoreFailed(original, null);
+        }
+    }
+
+    private void RestoreFailed(string original, AlertMessageContainer failure)
+    {
+        if (PlayerPrefs.GetString("token") != original) return;
+        restoringSession = false;
+        if (_loadingScreen != null) _loadingScreen.EndLoading();
+        if (failure != null && failure.StatusCode == "401")
+        {
+            UseAnotherAccount();
+            errorLogin.GetComponent<Text>().text = "Please sign in again.";
+            errorLogin.SetActive(true);
+        }
+        else
+        {
+            retrySavedSession = true;
+            sessionRetryDelay = 10;
+            savedSessionView.RetryAvailable();
         }
     }
 
