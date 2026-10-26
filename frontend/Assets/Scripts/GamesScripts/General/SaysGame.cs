@@ -10,11 +10,12 @@ public sealed class SaysGame : MonoBehaviour {
  public static int ChallengeCount(int round){return 5+2*round;}
  static string Key {get{return "says.preview.v1."+GameManager.AchievementUserId;}}
  public static bool Complete(int level){return level>=1 && level<=20 && (PlayerPrefs.GetInt(Key,0)&(1<<(level-1)))!=0;}
+ public static int Stars(int level){return level<1||level>20?0:Mathf.Clamp(PlayerPrefs.GetInt(Key+".stars."+level,Complete(level)?1:0),0,3);}
  static bool Unlocked(int level){return level==1||level==20||Complete(20)||Complete(level)||Complete(level-1);}
- GameObject overlay,levels,popup;ChainOriginalPresentation board;Material theme;Button play;Text cue;readonly List<Button> keys=new List<Button>();readonly List<CanvasGroup> frames=new List<CanvasGroup>();int[] faceIds=new int[0];float wrongRemaining;int wrongKey=-1;bool pendingFailure;int[] sequence;int owner,level,position,hearts,round,errors;bool watching,input,challenge;float elapsed,clock,deadline;int highlighted=-1;
+ GameObject overlay,levels,popup,recallCover;ChainOriginalPresentation board;Material theme;Button play;Text cue;readonly List<Button> keys=new List<Button>();readonly List<CanvasGroup> frames=new List<CanvasGroup>();int[] faceIds=new int[0];float wrongRemaining,recallRemaining;int wrongKey=-1;bool pendingFailure,recallTransition;int[] sequence;int owner,level,position,hearts,round,errors;bool watching,input,challenge;float elapsed,clock,deadline;int highlighted=-1;
  public static SaysGame Open(RectTransform parent){var game=parent.GetComponent<SaysGame>()??parent.gameObject.AddComponent<SaysGame>();game.Show();return game;}
  public void Show(){Close();owner=GameManager.AchievementUserId;challenge=false;overlay=ChainGame.Panel(GetComponentInParent<Canvas>().rootCanvas.transform,"Says native preview",Vector2.zero,Vector2.one,ChainGame.Purple);theme=new Material(Resources.Load<Shader>("MemotopiaTheme"));theme.SetColor("_ThemeColor",ChainGame.Purple);ShowLevels();}
- void ClearBoard(){if(board!=null)board.Destroy();board=null;keys.Clear();frames.Clear();wrongRemaining=0;wrongKey=-1;pendingFailure=false;if(play!=null)CardFaces.DestroyGenerated(play.gameObject);play=null;if(cue!=null)CardFaces.DestroyGenerated(cue.gameObject);cue=null;highlighted=-1;}
+ void ClearBoard(){if(recallCover!=null)CardFaces.DestroyGenerated(recallCover);recallCover=null;recallTransition=false;if(board!=null)board.Destroy();board=null;keys.Clear();frames.Clear();wrongRemaining=0;wrongKey=-1;pendingFailure=false;if(play!=null)CardFaces.DestroyGenerated(play.gameObject);play=null;if(cue!=null)CardFaces.DestroyGenerated(cue.gameObject);cue=null;highlighted=-1;}
  public void ShowLevels(){ClearBoard();input=watching=false;if(levels!=null)CardFaces.DestroyGenerated(levels);levels=Instantiate(Resources.Load<GameObject>("Prefabs/ExactFlashChainLevels"),overlay.transform,false);var rect=(RectTransform)levels.transform;rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;rect.offsetMin=rect.offsetMax=Vector2.zero;rect.localScale=Vector3.one;rect.anchoredPosition3D=Vector3.zero;
   foreach(var button in levels.GetComponentsInChildren<Button>(true)){button.onClick=new Button.ButtonClickedEvent();button.onClick.AddListener(Close);}
   var background=levels.GetComponent<Image>();background.sprite=Resources.Load<Sprite>("GamesResources/Levels/FlashBackground");background.material=theme;
@@ -22,10 +23,9 @@ public sealed class SaysGame : MonoBehaviour {
    if(image.name=="Chain title"){image.sprite=Resources.Load<Sprite>("GamesResources/Levels/FlashTop");image.material=theme;var cover=ChainGame.Panel(image.transform,"Says title",new Vector2(.23f,.53f),new Vector2(.77f,.83f),Color.white);ChainGame.Label(cover.transform,"SAYS",Vector2.zero,Vector2.one,60,ChainGame.Purple);}
    if(!image.name.StartsWith("Chain Level "))continue;int number=int.Parse(image.name.Substring(12));bool unlocked=Unlocked(number);image.sprite=Resources.Load<Sprite>(unlocked?"GamesResources/Levels/AAA-11":"GamesResources/Levels/FlashLevelCell");if(!unlocked)image.material=theme;
    var button=image.transform.GetChild(1).GetComponent<Button>();button.interactable=unlocked;button.onClick=new Button.ButtonClickedEvent();button.onClick.AddListener(()=>StartLevel(number));button.GetComponentInChildren<Text>(true).color=ChainGame.Purple;button.GetComponentInChildren<Text>(true).text=number.ToString();
-   var stars=image.transform.GetChild(0);stars.gameObject.SetActive(Complete(number));for(int n=0;n<stars.childCount;n++)stars.GetChild(n).gameObject.SetActive(n<PlayerPrefs.GetInt(Key+".stars."+number,0));
+   var stars=image.transform.GetChild(0);stars.gameObject.SetActive(Stars(number)>0);for(int n=0;n<stars.childCount;n++){stars.GetChild(n).gameObject.SetActive(n<Stars(number));var star=stars.GetChild(n).GetComponent<Image>();if(star!=null)star.sprite=Resources.Load<Sprite>("GamesResources/Levels/Asset "+(15-n));}
   }
   var images=levels.GetComponentsInChildren<Image>(true);TrainingAthleteTile.Attach(images.First(i=>i.name=="Chain Level 20"),images.First(i=>i.name=="Chain Level 16"),ChainGame.Purple,()=>StartLevel(21),Complete(20));
-  SprintUi.Button(levels.transform,"Challenge",new Vector2(.30f,.81f),new Vector2(.70f,.855f),()=>{challenge=true;round=errors=0;deadline=Time.realtimeSinceStartup+90;StartLevel(1);});
  }
  public void StartLevel(int value){PracticeSession.Release(this);if(!challenge && (value==21?!Complete(20):!Unlocked(value)))return;level=value;position=0;hearts=value==21?1:5;watching=input=false;elapsed=0;clock=180;ClearBoard();if(levels!=null){CardFaces.DestroyGenerated(levels);levels=null;}CardFaces.BeginSession();
   int count=challenge?ChallengeCount(round):Count(value);sequence=new int[count];for(int n=0;n<count;n++){int key;do{key=UnityEngine.Random.Range(0,10);}while(n>0 && key==sequence[n-1]);sequence[n]=key;}
@@ -47,11 +47,19 @@ public sealed class SaysGame : MonoBehaviour {
  void Update(){if(overlay==null)return;if(owner!=GameManager.AchievementUserId){Close();return;}if(Input.GetKeyDown(KeyCode.Escape))Quit();if(challenge && board!=null){board.ShowRecallClock(Mathf.Max(0,Mathf.CeilToInt(deadline-Time.realtimeSinceStartup)));if(Time.realtimeSinceStartup>=deadline){Finish(false);return;}}if(popup!=null)return;Tick(Time.deltaTime);}
  public void Tick(float dt){
   if(board==null || popup!=null)return;
+  if(!challenge&&PracticeMode.Untimed)board.ShowPracticeClock(PracticeSession.Clock(this));
+  if(recallTransition){recallRemaining=Mathf.Max(0,recallRemaining-dt);if(recallRemaining<=0){recallTransition=false;if(recallCover!=null)CardFaces.DestroyGenerated(recallCover);recallCover=null;board.Grid.gameObject.SetActive(true);input=true;cue.text="Recall";}return;}
   if(wrongRemaining>0){wrongRemaining=Mathf.Max(0,wrongRemaining-dt);if(wrongRemaining<=0){wrongKey=-1;if(pendingFailure){pendingFailure=false;Finish(false);return;}}}
   float strength=0;
-  if(watching){elapsed+=dt;float phase=elapsed-2;int show=phase>=0 && phase<sequence.Length*2.25f && phase%2.25f<2?sequence[Mathf.Min(sequence.Length-1,(int)(phase/2.25f))]:-1;Highlight(show);if(show>=0){float t=phase%2.25f;strength=Mathf.SmoothStep(0,1,Mathf.Clamp01(Mathf.Min(t/.18f,(2-t)/.18f)));}if(phase>=sequence.Length*2.25f+.7f){watching=false;input=true;Highlight(-1);cue.text="Recall";}}
+  if(watching){elapsed+=dt;float phase=elapsed-2;int show=phase>=0 && phase<sequence.Length*2.25f && phase%2.25f<2?sequence[Mathf.Min(sequence.Length-1,(int)(phase/2.25f))]:-1;Highlight(show);if(show>=0){float t=phase%2.25f;strength=Mathf.SmoothStep(0,1,Mathf.Clamp01(Mathf.Min(t/.18f,(2-t)/.18f)));}if(phase>=sequence.Length*2.25f+.7f)BeginRecall();}
   else if(input&&!challenge&&PracticeMode.Untimed){board.ShowPracticeClock(PracticeSession.Clock(this));}else if(input&&!challenge){clock=Mathf.Max(0,clock-dt);board.ShowRecallClock(Mathf.CeilToInt(clock));if(clock<=0){Finish(false);return;}}
   AnimateKeys(strength);
+ }
+ void BeginRecall(){
+  watching=input=false;Highlight(-1);recallTransition=true;recallRemaining=.9f;cue.text="";board.Grid.gameObject.SetActive(false);
+  recallCover=ChainGame.Panel(overlay.transform,"Says recall cue",new Vector2(.08f,.16f),new Vector2(.92f,.77f),Color.white);
+  var logo=ChainGame.Panel(recallCover.transform,"Existing Memotopia logo",new Vector2(.28f,.40f),new Vector2(.72f,.82f),Color.white).GetComponent<Image>();logo.sprite=Resources.Load<Sprite>("GamesResources/Loading/Untitled-3-01");logo.preserveAspect=true;logo.raycastTarget=false;
+  ChainGame.Label(recallCover.transform,"RECALL",new Vector2(.10f,.18f),new Vector2(.90f,.36f),64,ChainGame.Purple).fontStyle=FontStyle.Bold;
  }
  void Highlight(int value){highlighted=value;}
  void AnimateKeys(float strength){
