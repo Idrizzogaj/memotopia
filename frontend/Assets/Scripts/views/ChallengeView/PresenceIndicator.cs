@@ -4,6 +4,8 @@ using UnityEngine.UI;
 // Game-presence badge, not the phone's Wi-Fi connection. Hidden status is never disclosed.
 public sealed class PresenceIndicator : MaskableGraphic {
  private string textStamp;private float widthStamp;private int fontStamp;private TextAnchor alignmentStamp;
+ private RectTransform beforeButton;
+ public static void BeforeButton(Text label,Button button){var icon=label.GetComponentInChildren<PresenceIndicator>(true);if(icon==null)return;icon.beforeButton=button.transform as RectTransform;Set(label,icon.color.g>icon.color.r);}
  public static void Set(Text label,bool online){
   var child=label.transform.Find("Presence wifi");PresenceIndicator icon;
   if(child==null){var go=new GameObject("Presence wifi",typeof(RectTransform),typeof(CanvasRenderer),typeof(PresenceIndicator));go.transform.SetParent(label.transform,false);icon=go.GetComponent<PresenceIndicator>();}
@@ -16,6 +18,13 @@ public sealed class PresenceIndicator : MaskableGraphic {
   bool right=label.alignment==TextAnchor.MiddleRight || label.alignment==TextAnchor.UpperRight || label.alignment==TextAnchor.LowerRight;
   float offset=centred?Mathf.Max(0,(width-textWidth)*.5f):right?Mathf.Max(0,width-textWidth):0;
   var rect=icon.rectTransform;rect.anchorMin=rect.anchorMax=new Vector2(0,.5f);rect.sizeDelta=new Vector2(size,size);rect.anchoredPosition=new Vector2(offset+textWidth+size*.7f+32,0);
+  if(icon.beforeButton!=null){
+   var corners=new Vector3[4];icon.beforeButton.GetWorldCorners(corners);
+   Vector3 left=label.rectTransform.InverseTransformPoint(corners[0]);float centre=left.x-size*.5f-18;
+   float allowed=centre-size*.5f-14-label.rectTransform.rect.xMin;
+   if(allowed>30 && label.rectTransform.rect.width>allowed)label.rectTransform.offsetMax-=new Vector2(label.rectTransform.rect.width-allowed,0);
+   left=label.rectTransform.InverseTransformPoint(corners[0]);rect.anchoredPosition=new Vector2(left.x-size*.5f-18-label.rectTransform.rect.xMin,0);
+  }
   icon.raycastTarget=false;icon.color=online?(Color)new Color32(28,145,89,255):(Color)new Color32(202,48,75,255);icon.SetVerticesDirty();
   icon.textStamp=label.text;icon.widthStamp=width;icon.fontStamp=label.fontSize;icon.alignmentStamp=label.alignment;
  }

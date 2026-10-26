@@ -86,6 +86,9 @@ public static class TipsEnhancer
             originalLink.SetSiblingIndex(1);
         } else GuideCard(content,"TheLinkGuide","The Link Method",link,1);
 
+        var majorCard=content.Find("MajorSystem");var deckCard=content.Find("TheDeckGuide");
+        if(majorCard!=null && deckCard!=null){deckCard.SetAsLastSibling();deckCard.SetSiblingIndex(majorCard.GetSiblingIndex()+1);DeckTipArt(deckCard);}
+
         LayoutRebuilder.ForceRebuildLayoutImmediate(listRect);var tipList=content.GetComponentInParent<ScrollRect>();if(tipList!=null){tipList.horizontal=false;tipList.vertical=true;tipList.verticalNormalizedPosition=1;}
 
         // an "I have read this" box on every page
@@ -109,6 +112,17 @@ public static class TipsEnhancer
         card.GetComponent<LayoutElement>().preferredHeight=180;
         card.GetComponent<Button>().onClick.AddListener(()=>{page.parent.gameObject.SetActive(true);page.gameObject.SetActive(true);page.SetAsLastSibling();});
         var label=MakeText(card.transform,"Title",title,46,FontStyle.Bold,Purple,TextAnchor.MiddleCenter);Stretch(label.rectTransform);
+    }
+
+    // The same CC0 playing-card artwork already used throughout the game.
+    private static void DeckTipArt(Transform card){
+        if(card.Find("Deck icon")!=null)return;
+        var title=card.Find("Title").GetComponent<Text>();title.rectTransform.anchorMin=new Vector2(.34f,0);title.rectTransform.anchorMax=Vector2.one;title.rectTransform.offsetMin=title.rectTransform.offsetMax=Vector2.zero;
+        var icon=new GameObject("Deck icon",typeof(RectTransform));icon.transform.SetParent(card,false);var area=(RectTransform)icon.transform;area.anchorMin=new Vector2(.03f,.10f);area.anchorMax=new Vector2(.32f,.90f);area.offsetMin=area.offsetMax=Vector2.zero;
+        for(int n=0;n<3;n++){
+            var face=new GameObject("Existing ace "+n,typeof(RectTransform),typeof(Image));face.transform.SetParent(icon.transform,false);var r=(RectTransform)face.transform;r.anchorMin=r.anchorMax=new Vector2(.30f+n*.18f,.50f);r.sizeDelta=new Vector2(78,120);r.localRotation=Quaternion.Euler(0,0,14-n*14);
+            var image=face.GetComponent<Image>();image.sprite=DeckCatalog.Face(n==0?39:n==1?0:26);image.preserveAspect=true;image.raycastTarget=false;
+        }
     }
 
     // ---------- bigger touch areas
