@@ -1,5 +1,7 @@
 # Rematches, Arena presence and The Deck
 
+Update: the client changes below are now included in [Android2.1.0(23)](ANDROID-2.1.0-23.md), built on26October after the user authorized it. Server integration/deployment remains pending. The original source-only status below describes the earlier work phase.
+
 Source changes only. The user explicitly requested no new build. No app installation or server deployment has been performed for these changes. AAB 2.1.0 (22) remains the earlier verified artifact and does not contain these changes.
 
 ## Rematches

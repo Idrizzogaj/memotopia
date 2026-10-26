@@ -1,5 +1,7 @@
 # Saved-session startup, 26 October 2026
 
+Update: included in [Android2.1.0(23)](ANDROID-2.1.0-23.md), built and verified after the user authorized the Android build. No new iOS build or device installation.
+
 Status: source changes and Unity editor validation only. No app package, device installation or server deployment. The existing Android 2.1.0 (22) bundle does not include these changes.
 
 ## Cause and change

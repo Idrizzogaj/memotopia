@@ -1,5 +1,7 @@
 # Says recall and stars, 26 October 2026
 
+Update: included in [Android2.1.0(23)](ANDROID-2.1.0-23.md), built and verified after the user authorized the Android build. No new iOS build or device installation.
+
 Status: source and editor validation only, no new build or installation. Applies to the 2.1 Focus/Says branch.
 
 - After playback, all ten pictures are covered for0.9seconds with the existing Memotopia logo and RECALL. Input is blocked during this cue. The pictures then return and the180second recall countdown starts. The existing keypad, playback animation and wrong-answer feedback are unchanged.
