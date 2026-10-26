@@ -23,7 +23,7 @@ public static class MemotopiaPlayBuild
             throw new Exception("Android SDK API 36 is missing.");
 
         PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.zogajretention.memotopia");
-        PlayerSettings.bundleVersion = "1.0.56";
+        PlayerSettings.bundleVersion = "2.1.0";
         PlayerSettings.Android.bundleVersionCode = versionCode;
         PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
         PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)36;
@@ -34,6 +34,8 @@ public static class MemotopiaPlayBuild
         EditorUserBuildSettings.development = false;
         EditorUserBuildSettings.allowDebugging = false;
 
+        ReactionAssetImporter.Repair();
+        SaysNativeValidation.Validate();
         MajorSystemValidation.Validate();
         ChainValidation.ValidateLogic();
         ChallengeSprintValidation.Run();
