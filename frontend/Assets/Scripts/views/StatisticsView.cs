@@ -97,7 +97,7 @@ public class StatisticsView : MonoBehaviour
             xpCircle.GetComponent<VerticalLayoutGroup>().padding.top = 50;
             xpCircle.GetComponent<VerticalLayoutGroup>().padding.bottom = 50;
             //achievementsButton.GetComponent<LayoutElement>().preferredHeight = 90;
-            challengeStatsPanel.GetComponent<LayoutElement>().preferredHeight = 150;
+            // Challenge cards now determine their own height.
             lastTwoPanels.GetComponent<LayoutElement>().preferredHeight = 450;
         }
         else
@@ -115,42 +115,19 @@ public class StatisticsView : MonoBehaviour
             xpCircle.GetComponent<VerticalLayoutGroup>().padding.top = 90;
             xpCircle.GetComponent<VerticalLayoutGroup>().padding.bottom = 90;
             //achievementsButton.GetComponent<LayoutElement>().preferredHeight = 100;
-            challengeStatsPanel.GetComponent<LayoutElement>().preferredHeight = 300;
+            // Challenge cards now determine their own height.
             lastTwoPanels.GetComponent<LayoutElement>().preferredHeight = 300;
         }
     }
 
-    // Keep the existing Statistics panel/background, replacing only its old four-field contents.
     public void ApplyChallengeCounters(UserStatistics statistics)
     {
-        if (challengeStatsPanel == null) return;
-        var heading = challengeStatsPanel.transform.Find("ChallengeStatsText");
-        if (heading != null) { var text = heading.GetComponent<Text>(); if (text != null) { text.text = "Challenges"; text.color = Color.white; } }
-        var holder = challengeStatsPanel.transform.Find("StatsHolder");
-        if (holder == null) holder = challengeStatsPanel.transform;
-        var fields = holder.Find("Challenge format stats");
-        if (fields == null) {
-            foreach (Transform child in holder) child.gameObject.SetActive(false);
-            var go = ChainGame.Panel(holder, "Challenge format stats", new Vector2(.02f,.05f),new Vector2(.98f,.95f),Color.clear);
-            go.GetComponent<Image>().raycastTarget=false;go.AddComponent<LayoutElement>().ignoreLayout=true;fields=go.transform;
-            string[] names={"Games","Matches","Single","Losses","Draw"};
-            for(int i=0;i<names.Length;i++) {
-                var column=ChainGame.Panel(fields,names[i],new Vector2(i/5f,0),new Vector2((i+1)/5f,1),Color.clear);
-                column.GetComponent<Image>().raycastTarget=false;
-                ChainGame.Label(column.transform,names[i],new Vector2(.02f,.10f),new Vector2(.98f,.44f),28,Color.white);
-                var value=ChainGame.Label(column.transform,"—",new Vector2(.02f,.47f),new Vector2(.98f,.92f),44,Color.white);value.name="Value";value.fontStyle=FontStyle.Bold;
-            }
-        }
-        string unknown="—";
-        string[] values={statistics==null?unknown:statistics.numberOfChallenges.ToString(),
-            statistics==null || !statistics.challengeFormatsAvailable?unknown:statistics.numberOfMatchChallenges.ToString(),
-            statistics==null || !statistics.challengeFormatsAvailable?unknown:statistics.numberOfSingleChallenges.ToString(),
-            statistics==null?unknown:statistics.numberOfLossChallenges.ToString(),statistics==null?unknown:statistics.numberOfDrawChallenges.ToString()};
-        string[] captions={"Games","Matches","Single","Losses","Draw"};
-        for(int i=0;i<captions.Length;i++)fields.Find(captions[i]+"/Value").GetComponent<Text>().text=values[i];
+        if (challengeStatsPanel != null) ChallengeStatisticsPanel.Apply(challengeStatsPanel.transform, statistics);
     }
-    public void ApplyFocusStatistics(){
-        if(!TrainingHubLayout.ShowFocus || challengeStatsPanel==null)return;
+    // Retain the existing editor preview entry point.
+    public void ApplyFocusStatistics(){ApplyGameStatistics();}
+    public void ApplyGameStatistics(bool refresh=true){
+        if(challengeStatsPanel==null)return;
         // The original Statistics screen was a fixed-height layout, not a scroll view.
         // Keep its real header/back button fixed and move the original panels into a viewport.
         var root=statisticsGameObject.transform;
@@ -163,7 +140,15 @@ public class StatisticsView : MonoBehaviour
             foreach(var panel in original.Skip(1))panel.SetParent(scroll.content,false);
             scroll.verticalNormalizedPosition=1;
         }
+        ApplyChallengeCounters(UserConstants.s_user == null ? null : UserConstants.s_user.userStatistics);
+        MemoryStatisticsPanel.Apply(challengeStatsPanel.transform, true);
         FocusStatisticsPanel.Apply(challengeStatsPanel.transform);
+        if (!refresh) return;
+        int owner = GameManager.AchievementUserId;
+        foreach (string game in new[]{"Pairs", "Boxes", "Flash"}) ProgressSync.Instance.GetLevels(game, ready => {
+            if (this == null || GameManager.AchievementUserId != owner || !statisticsGameObject.activeInHierarchy) return;
+            MemoryStatisticsPanel.Apply(challengeStatsPanel.transform, true);
+        });
     }
 
     private void RefreshChallengeCounters()

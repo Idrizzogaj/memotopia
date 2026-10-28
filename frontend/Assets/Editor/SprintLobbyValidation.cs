@@ -76,11 +76,11 @@ public static class SprintLobbyValidation {
    var stats=nav.GetComponent<StatisticsView>();var originalStats=(GameObject)Get(stats,"challengeStatsPanel");
    var clone=UnityEngine.Object.Instantiate(originalStats,canvas.transform,false);clone.name="Statistics review";clone.SetActive(true);var sr=(RectTransform)clone.transform;sr.anchorMin=sr.anchorMax=new Vector2(.5f,.5f);sr.sizeDelta=new Vector2(760,300);sr.anchoredPosition3D=Vector3.zero;sr.localScale=Vector3.one;Set(stats,"challengeStatsPanel",clone);
    stats.ApplyChallengeCounters(new UserStatistics{numberOfChallenges=12,numberOfMatchChallenges=4,numberOfSingleChallenges=8,numberOfLossChallenges=2,numberOfDrawChallenges=1,challengeFormatsAvailable=true});
-   var formats=clone.transform.Find("StatsHolder/Challenge format stats");Check(formats!=null && formats.childCount==5,"Five Statistics fields");
+   var formats=clone.transform.Find("Challenges statistics/Challenge format stats");Check(formats!=null && formats.childCount==5,"Five Statistics fields");
    Check(formats.Find("Matches/Value").GetComponent<Text>().text=="4" && formats.Find("Single/Value").GetComponent<Text>().text=="8","Format counters not relabelled old wins");
    Check(formats.GetComponentsInChildren<Text>().All(t=>t.color==Color.white),"Statistics text white");
    foreach(Transform child in canvas.transform)if(child!=clone.transform)child.gameObject.SetActive(false);Capture("challenge-statistics");
-   stats.ApplyChallengeCounters(new UserStatistics{numberOfChallenges=12});Check(formats.Find("Matches/Value").GetComponent<Text>().text=="—" && formats.Find("Single/Value").GetComponent<Text>().text=="—","Old API must not invent format counts");Set(stats,"challengeStatsPanel",originalStats);UnityEngine.Object.DestroyImmediate(clone);
+   stats.ApplyChallengeCounters(new UserStatistics{numberOfChallenges=12});formats=clone.transform.Find("Challenges statistics/Challenge format stats");Check(formats.Find("Matches/Value").GetComponent<Text>().text=="—" && formats.Find("Single/Value").GetComponent<Text>().text=="—","Old API must not invent format counts");Set(stats,"challengeStatsPanel",originalStats);UnityEngine.Object.DestroyImmediate(clone);
    Debug.Log("SPRINT_LOBBY_UI_VALIDATION_PASSED: real dropdown/back taps, independent scrolling, inline facts, colours, trophy and shared game tiles");
   }finally{UserConstants.s_user=old;camera.targetTexture=null;UnityEngine.Object.DestroyImmediate(cameraObject);UnityEngine.Object.DestroyImmediate(texture);}
  }

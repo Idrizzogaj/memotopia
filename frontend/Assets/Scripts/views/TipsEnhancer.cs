@@ -87,7 +87,14 @@ public static class TipsEnhancer
         } else GuideCard(content,"TheLinkGuide","The Link Method",link,1);
 
         var majorCard=content.Find("MajorSystem");var deckCard=content.Find("TheDeckGuide");
-        if(majorCard!=null && deckCard!=null){deckCard.SetAsLastSibling();deckCard.SetSiblingIndex(majorCard.GetSiblingIndex()+1);DeckTipArt(deckCard);}
+        if(majorCard!=null && deckCard!=null){
+            deckCard.SetAsLastSibling();deckCard.SetSiblingIndex(majorCard.GetSiblingIndex()+1);
+            // Match the original illustrated tip cards, not the small temporary guide button.
+            // The original card has preferredHeight=-1 and obtains its height from its sprite.
+            // Copy the effective layout height, otherwise a sprite-less card collapses to zero.
+            deckCard.GetComponent<LayoutElement>().preferredHeight=Mathf.Max(180,LayoutUtility.GetPreferredHeight((RectTransform)majorCard));
+            DeckTipArt(deckCard);
+        }
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(listRect);var tipList=content.GetComponentInParent<ScrollRect>();if(tipList!=null){tipList.horizontal=false;tipList.vertical=true;tipList.verticalNormalizedPosition=1;}
 
@@ -117,10 +124,12 @@ public static class TipsEnhancer
     // The same CC0 playing-card artwork already used throughout the game.
     private static void DeckTipArt(Transform card){
         if(card.Find("Deck icon")!=null)return;
-        var title=card.Find("Title").GetComponent<Text>();title.rectTransform.anchorMin=new Vector2(.34f,0);title.rectTransform.anchorMax=Vector2.one;title.rectTransform.offsetMin=title.rectTransform.offsetMax=Vector2.zero;
-        var icon=new GameObject("Deck icon",typeof(RectTransform));icon.transform.SetParent(card,false);var area=(RectTransform)icon.transform;area.anchorMin=new Vector2(.03f,.10f);area.anchorMax=new Vector2(.32f,.90f);area.offsetMin=area.offsetMax=Vector2.zero;
+        var background=card.GetComponent<Image>();background.sprite=null;background.color=Color.white;
+        var title=card.Find("Title").GetComponent<Text>();title.text="THE\nDECK";title.font=Resources.Load<Font>("Fonts/Montserrat/Montserrat-Black")??font;title.alignment=TextAnchor.MiddleLeft;title.fontSize=60;title.color=Purple;title.resizeTextForBestFit=true;title.resizeTextMinSize=24;title.resizeTextMaxSize=60;title.raycastTarget=false;
+        title.rectTransform.anchorMin=new Vector2(.04f,.08f);title.rectTransform.anchorMax=new Vector2(.49f,.92f);title.rectTransform.offsetMin=title.rectTransform.offsetMax=Vector2.zero;
+        var icon=new GameObject("Deck icon",typeof(RectTransform));icon.transform.SetParent(card,false);var area=(RectTransform)icon.transform;area.anchorMin=new Vector2(.52f,.08f);area.anchorMax=new Vector2(.97f,.92f);area.offsetMin=area.offsetMax=Vector2.zero;
         for(int n=0;n<3;n++){
-            var face=new GameObject("Existing ace "+n,typeof(RectTransform),typeof(Image));face.transform.SetParent(icon.transform,false);var r=(RectTransform)face.transform;r.anchorMin=r.anchorMax=new Vector2(.30f+n*.18f,.50f);r.sizeDelta=new Vector2(78,120);r.localRotation=Quaternion.Euler(0,0,14-n*14);
+            var face=new GameObject("Existing ace "+n,typeof(RectTransform),typeof(Image));face.transform.SetParent(icon.transform,false);var r=(RectTransform)face.transform;r.anchorMin=new Vector2(.05f+n*.18f,.15f);r.anchorMax=new Vector2(.62f+n*.18f,.85f);r.offsetMin=r.offsetMax=Vector2.zero;r.localRotation=Quaternion.Euler(0,0,14-n*14);
             var image=face.GetComponent<Image>();image.sprite=DeckCatalog.Face(n==0?39:n==1?0:26);image.preserveAspect=true;image.raycastTarget=false;
         }
     }
@@ -230,15 +239,9 @@ public static class TipsEnhancer
         title.resizeTextForBestFit = true; title.resizeTextMinSize = 28; title.resizeTextMaxSize = 54;
 
         // back button
-        var back = new GameObject("Back", typeof(RectTransform), typeof(Image), typeof(Button));
-        var br = (RectTransform)back.transform;
-        br.SetParent(rect, false);
-        br.anchorMin = new Vector2(0.03f, 0.92f); br.anchorMax = new Vector2(0.22f, 0.98f); br.offsetMin = br.offsetMax = Vector2.zero;
-        back.GetComponent<Image>().color = new Color(0.93f, 0.91f, 1f, 1f);
-        // like the other tip pages: back goes through GoToTips, which shows the list of tips again
-        back.GetComponent<Button>().onClick.AddListener(() => { page.SetActive(false); if (menu != null) menu.GoToTips(); });
-        var backText = MakeText(br, "Label", "< Back", 34, FontStyle.Bold, Purple, TextAnchor.MiddleCenter);
-        Stretch((RectTransform)backText.transform);
+        var back= SprintUi.Back(rect,()=>{page.SetActive(false);if(menu!=null)menu.GoToTips();});
+        back.name="Back";
+        foreach(var image in back.GetComponentsInChildren<Image>(true))image.color=Purple;
 
         // scrolling text
         var scrollObject = new GameObject("Scroll", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
@@ -274,8 +277,14 @@ public static class TipsEnhancer
         }
         else if (deckPage)
         {
+            var banner=ChainGame.Panel(cr,"Deck illustration",Vector2.zero,Vector2.one,Color.white);
+            banner.AddComponent<LayoutElement>().preferredHeight=285;
+            MakeText(banner.transform,"Title","The Deck",60,FontStyle.Bold,Purple,TextAnchor.MiddleLeft);
+            DeckTipArt(banner.transform);
             AddParagraph(cr,"One card, one memorable image",44,true);
             AddParagraph(cr,"Learn one clear association for each of the 52 playing cards. Link those images into a story, or place them along a familiar route in your memory palace.",36,false);
+            AddParagraph(cr,"Diamond 5 → D + L → DOLL",40,true);
+            AddDeckRow(cr,17);
             AddParagraph(cr,"Suit + value",44,true);
             AddParagraph(cr,"Clubs uses hard C/K (7). Diamonds uses D (1). Spades uses S (0). Hearts uses H as a visual cue; H is silent in the numerical Major code. For example: Diamond 5 is D + L = DOLL (15).",36,false);
             AddParagraph(cr,"Ace = 1; 2-9 keep their Major sounds; 10 = 0. Court cards are explicit exceptions: Jack = 11, Queen = 12, King = 13. Hearts King uses ATOM (13); the H is only a suit cue. These are English starter associations, not a universal card system.",36,false);
@@ -334,8 +343,10 @@ public static class TipsEnhancer
             var header=new GameObject("Expand "+caption,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement));
             header.transform.SetParent(content,false);header.GetComponent<Image>().color=new Color32(238,234,255,255);
             header.GetComponent<LayoutElement>().preferredHeight=95;
-            var label=MakeText(header.transform,"Label","+ "+caption,40,FontStyle.Bold,Purple,TextAnchor.MiddleLeft);
-            Stretch(label.rectTransform);label.rectTransform.offsetMin=new Vector2(20,0);
+            var label=MakeText(header.transform,"Label",caption+(deck?" · 13 cards":""),40,FontStyle.Bold,Purple,TextAnchor.MiddleLeft);
+            Stretch(label.rectTransform);label.rectTransform.offsetMin=new Vector2(deck?92:20,0);label.rectTransform.offsetMax=new Vector2(-80,0);label.resizeTextForBestFit=true;label.resizeTextMinSize=24;label.resizeTextMaxSize=40;
+            if(deck){var suit=ChainGame.Panel(header.transform,"Suit",new Vector2(.015f,.18f),new Vector2(.10f,.82f),Color.white).GetComponent<Image>();suit.sprite=DeckCatalog.Face(group*13);suit.preserveAspect=true;suit.raycastTarget=false;}
+            var arrow=MakeText(header.transform,"Expand indicator","+",40,FontStyle.Bold,Purple,TextAnchor.MiddleCenter);arrow.rectTransform.anchorMin=new Vector2(.88f,0);arrow.rectTransform.anchorMax=Vector2.one;arrow.rectTransform.offsetMin=arrow.rectTransform.offsetMax=Vector2.zero;
             var body=new GameObject("Group "+caption,typeof(RectTransform),typeof(VerticalLayoutGroup));
             body.transform.SetParent(content,false);var layout=body.GetComponent<VerticalLayoutGroup>();
             layout.childControlWidth=layout.childControlHeight=true;layout.childForceExpandHeight=false;layout.spacing=12;
@@ -352,7 +363,7 @@ public static class TipsEnhancer
                     }
                     populated=true;
                 }
-                body.SetActive(!body.activeSelf);label.text=(body.activeSelf?"- ":"+ ")+caption;
+                body.SetActive(!body.activeSelf);arrow.text=body.activeSelf?"−":"+";
                 LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)body.transform);
                 LayoutRebuilder.ForceRebuildLayoutImmediate(content);
             });
@@ -362,8 +373,9 @@ public static class TipsEnhancer
     private static void AddDeckRow(RectTransform parent,int index)
     {
         var e=DeckCatalog.Get(index);
-        var row=new GameObject("Card "+e.Suit+e.Rank,typeof(RectTransform),typeof(HorizontalLayoutGroup),typeof(LayoutElement));
+        var row=new GameObject("Card "+e.Suit+e.Rank,typeof(RectTransform),typeof(Image),typeof(HorizontalLayoutGroup),typeof(LayoutElement));
         row.transform.SetParent(parent,false);row.GetComponent<LayoutElement>().preferredHeight=260;
+        row.GetComponent<Image>().color=new Color32(246,243,255,255);row.GetComponent<Image>().raycastTarget=false;
         var layout=row.GetComponent<HorizontalLayoutGroup>();layout.padding=new RectOffset(20,20,10,10);layout.spacing=24;
         layout.childAlignment=TextAnchor.MiddleLeft;
         layout.childControlWidth=layout.childControlHeight=true;layout.childForceExpandWidth=false;layout.childForceExpandHeight=false;
