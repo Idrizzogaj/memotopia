@@ -25,3 +25,5 @@ The guide has the original back arrow, an illustrated Diamond 5 → D + L → DO
 Phone and iPad native renders were inspected; visual inspection caught and corrected a collapsed Deck list card. Final 2.1 log: `MemotopiaAndroidBuild/ChallengeSprint/statistics-deck-20261028d.log` (exit0). Renders: `MemotopiaAndroidBuild/ChainReuseFix/statistics-{memory,challenges,focus}-{phone,ipad}.png`, `tips-deck-{list,guide,diamonds}-{phone,ipad}.png`. Fixtures are synthetic test accounts, not production records.
 
 Device verification awaits the next user-authorized build. No backend change is required for this UI. The earlier rematch server fix remains a separate, undeployed task while the Mac route is unavailable.
+
+2.0 shared UI verification also passed in the staging editor using the release StatisticsView/MenuNavigation/TrainingHubLayout: statistics-deck-release20-20261028.log, exit0. It asserts four Memory cards and absence of Focus. The validation project retains its existing2.1-only editor helpers; this was not a complete2.0 mobile build. Renders carry the -release20 suffix.
