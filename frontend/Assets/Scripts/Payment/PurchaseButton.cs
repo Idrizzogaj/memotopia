@@ -1,4 +1,4 @@
-﻿using Assets.Script.Constants;
+using Assets.Script.Constants;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -115,6 +115,6 @@ public class PurchaseButton : MonoBehaviour
 
     public void linkBtn()
     {
-        Application.OpenURL("https://memotopia.com/terms.html");
+        UrlOpener.Open("https://memotopia.com/terms.html");
     }
 }

@@ -56,7 +56,8 @@ public sealed class FocusGame : MonoBehaviour {
  }
  void Hud(){if(clock==null)return;clock.text=practice?PracticeSession.Clock(this):Mathf.CeilToInt(remaining).ToString();clock.color=!practice&&remaining<=10?Red:Teal;levelText.text=level.ToString();scoreText.text=score.ToString();roundText.text=(practice?"Practice · ":"")+"Level "+(playing?level:startLevel)+(kind==2?" · "+(flashPart+1)+"/3":"");}
  void Feedback(string value){if(message!=null)message.text=value;messageUntil=Time.realtimeSinceStartup+1.2f;}
- void Award(bool right){if(right){if(practiceRun!=null)practiceRun.Progress(level);score++;correct++;streak=0;Feedback("+1");}else{errors++;streak++;if(kind==1)score--;Feedback(kind==1?"−1":"Try again");}Hud();}
+ void Award(bool right){if(right){if(practiceRun!=null)practiceRun.Progress(level);score++;correct++;streak=0;Feedback("+1");}else{errors++;streak++;if(kind==1)score--;Feedback(kind==1?"−1":"Try again");WrongFeedback.Vibrate();}Hud();if(!right&&kind==1&&score<=-10&&playing){lostFocus=true;Finish();lostFocus=false;}}
+ bool lostFocus;
  void Prepare(){
   transition=false;flashWatching=false;arenas.Clear();for(int i=body.transform.childCount-1;i>=0;i--)Remove(body.transform.GetChild(i).gameObject);Hud();
   if(kind==0){MathBoard();return;}if(kind==1){BoxesBoard();return;}NumbersBoard();
@@ -104,10 +105,17 @@ public sealed class FocusGame : MonoBehaviour {
    flashWatching=true;flashRemaining=FocusRules.FlashSeconds(keys.Length);rule.text="Memorise · "+flashRemaining+"s";
 
   }else{
-   var colours=mode==0?new[]{false}:mode==1?new[]{true}:new[]{false,true};int columns=n==15?5:6,rows=Mathf.CeilToInt(n/(float)columns);float band=colours.Length==1?.7f:.38f,diameter=Mathf.Min(size.x*.84f/columns,size.y*band/rows)*.86f;
-   for(int group=0;group<colours.Length;group++){
-    float top=colours.Length==1?.8f:group==0?.84f:.39f;Label(body.transform,colours[group]?"RED ↓":"GREEN ↑",new Vector2(.04f,top+.02f),new Vector2(.96f,top+.10f),24,colours[group]?Red:Green);
-    var keys=Enumerable.Range(1,n).OrderBy(_=>random.Next()).ToArray();for(int i=0;i<n;i++){float x=.09f+(i%columns)*.82f/(columns-1),y=top-(i/columns+.5f)*band/rows;Token(keys[i]+(colours[group]?1000:0),new Vector2(x,y),diameter,false);}
+   var colours=mode==0?new[]{false}:mode==1?new[]{true}:new[]{false,true};
+   // One evenly filled grid, as large as fits. Green and red are shuffled together only on levels that use both colours.
+   var all=new List<int>();foreach(bool red in colours)for(int value=1;value<=n;value++)all.Add(value+(red?1000:0));
+   all=all.OrderBy(_=>random.Next()).ToList();
+   float usableW=size.x*.9f,usableH=size.y*.84f,diameter=0;int columns=2;
+   for(int c=2;c<=8;c++){int r=Mathf.CeilToInt(all.Count/(float)c);float d=Mathf.Min(usableW/c,usableH/r)*.86f;if(d>diameter){diameter=d;columns=c;}}
+   int rows=Mathf.CeilToInt(all.Count/(float)columns);diameter=Mathf.Min(diameter,size.x*.3f);
+   for(int i=0;i<all.Count;i++){
+    int col=i%columns,row=i/columns,inRow=Mathf.Min(columns,all.Count-row*columns);
+    float x=.5f+(col-(inRow-1)/2f)*(usableW/columns)/size.x,y=.5f+(rows/2f-row-.5f)*(usableH/rows)/size.y;
+    Token(all[i],new Vector2(x,y),diameter,false);
    }
   }
  }
@@ -141,7 +149,11 @@ public sealed class FocusGame : MonoBehaviour {
  }
  void PlaceBall(NativeBall ball,int target){ball.Image.rectTransform.anchorMin=ball.Image.rectTransform.anchorMax=ball.State.Position;ball.Image.rectTransform.anchoredPosition=Vector2.zero;ball.Image.color=ball.State.Armed?Green:ball.State.Hits>=target?Color.gray:Red;if(ball.Halo!=null)ball.Halo.gameObject.SetActive(ball.State.Armed);}
  void Counts(Arena arena){arena.Count.text=string.Join("  ",arena.Balls.Select(b=>b.State.Hits+"/"+arena.Target).ToArray());}
- void Wall(Arena arena,int wall){if(!playing || transition)return;var ball=arena.Balls.Where(b=>b.State.Hits<arena.Target && !b.State.Armed && b.State.NextWall()==wall).OrderBy(b=>b.State.Arrival()).FirstOrDefault();if(ball==null)return;ball.State.Armed=true;ball.State.Hits++;Award(true);Flash(arena.Walls[wall],Green);PlaceBall(ball,arena.Target);Counts(arena);if(arenas.All(a=>a.Balls.All(b=>b.State.Hits>=a.Target)))NextLevel();}
+ void Wall(Arena arena,int wall){if(!playing || transition)return;var ball=arena.Balls.Where(b=>b.State.Hits<arena.Target && !b.State.Armed && b.State.NextWall()==wall).OrderBy(b=>b.State.Arrival()).FirstOrDefault();if(ball==null){Award(false);Flash(arena.Walls[wall],Red);return;} // guessing a wall costs a point and vibrates
+  ball.State.Armed=true;ball.State.Hits++;Award(true);Flash(arena.Walls[wall],Green);
+  // Single big box only: a correct tap sends the ball back, so the next wall comes sooner.
+  if(arenas.Count==1){ball.State.Bounce(wall);ball.State.Armed=false;}
+  PlaceBall(ball,arena.Target);Counts(arena);if(arenas.All(a=>a.Balls.All(b=>b.State.Hits>=a.Target)))NextLevel();}
  void Flash(Image wall,Color colour){StartCoroutine(Blink(wall,colour));}
  IEnumerator Blink(Image wall,Color colour){wall.color=colour;yield return new WaitForSecondsRealtime(.25f);if(wall!=null)wall.color=new Color32(192,215,217,255);}
  void Dialog(string first,string second,string left,string right,UnityEngine.Events.UnityAction no,UnityEngine.Events.UnityAction yes){
@@ -152,7 +164,7 @@ public sealed class FocusGame : MonoBehaviour {
  }
  void Earn(string key){if(!practice&&!string.IsNullOrEmpty(key) && GameManager.AchievementUserId>0 && GameManager.UnlockAchievement(key))earned.Add(key);}
  void SaveRun(bool complete){if(practiceRun!=null)practiceRun.Stop();if(string.IsNullOrEmpty(runId))return;FocusStats.End(runOwner,runId,level,score,correct,errors,90-remaining,complete);runId=null;}
- void Finish(){SaveRun(true);playing=false;transition=false;StopAllCoroutines();Hud();Dialog(practice?"Practice complete":"BRAINS OUT!","Score "+score+"\n"+correct+" correct · "+errors+" errors","Home","Replay",Close,Begin);if(Application.isPlaying&&!practice){foreach(string key in earned)BadgePopup.ShowFor(this,key);earned.Clear();if(!string.IsNullOrEmpty(PlayerPrefs.GetString("token")))ProgressSync.Instance.GetApi<Assets.Script.Controllers.AchievementsAPIController>().FlushPending();}}
+ void Finish(){SaveRun(true);playing=false;transition=false;StopAllCoroutines();Hud();Dialog(lostFocus?"LOST FOCUS":practice?"Practice complete":"BRAINS OUT!","Score "+score+"\n"+correct+" correct · "+errors+" errors","Home","Replay",Close,Begin);if(Application.isPlaying&&!practice){foreach(string key in earned)BadgePopup.ShowFor(this,key);earned.Clear();if(!string.IsNullOrEmpty(PlayerPrefs.GetString("token")))ProgressSync.Instance.GetApi<Assets.Script.Controllers.AchievementsAPIController>().FlushPending();}}
  void Quit(){if(!playing){Close();return;}if(popup!=null)return;Dialog("Are you sure you","want to quit?","No","Yes",()=>{Remove(popup);popup=null;last=Time.realtimeSinceStartup;},Close);}
  public void Close(){SaveRun(false);PracticeSession.Release(this);practiceRun=null;bool wasOpen=overlay!=null;playing=false;StopAllCoroutines();Remove(overlay);overlay=body=popup=null;arenas.Clear();if(wasOpen)Application.targetFrameRate=priorFrameRate;}
  static void Remove(GameObject value){if(value!=null){value.SetActive(false);CardFaces.DestroyGenerated(value);}}

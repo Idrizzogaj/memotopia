@@ -57,7 +57,7 @@ public static class StatisticsDeckValidation
             var list=menu.tipsScreen.transform.Find("Scroll View/Viewport/Content");var deck=list.Find("TheDeckGuide");var major=list.Find("MajorSystem");
             Check(deck.GetSiblingIndex()==major.GetSiblingIndex()+1 && list.Find("MemoryPalace").GetSiblingIndex()>deck.GetSiblingIndex(),"Deck immediately after Major and before Palace");
             Check(deck.GetComponent<LayoutElement>().preferredHeight==LayoutUtility.GetPreferredHeight((RectTransform)major) && ((RectTransform)deck).rect.height>180 && deck.GetComponent<Image>().color==Color.white,"Exact effective tip card height, visible and white");
-            Check(deck.Find("Deck icon").GetComponentsInChildren<Image>().Length==3,"Existing CC0 card artwork");
+            Check(deck.Find("Deck icon").GetComponentsInChildren<Image>().Length==4,"Existing CC0 card artwork (four aces)");
             var tipScroll=list.GetComponentInParent<ScrollRect>();ScrollTo(tipScroll,major);Capture(canvas,camera,"tips-deck-list-"+(tablet?"ipad":"phone"),width,height);
             deck.GetComponent<Button>().onClick.Invoke();var page=menu.tipsScreen.transform.Find("Screens/DeckGuidePage");Check(page.gameObject.activeInHierarchy,"Deck opens from the list");
             var guideScroll=page.Find("Scroll").GetComponent<ScrollRect>();StatisticsCards.Reflow(guideScroll.content);page.GetComponentInChildren<ScrollAboveFooter>(true).Apply();guideScroll.verticalNormalizedPosition=1;

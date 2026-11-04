@@ -393,6 +393,7 @@ public class FlashManager : GamesScript, IGameable
         }
         else
         {
+            WrongFeedback.Mistake(newRecallImageCellBtn);
             if(SprintRuntime.Active){SprintRuntime.Current.Error();return;}
             wrongSelected++;
             hearts[maxMistakes - wrongSelected].gameObject.SetActive(false);

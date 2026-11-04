@@ -12,7 +12,7 @@ public static class TrainingAthleteTile
  public static string Badge(string game){return "athlete-one-heart-"+game.ToLowerInvariant();}
  private static string pendingPopup;private static int popupOwner;
  public static bool TakePopup(string game){if(popupOwner!=GameManager.AchievementUserId || pendingPopup!=game)return false;pendingPopup=null;return true;}
- public static bool Eligible(string game){if(game=="Chain")return ChainProgress.Completed(20);var levels=LevelProgress.Get(game);return levels!=null && Array.Exists(levels,l=>l.level==20 && l.stars>0);}
+ public static bool Eligible(string game){if(game=="Chain")return ChainProgress.Completed(20);if(game=="Says")return SaysGame.Level20Done;var levels=LevelProgress.Get(game);return levels!=null && Array.Exists(levels,l=>l.level==20 && l.stars>0);}
  public static bool Complete(string game){
   if(PracticeMode.Untimed || !Eligible(game) || GameManager.AchievementUserId<=0)return false;
   PlayerPrefs.SetInt(Key(game),1);PlayerPrefs.Save();

@@ -209,8 +209,39 @@ public static class CardFaces
     {
         const string prefix = "MajorSystem/";
         int n;
-        if (path != null && path.StartsWith(prefix) && int.TryParse(path.Substring(prefix.Length), out n)) return Face(n + 1);
+        if (path != null && path.StartsWith(prefix) && int.TryParse(path.Substring(prefix.Length), out n))
+        {
+            int id = n + 1;
+            if (active && deck && id >= 1 && id <= DeckCatalog.Count && kinds[id] == CardKind.PlayingCard)
+            {
+                try { return PairsCard(id); }
+                catch (Exception e) { Debug.LogWarning("Pairs card fell back to the plain face: " + e.Message); }
+            }
+            return Face(id);
+        }
         return MajorSystemImages.LoadPath(path);
+    }
+
+    /// <summary>
+    /// A playing card on a square canvas with a small margin: it keeps its proportions in Pairs' square cells and its
+    /// black frame is never cut off at the edge of the grid (top row).
+    /// </summary>
+    private static Sprite PairsCard(int id)
+    {
+        string key = "pairs-card:" + id;
+        Sprite result;
+        if (cache.TryGetValue(key, out result) && result != null) return result;
+        var source = DeckCatalog.Face(id - 1);
+        var rect = source.textureRect;
+        int tw = source.texture.width, rx = (int)rect.x, ry = (int)rect.y, w = (int)rect.width, h = (int)rect.height;
+        var whole = ReadPixels(source.texture);
+        var pixels = new Color32[w * h];
+        for (int row = 0; row < h; row++) Array.Copy(whole, (ry + row) * tw + rx, pixels, row * w, w);
+        var square = FitIntoSquare(pixels, w, h, DeckCanvas, 0f, .035f);
+        result = MakeSprite(square, DeckCanvas, DeckCanvas, 100f);
+        MajorSystemImages.SetVisibleSize(result, Vector2.one);
+        cache[key] = result;
+        return result;
     }
 
     /// <summary>Text only, wide and transparent: used where the picture area is small and wide (Flash tiles).</summary>
@@ -228,8 +259,8 @@ public static class CardFaces
             Sprite sprite;
             if (cache.TryGetValue(key, out sprite)) return sprite;
             const int S = 512, H = 154; // 512 x 154 strip cut out of the middle of a square rendering
-            float[] cov = TextRaster.Coverage(text, S, 0.96f, sub == null ? 0.29f : 0.17f, 0.5f, sub == null ? 0.5f : 0.57f, true);
-            float[] subCov = sub == null ? null : TextRaster.Coverage(sub, S, 0.35f, 0.08f, 0.5f, 0.42f, true);
+            float[] cov = TextRaster.Coverage(text, S, 0.96f, sub == null ? 0.29f : 0.17f, 0.5f, sub == null ? 0.5f : 0.54f, true);
+            float[] subCov = sub == null ? null : TextRaster.Coverage(sub, S, 0.35f, 0.08f, 0.5f, 0.465f, true); // value and number half as far apart as before
             var px = new Color32[S * H];
             Color ink = number ? PurpleInk : DarkInk;
             int offset = (S - H) / 2;
@@ -267,20 +298,69 @@ public static class CardFaces
         cache[key]=sprite;return sprite;
     }
 
+    // Every deck illustration is delivered on the same square canvas, so pictures keep their proportions in square
+    // cells (Pairs, Boxes, Flash, Says) and the explaining label has the same size on every card.
+    private const int DeckCanvas=512;
     private static Sprite DeckImage(int id) {
         var source=DeckCatalog.Mnemonic(id-1);
         if(source==null)throw new InvalidOperationException("Missing deck illustration: "+id);
-        if(deckFaces[id]!=DeckDisplay.Decode)return source;
-        string key="deck-image-help:"+id;
+        bool label=deckFaces[id]==DeckDisplay.Decode;
+        string key=(label?"deck-image-help:":"deck-image:")+id;
         Sprite result;if(cache.TryGetValue(key,out result))return result;
-        int w=source.texture.width,h=source.texture.height;
-        var pixels=ReadPixels(source.texture);
-        FillRounded(pixels,w,h,.02f,.01f,.98f,.24f,.04f,Color.white,Color.white);
-        Blend(pixels,TextRaster.Coverage(DeckCatalog.Decode(id-1),w,.92f,.09f,.5f,.12f,true),PurpleInk);
-        result=MakeSprite(pixels,w,h,source.pixelsPerUnit);
+        // A sprite may sit on a shared (packed) texture: copy only its own rectangle, never the whole texture.
+        var rect=source.textureRect;
+        int tw=source.texture.width,rx=(int)rect.x,ry=(int)rect.y,w=(int)rect.width,h=(int)rect.height;
+        var whole=ReadPixels(source.texture);
+        var pixels=new Color32[w*h];
+        for(int row=0;row<h;row++)Array.Copy(whole,(ry+row)*tw+rx,pixels,row*w,w);
+        // Trim empty (transparent) borders first, so every picture is centred and sized by what is actually visible.
+        int minx=w,miny=h,maxx=-1,maxy=-1;
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(pixels[y*w+x].a>12){if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;}
+        if(maxx>=minx && maxy>=miny && (maxx-minx+1<w || maxy-miny+1<h)){
+            int cw=maxx-minx+1,ch=maxy-miny+1;var cropped=new Color32[cw*ch];
+            for(int row=0;row<ch;row++)Array.Copy(pixels,(miny+row)*w+minx,cropped,row*cw,cw);
+            pixels=cropped;w=cw;h=ch;
+        }
+        var square=FitIntoSquare(pixels,w,h,DeckCanvas,label?.27f:0f,.07f);
+        if(label){
+            // Same white card behind the picture as behind the label, so the whole face reads as one card.
+            var card=new Color32[DeckCanvas*DeckCanvas];
+            FillRounded(card,DeckCanvas,DeckCanvas,0f,0f,1f,1f,.06f,Color.white,Color.white);
+            for(int p=0;p<card.Length;p++){
+                if(card[p].a==0)continue;
+                var s=square[p];float sa=s.a/255f;
+                card[p]=new Color32((byte)(255+(s.r-255)*sa),(byte)(255+(s.g-255)*sa),(byte)(255+(s.b-255)*sa),card[p].a);
+            }
+            square=card;
+            FillRounded(square,DeckCanvas,DeckCanvas,.04f,.02f,.96f,.23f,.05f,Color.white,Color.white);
+            Blend(square,TextRaster.Coverage(DeckCatalog.Decode(id-1),DeckCanvas,.9f,.07f,.5f,.125f,true),PurpleInk);
+        }
+        result=MakeSprite(square,DeckCanvas,DeckCanvas,100f);
         MajorSystemImages.SetVisibleSize(result,Vector2.one);cache[key]=result;return result;
     }
 
+    /// <summary>Scales a picture to fit the square canvas above a bottom strip (fraction), keeping its proportions.</summary>
+    private static Color32[] FitIntoSquare(Color32[] src,int w,int h,int size,float bottomFraction,float pad){
+        var dst=new Color32[size*size];
+        float areaBottom=bottomFraction*size,areaH=size-areaBottom;
+        // Keep a margin (pad) on every side so no picture touches or leaves the card.
+        float scale=Mathf.Min(size*(1f-2f*pad)/w,(areaH-size*pad*2f)/h);
+        int nw=Mathf.Max(1,Mathf.RoundToInt(w*scale)),nh=Mathf.Max(1,Mathf.RoundToInt(h*scale));
+        int ox=(size-nw)/2,oy=Mathf.RoundToInt(areaBottom+(areaH-nh)/2f);
+        for(int y=0;y<nh;y++){
+            int dy=oy+y;if(dy<0||dy>=size)continue;
+            int iy0=Mathf.Clamp((int)(y/scale),0,h-1),iy1=Mathf.Clamp((int)Mathf.Ceil((y+1)/scale)-1,iy0,h-1);
+            for(int x=0;x<nw;x++){
+                int dx=ox+x;if(dx<0||dx>=size)continue;
+                int ix0=Mathf.Clamp((int)(x/scale),0,w-1),ix1=Mathf.Clamp((int)Mathf.Ceil((x+1)/scale)-1,ix0,w-1);
+                float a=0,r=0,g=0,b=0;int n=0;
+                for(int sy=iy0;sy<=iy1;sy++)for(int sx=ix0;sx<=ix1;sx++){var c=src[sy*w+sx];float ca=c.a/255f;a+=ca;r+=c.r*ca;g+=c.g*ca;b+=c.b*ca;n++;}
+                if(n==0||a<=0f)continue;
+                dst[dy*size+dx]=new Color32((byte)Mathf.Clamp(r/a,0,255),(byte)Mathf.Clamp(g/a,0,255),(byte)Mathf.Clamp(b/a,0,255),(byte)Mathf.Clamp(255f*a/n,0,255));
+            }
+        }
+        return dst;
+    }
     // Says has exactly ten fixed keys, independent of the two/three-digit setting.
     public static Sprite SaysFace(int id,int digit) {
         if(KindOf(id)==CardKind.Number)return SingleDigit(digit);

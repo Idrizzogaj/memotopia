@@ -129,6 +129,7 @@ public class MenuNavigation : MonoBehaviour
 
         ProgressSync.Instance.RetryPending();
         GetCompleatedAchievements();
+        CreatorPromo.MaybeShow(this);
     }
 
     public void PaymentRestrictions()

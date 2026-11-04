@@ -77,7 +77,7 @@ public static class StartupSessionValidation
 
     static void Capture(AuthView auth, string name, int width, int height)
     {
-        var canvas = auth.logInScreen.GetComponentInParent<Canvas>(true).rootCanvas;
+        var canvas = auth.logInScreen.GetComponentsInParent<Canvas>(true)[0].rootCanvas; // works in 2019.3 and 2022 (also for inactive objects)
         canvas.renderMode = RenderMode.WorldSpace;
         canvas.transform.position = Vector3.zero; canvas.transform.localScale = Vector3.one;
         ((RectTransform)canvas.transform).sizeDelta = new Vector2(800, height * 800f / width);

@@ -92,8 +92,9 @@ public static class DeckCatalog
         string rank=e.Rank=="A"?"1":e.Rank=="10"?"0":e.Rank=="J"?"11":e.Rank=="Q"?"12":e.Rank=="K"?"13":e.Rank;
         const string letters="STNMRLJKFP";
         string sounds=String.Join("+",System.Linq.Enumerable.Select(rank,c=>letters[c-'0'].ToString()).ToArray());
-        if(e.Suit=="hearts" && e.Rank=="K")return "HK: T+M = 13";
-        return (e.Suit=="clubs"?"C":e.Suit=="diamonds"?"D":e.Suit=="hearts"?"H":"S")+e.Rank+": "+prefix+"+"+sounds+" = "+e.Code;
+        // Only how the card decodes into sounds; the picture/word code is not part of the explanation.
+        if(e.Suit=="hearts" && e.Rank=="K")return "HK: T+M";
+        return (e.Suit=="clubs"?"C":e.Suit=="diamonds"?"D":e.Suit=="hearts"?"H":"S")+e.Rank+": "+prefix+"+"+sounds;
     }
     public static Sprite Mnemonic(int index) { var e=Get(index);return Resources.Load<Sprite>("DeckMnemonics/"+e.Suit+"_"+e.Rank); }
     public static Sprite Face(int index)

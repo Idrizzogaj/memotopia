@@ -64,6 +64,8 @@ public class MemorySettingsPanel : MonoBehaviour
     private void Rebuild()
     {
         for (int i=content.childCount-1;i>=0;i--) { var old=content.GetChild(i).gameObject;old.SetActive(false);Destroy(old); }
+        var creator=Button(content,"Meet the creator · More from Zogaj",()=>CreatorPage.Open(GetComponent<MenuNavigation>()),86);
+        creator.image.color=new Color32(253,191,80,255);
         var practice=Button(content,(MemorySettings.Practice?"[x] ":"[ ] ")+"Practice",()=>{MemorySettings.Practice=!MemorySettings.Practice;Rebuild();},86);
         practice.image.color=MemorySettings.Practice?(Color)new Color32(254,191,75,255):(Color)new Color32(238,234,255,255);
         Label(content,"Practice counts time upwards and saves Level + Time. No achievements. Challenges always stay timed.",28,110);
@@ -101,6 +103,8 @@ public class MemorySettingsPanel : MonoBehaviour
     }
     private void Credits()
     {
+        // The licence texts live on the website; the bundled copy below is only the offline fallback.
+        if(Application.internetReachability!=NetworkReachability.NotReachable){UrlOpener.Open("https://www.memotopia.com/licenses.html");return;}
         if(content.Find("LicenseCredits")!=null) return;
         foreach (var path in new[]{"Licenses/CMUDICT-LICENSE","Licenses/WORDNET-LICENSE","Licenses/CLASSIC-DECK-CC0"})
         {

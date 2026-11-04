@@ -31,7 +31,7 @@ public static class TrainingHubLayout
         }
     }
     private static readonly string[] Names={"PAIRS","BOXES","FLASH","CHAIN","SAYS"};
-    private static readonly Color[] GameTones={new Color32(36,189,224,255),new Color32(234,24,100,255),new Color32(254,191,75,255),new Color32(123,31,255,255),new Color32(106,28,225,255)};
+    private static readonly Color[] GameTones={new Color32(36,189,224,255),new Color32(234,24,100,255),new Color32(254,191,75,255),new Color32(0,150,160,255) /* Chain: same colour as ChainGame.Theme */,new Color32(106,28,225,255)};
     public static readonly Color MemoryTone=new Color32(106,28,225,255), FocusTone=new Color32(0,112,122,255);
     private static void Header(RectTransform screen,string caption,float top,float width) {
         var go=ChainGame.Panel(screen,caption+" section",Vector2.zero,Vector2.one,caption=="FOCUS"?FocusTone:MemoryTone);

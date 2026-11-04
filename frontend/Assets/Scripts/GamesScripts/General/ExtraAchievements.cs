@@ -29,6 +29,7 @@ public static class ExtraAchievements
         new Def("athlete-one-heart-boxes", "Memory Athlete: Boxes", "Clear the extra Boxes level with one heart. 500 XP, once."),
         new Def("athlete-one-heart-flash", "Memory Athlete: Flash", "Clear the extra Flash level with one heart. 500 XP, once."),
         new Def("athlete-one-heart-chain", "Memory Athlete: Chain", "Clear the extra Chain level with one heart. 500 XP, once."),
+        new Def("athlete-one-heart-says", "Memory Athlete: Says", "Clear the extra Says level with one heart. 500 XP, once."),
         new Def("chain-all", "Break the Chains!", "Complete all 20 Chain levels."),
         new Def("memory-athlete", "Memory Athlete", "Clear level 20 in Pairs, Flash or Boxes."),
         new Def("all-star", "All Star", "Earn 3 stars on all 20 levels in Pairs, Flash and Boxes."),
@@ -73,8 +74,8 @@ public static class ExtraAchievements
             achievement.constantString = def.Key;
             achievement.title = def.Title;
             achievement.description = def.Description;
-            if(def.Key.StartsWith("athlete-one-heart-")){achievement.icon=Resources.Load<Sprite>("GamesResources/Loading/Untitled-3-01");built.Add(achievement);continue;}
-            achievement.icon = def.Key.StartsWith("chain-") ? Resources.Load<Sprite>("Achievements/Extra/tip-link-method") : def.Key == "tip-the-deck" ? DeckCatalog.Face(17) : Resources.Load<Sprite>("Achievements/Extra/" + def.Key);
+            if(def.Key.StartsWith("athlete-one-heart-")){achievement.icon=Resources.Load<Sprite>("Achievements/Extra/"+def.Key)??Resources.Load<Sprite>("GamesResources/Loading/Untitled-3-01");built.Add(achievement);continue;}
+            achievement.icon = def.Key.StartsWith("chain-") ? Resources.Load<Sprite>("Achievements/Extra/tip-link-method") : def.Key == "tip-the-deck" ? DeckCatalog.Face(39) /* ace of spades */ : Resources.Load<Sprite>("Achievements/Extra/" + def.Key);
             built.Add(achievement);
         }
         return built;

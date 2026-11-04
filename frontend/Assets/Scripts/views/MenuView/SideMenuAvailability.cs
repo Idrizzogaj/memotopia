@@ -35,13 +35,34 @@ public class SideMenuAvailability : MonoBehaviour
                 image.gameObject.SetActive(false);
     }
 
+    // While the app has no public store listing the greyed-out "Rate" row is useless: it becomes "Meet the creator".
+    private const string CreatorMarker = "CreatorEntry";
+    public static bool IsCreatorEntry(Button button) { return button.transform.Find(CreatorMarker) != null; }
+
+    private void RelabelCreator(Button button)
+    {
+        if (!IsCreatorEntry(button))
+        {
+            bool isRate = false;
+            for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
+                isRate |= button.onClick.GetPersistentMethodName(i) == "RateBtnClick";
+            if (!isRate || MenuNavigation.PublicStoreListingAvailable) return;
+            new GameObject(CreatorMarker).transform.SetParent(button.transform, false);
+            button.onClick = new Button.ButtonClickedEvent();
+            button.onClick.AddListener(() => CreatorPage.Open(FindObjectOfType<MenuNavigation>()));
+        }
+        foreach (var text in button.GetComponentsInChildren<Text>(true))
+            if (text.text != "Meet the creator") text.text = "Meet the creator";
+    }
+
     public void Refresh()
     {
         bool unsupportedUpgrade = Application.platform == RuntimePlatform.IPhonePlayer &&
             UserConstants.s_user != null && UserConstants.s_user.paymentStatus == PaymentStatus.s_monthly;
         foreach (var button in GetComponentsInChildren<Button>(true))
         {
-            bool active = MemorySettingsPanel.IsEntry(button);
+            RelabelCreator(button);
+            bool active = MemorySettingsPanel.IsEntry(button) || IsCreatorEntry(button);
             for (int i = 0; i < button.onClick.GetPersistentEventCount(); i++)
                 active |= IsAvailable(button.onClick.GetPersistentMethodName(i), MyIAPManager.CanBuySubscriptions, unsupportedUpgrade);
             button.interactable = active;

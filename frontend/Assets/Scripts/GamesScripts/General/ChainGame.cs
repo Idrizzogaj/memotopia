@@ -89,6 +89,7 @@ public static class StudySteps
 
 public sealed class ChainGame : GamesScript
 {
+    public static readonly Color Theme=new Color32(0,150,160,255); // Chain has its own colour, Says keeps purple
     public static readonly Color Purple=new Color32(123,31,255,255), Ink=new Color32(45,30,75,255);
     private RectTransform overlay,body,safe;
     private GameObject exactLevels;
@@ -104,7 +105,7 @@ public sealed class ChainGame : GamesScript
     private readonly List<Button> tiles=new List<Button>();
     public static void Attach(RectTransform screen) {
         if(screen.Find("Chain")!=null)return;
-        var root=Panel(screen,"Chain",new Vector2(.08f,.1f),new Vector2(.92f,.27f),Purple);
+        var root=Panel(screen,"Chain",new Vector2(.08f,.1f),new Vector2(.92f,.27f),Theme);
         // Match existing stacked training tile geometry; ContentSelectorBar fits all four together.
         var prototype=screen.Find("Flash") as RectTransform;
         if(prototype!=null) {
@@ -123,7 +124,7 @@ public sealed class ChainGame : GamesScript
         if(overlay!=null)return;
         owner=GameManager.AchievementUserId;
         var canvas=GetComponentInParent<Canvas>().rootCanvas;
-        overlay=(RectTransform)Panel(canvas.transform,"Chain overlay",Vector2.zero,Vector2.one,Purple).transform;
+        overlay=(RectTransform)Panel(canvas.transform,"Chain overlay",Vector2.zero,Vector2.one,Theme).transform;
         safe=(RectTransform)Panel(overlay,"Safe area",Vector2.zero,Vector2.one,Color.clear).transform;
         ApplySafeArea();
         title=Label(safe,"",Vector2.zero,Vector2.zero,14,Purple);title.gameObject.SetActive(false);
@@ -185,14 +186,17 @@ public sealed class ChainGame : GamesScript
         if(exactTheme!=null)CardFaces.DestroyGenerated(exactTheme);
         exactLevels=UnityEngine.Object.Instantiate(template,overlay,false);
         var rect=(RectTransform)exactLevels.transform;rect.localScale=Vector3.one;rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;rect.offsetMin=rect.offsetMax=Vector2.zero;rect.anchoredPosition3D=Vector3.zero;safe.gameObject.SetActive(false);
-        var shader=Resources.Load<Shader>("MemotopiaTheme");exactTheme=new Material(shader);exactTheme.SetColor("_ThemeColor",Purple);
+        var shader=Resources.Load<Shader>("MemotopiaTheme");exactTheme=new Material(shader);exactTheme.SetColor("_ThemeColor",Theme);
         var background=exactLevels.GetComponent<Image>();background.sprite=Resources.Load<Sprite>("GamesResources/Levels/FlashBackground");background.color=Color.white;background.material=exactTheme;
         foreach(var button in exactLevels.GetComponentsInChildren<Button>(true)) {button.onClick=new Button.ButtonClickedEvent();button.onClick.AddListener(Close);}
         foreach(var image in exactLevels.GetComponentsInChildren<Image>(true)) {
             if(image.name=="Chain title") {
-                image.sprite=Resources.Load<Sprite>("GamesResources/Levels/FlashTop");image.color=Color.white;image.material=exactTheme;
-                var cover=Panel(image.transform,"Chain title text",new Vector2(.23f,.53f),new Vector2(.77f,.83f),Color.white);
-                var caption=Label(cover.transform,"CHAIN",Vector2.zero,Vector2.one,60,Purple);caption.fontStyle=FontStyle.Bold;
+                // Same header art as Pairs/Boxes/Flash but drawn white (not tinted), with the word cut out in the game colour.
+                // The white patch only covers the old word in the middle and never catches taps, so the back button stays usable.
+                image.sprite=Resources.Load<Sprite>("GamesResources/Levels/FlashTop");image.color=Color.white;
+                var whiteTheme=new Material(Resources.Load<Shader>("MemotopiaTheme"));whiteTheme.SetColor("_ThemeColor",Color.white);image.material=whiteTheme;
+                var cover=Panel(image.transform,"Chain title text",new Vector2(.23f,.53f),new Vector2(.77f,.83f),Color.white);cover.GetComponent<Image>().raycastTarget=false;
+                var caption=Label(cover.transform,"CHAIN",Vector2.zero,Vector2.one,66,Theme);caption.fontStyle=FontStyle.Bold;caption.raycastTarget=false;
                 var existing=exactLevels.GetComponentInChildren<Text>(true);if(existing!=null && existing!=caption)caption.font=existing.font;
             }
             if(!image.name.StartsWith("Chain Level "))continue;
@@ -200,7 +204,7 @@ public sealed class ChainGame : GamesScript
             bool unlocked=ChainProgress.Unlocked(n);
             image.sprite=Resources.Load<Sprite>(unlocked?"GamesResources/Levels/AAA-11":"GamesResources/Levels/FlashLevelCell");
             if(!unlocked)image.material=exactTheme;
-            var number=image.transform.GetChild(1).GetComponentInChildren<Text>(true);number.text=n.ToString();number.color=Purple;
+            var number=image.transform.GetChild(1).GetComponentInChildren<Text>(true);number.text=n.ToString();number.color=Theme;
             var button=image.transform.GetChild(1).GetComponent<Button>();button.interactable=unlocked;button.onClick=new Button.ButtonClickedEvent();if(unlocked)button.onClick.AddListener(()=>StartLevel(n));
             var stars=image.transform.GetChild(0);stars.gameObject.SetActive(ChainProgress.Stars(n)>0);
             for(int i=0;i<stars.childCount;i++) {
@@ -211,7 +215,7 @@ public sealed class ChainGame : GamesScript
         var originals=exactLevels.GetComponentsInChildren<Image>(true);
         var last=Array.Find(originals,i=>i.name=="Chain Level 20");
         var previous=Array.Find(originals,i=>i.name=="Chain Level 16");
-        TrainingAthleteTile.Attach(last,previous,Purple,()=>StartLevel(MemoryAthlete.Level),TrainingAthleteTile.Eligible("Chain"));
+        TrainingAthleteTile.Attach(last,previous,Theme,()=>StartLevel(MemoryAthlete.Level),TrainingAthleteTile.Eligible("Chain"));
         return true;
     }
 
@@ -234,7 +238,11 @@ public sealed class ChainGame : GamesScript
         if(SprintRuntime.Active){yield return SprintRuntime.ReadyIntro();ShowStudy();yield break;}
         safe.gameObject.SetActive(false);
         countdownPanel=UnityEngine.Object.Instantiate(Resources.Load<GameObject>("Prefabs/ReadySteadyGo"),overlay,false);
+        // Behind READY/STEADY/GO use the countdown's own colour, so the screen is not split in two colours.
+        var overlayImage=overlay.GetComponent<Image>();var countdownImage=countdownPanel.GetComponent<Image>();
+        if(overlayImage!=null && countdownImage!=null && countdownImage.sprite==null)overlayImage.color=countdownImage.color;
         yield return StartCoroutine(ShowRSG(countdownPanel));
+        if(overlayImage!=null)overlayImage.color=Theme;
         while(quitDialog!=null)yield return null;
         if(GameManager.UnlockAchievement("chain-first"))firstEarned=true;
         ShowStudy();
@@ -243,7 +251,7 @@ public sealed class ChainGame : GamesScript
     private void ShowStudy() {
         PracticeSession.Begin(this,"Memory.Chain",level);
         ClearBody();ClearOriginalGame();safe.gameObject.SetActive(false);
-        if(exactTheme==null){exactTheme=new Material(Resources.Load<Shader>("MemotopiaTheme"));exactTheme.SetColor("_ThemeColor",Purple);}
+        if(exactTheme==null){exactTheme=new Material(Resources.Load<Shader>("MemotopiaTheme"));exactTheme.SetColor("_ThemeColor",Theme);}
         originalGame=new ChainOriginalPresentation(overlay,true,Back,NextCard,exactTheme);
         studyCard=originalGame.Study;next=originalGame.Next;NextCard();
     }
@@ -253,6 +261,7 @@ public sealed class ChainGame : GamesScript
         int index;
         if(!StudySteps.Take(ref studyIndex,state.Sequence.Length,1,out index)){ShowRecall();return;}
         studyCard.sprite=CardFaces.Face(state.Sequence[index]);
+        studyCard.preserveAspect=true; // playing cards keep their own proportions instead of filling the square
         CardFaces.SmallFace(state.Sequence[index]); // Prepare the recall face progressively, not all 52 on the last Next.
 
 

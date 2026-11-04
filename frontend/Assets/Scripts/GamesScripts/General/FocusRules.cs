@@ -12,7 +12,7 @@ public static class FocusRules {
   if(kind==2)return Mathf.Clamp(level,1,12)+2;
   return level<=6?new[]{6,6,12,12,15,15}[level-1]:level<=9?new[]{6,12,15}[level-7]:new[]{6,12,15,15}[Mathf.Min(level-10,3)];
  }
- public static int NumberMode(int kind,int level,int part=0){if(kind==2)return part==0?0:part==1?1:3;return level<=6?(level%2==1?0:1):(level<=9?2:3);}
+ public static int NumberMode(int kind,int level,int part=0){if(kind==2)return part==0?0:part==1?1:3;return level<=6?(level%2==1?0:1):3;} // from level 7 both colours alternate: green 1, red n, green 2, red n-1, ...
  public static int[] Sequence(int kind,int level,int part=0){
   int n=NumberCount(kind,level),mode=NumberMode(kind,level,part);var result=new List<int>();
   if(mode==0)for(int i=1;i<=n;i++)result.Add(i);
@@ -40,6 +40,8 @@ public static class FocusRules {
   static float AxisArrival(float position,float velocity){return Mathf.Abs(velocity)<.000001f?float.PositiveInfinity:(velocity>0?.95f-position:.05f-position)/velocity;}
   public int NextWall(){float x=AxisArrival(Position.x,Velocity.x),y=AxisArrival(Position.y,Velocity.y);return x<y?(Velocity.x>0?1:3):(Velocity.y>0?0:2);}
   public float Arrival(){return Mathf.Min(AxisArrival(Position.x,Velocity.x),AxisArrival(Position.y,Velocity.y));}
+  // A correct tap on a wall bounces the ball off it as if it had hit it: same random 90 degree cone as a real impact.
+  public void Bounce(int wall){float speed=Velocity.magnitude;float angle=(float)((Random??fallbackRandom).NextDouble()*90-45)*Mathf.Deg2Rad;Vector2 normal=wall==0?Vector2.down:wall==1?Vector2.left:wall==2?Vector2.up:Vector2.right;Velocity=(normal*Mathf.Cos(angle)+new Vector2(-normal.y,normal.x)*Mathf.Sin(angle))*speed;}
   // Returns the wall hit this tick, or -1; arrival coverage is consumed exactly once.
   public int Step(float seconds){int wall=NextWall();Position+=Velocity*seconds;bool hit=false;
    if(Position.x<.05f || Position.x>.95f){Position.x=Mathf.Clamp(Position.x,.05f,.95f);Velocity.x=-Velocity.x;hit=true;}

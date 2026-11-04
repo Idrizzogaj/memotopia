@@ -512,6 +512,6 @@ public class AuthView : MonoBehaviour
 
     public void linkBtn()
     {
-        Application.OpenURL("https://memotopia.com/terms.html");
+        UrlOpener.Open("https://memotopia.com/terms.html");
     }
 }
