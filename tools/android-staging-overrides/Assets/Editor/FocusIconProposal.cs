@@ -1,0 +1,15 @@
+using UnityEngine;using UnityEngine.UI;using System.Reflection;using UnityEditor.SceneManagement;
+public static class FocusIconProposal {
+ public static void Render(){EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);var root=new GameObject("Focus icon proposal only",typeof(RectTransform),typeof(Canvas));var rect=(RectTransform)root.transform;rect.sizeDelta=new Vector2(1100,1250);root.GetComponent<Canvas>().renderMode=RenderMode.WorldSpace;
+ ChainGame.Label(root.transform,"FOCUS · Achievement icons",new Vector2(.03f,.93f),new Vector2(.97f,.985f),44,ChainGame.Ink);ChainGame.Label(root.transform,"First play: teal  ·  Highest level: gold frame",new Vector2(.03f,.89f),new Vector2(.97f,.935f),25,ChainGame.Ink);
+ string[] names={"First time focus!","Beginner class","Professor","First catch","Ball breaker","Fast eyes","Vision","In line","First in line"};int[] kinds={-1,0,0,1,1,2,2,3,3};bool[] top={false,false,true,false,true,false,true,false,true};var hex=Resources.Load<Sprite>("GamesResources/Levels/AAA-11");var white=new Material(Resources.Load<Shader>("MemotopiaTheme"));white.SetColor("_ThemeColor",Color.white);
+ for(int n=0;n<9;n++){int col=n%3,row=n/3;var cell=ChainGame.Panel(root.transform,names[n],new Vector2(.025f+col*.325f,.04f+(2-row)*.282f),new Vector2(.325f+col*.325f,.31f+(2-row)*.282f),new Color(.975f,.975f,.99f));
+ var badge=ChainGame.Panel(cell.transform,"Badge",new Vector2(.15f,.28f),new Vector2(.85f,.97f),top[n]?new Color32(254,191,75,255):TrainingHubLayout.FocusTone).GetComponent<Image>();badge.sprite=hex;badge.preserveAspect=true;
+ var inside=ChainGame.Panel(badge.transform,"Focus",new Vector2(.055f,.055f),new Vector2(.945f,.945f),TrainingHubLayout.FocusTone).GetComponent<Image>();inside.sprite=hex;inside.preserveAspect=true;var art=(RectTransform)ChainGame.Panel(inside.transform,"Symbol",new Vector2(.15f,.18f),new Vector2(.85f,.82f),Color.clear).transform;art.GetComponent<Image>().raycastTarget=false;Canvas.ForceUpdateCanvases();
+ if(kinds[n]<0){var logo=ChainGame.Panel(art,"Existing elephant",Vector2.zero,Vector2.one,Color.white).GetComponent<Image>();logo.sprite=Resources.Load<Sprite>("GamesResources/Loading/Untitled-3-01");logo.preserveAspect=true;logo.material=white;}else TrainingGameSymbol.Draw(art,kinds[n],Color.white);
+ ChainGame.Label(cell.transform,names[n],new Vector2(.03f,.035f),new Vector2(.97f,.25f),32,ChainGame.Ink).fontStyle=FontStyle.Bold;
+ }
+ var camera=new GameObject("Proposal camera",typeof(Camera)).GetComponent<Camera>();camera.transform.position=new Vector3(0,0,-20);camera.orthographic=true;camera.nearClipPlane=.1f;camera.farClipPlane=1000;camera.cullingMask=1<<30;camera.clearFlags=CameraClearFlags.SolidColor;camera.backgroundColor=Color.white;root.GetComponent<Canvas>().worldCamera=camera;
+ typeof(ChainReuseValidation).GetMethod("Capture",BindingFlags.NonPublic|BindingFlags.Static).Invoke(null,new object[]{root,camera,"focus-achievement-icon-proposal",1320,1500});Debug.Log("FOCUS_ICON_PROPOSAL_RENDERED");
+ }
+}

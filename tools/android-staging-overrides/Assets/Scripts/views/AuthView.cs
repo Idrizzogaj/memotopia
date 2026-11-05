@@ -1,0 +1,517 @@
+using System;
+using UnityEngine;
+using UnityEngine.UI;
+using Assets.Script.Constants;
+using Assets.Script.Controllers;
+using Assets.Script.Models;
+using Assets.Script.Utilities;
+using UnityEngine.SceneManagement;
+using System.Collections.Generic;
+using UnityEngine.SignInWithApple;
+
+public class AuthView : MonoBehaviour
+{
+    public InputField usernameLogIn;
+    public InputField passwordLogIn;
+
+    public InputField usernameSignUp;
+    public InputField emailSignUp;
+    public InputField firstPasswordSignUp;
+    public InputField secondPasswordSignUp;
+
+    public InputField emailForgotPassword;
+    public Text forgotPasswordText;
+
+    public GameObject errorLogin;
+    public GameObject errorSignUp;
+
+    public GameObject iOSSocialLogin;
+    public GameObject AndroidSocialLogin;
+
+    public Toggle toggleTermsAndConditions;
+
+    public GameObject logInScreen;
+    public GameObject signUpScreen;
+    public GameObject forgotPasswordScreen;
+
+    LoadingManager _loadingScreen;
+    AuthAPIController _authApiController;
+    DataController _dataController;
+    ValidationUtilities _validationUtilities;
+    UserAPIController _userAPIController;
+    string aToken;
+    private bool _appleLoginPending;
+    private SavedSessionView savedSessionView;
+    private float sessionRetryDelay;
+
+    private void ShowSavedSession()
+    {
+        logInScreen.SetActive(false);
+        signUpScreen.SetActive(false);
+        forgotPasswordScreen.SetActive(false);
+        if (savedSessionView == null)
+            savedSessionView = SavedSessionView.Show(logInScreen.transform.parent, getUser, UseAnotherAccount);
+        savedSessionView.Pending();
+    }
+
+    private void UseAnotherAccount()
+    {
+        retrySavedSession = restoringSession = false;
+        PlayerPrefs.DeleteKey("token");
+        PlayerPrefs.Save();
+        UserConstants.s_user = null;
+        if (savedSessionView != null) savedSessionView.Hide();
+        savedSessionView = null;
+        goToScreen("logIn");
+    }
+
+    void Awake()
+    {
+        // Hide credential forms before the first rendered frame, on both iOS and Android.
+        if (!String.IsNullOrEmpty(PlayerPrefs.GetString("token"))) ShowSavedSession();
+        // Facebook SDK disabled for iOS/TestFlight stability.
+#if UNITY_IPHONE
+        iOSSocialLogin.SetActive(true);
+        AndroidSocialLogin.SetActive(false);
+#endif
+#if UNITY_ANDROID
+        iOSSocialLogin.SetActive(false);
+        AndroidSocialLogin.SetActive(false);
+#endif
+    }
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        _authApiController = gameObject.AddComponent<AuthAPIController>();
+        _dataController = gameObject.AddComponent<DataController>();
+        _validationUtilities = gameObject.AddComponent<ValidationUtilities>();
+        _userAPIController = gameObject.AddComponent<UserAPIController>();
+        _loadingScreen = GameObject.Find("LoadingCanvas").GetComponent<LoadingManager>();
+        _dataController.MenuLastPage = NavigationConstants.s_homeNav;
+#if UNITY_ANDROID
+        if (GetComponent<AndroidGoogleSignIn>() == null) gameObject.AddComponent<AndroidGoogleSignIn>();
+#endif
+
+        if (!String.IsNullOrEmpty(_dataController.Token))
+        {
+            getUser();
+        }
+        else
+        {
+            _loadingScreen.EndLoading();
+        }
+    }
+
+    void Update() {
+        if (retrySavedSession && !restoringSession)
+        {
+            sessionRetryDelay -= Time.unscaledDeltaTime;
+            if (sessionRetryDelay <= 0) getUser();
+        }
+        if (usernameLogIn.isFocused || passwordLogIn.isFocused && errorLogin.active)
+            errorLogin.SetActive(false);
+
+        if (usernameSignUp.isFocused || emailSignUp.isFocused || firstPasswordSignUp.isFocused || secondPasswordSignUp.isFocused  && errorSignUp.active)
+            errorSignUp.SetActive(false);
+    }
+
+    public void loginWithFacebook()
+    {
+        Debug.Log("FACEBOOK LOGIN DISABLED");
+        return;
+    }
+
+    public void loginWithApple()
+    {
+    #if UNITY_IOS
+        if (_appleLoginPending) return;
+        _appleLoginPending = true;
+        errorLogin.GetComponent<Text>().text = "Opening Sign in with Apple...";
+        errorLogin.SetActive(true);
+        Debug.Log("Apple sign-in: button pressed");
+        try
+        {
+            var siwa = gameObject.GetComponent<SignInWithApple>();
+            if (siwa == null) throw new InvalidOperationException("Apple sign-in component is missing.");
+            siwa.Login(OnAppleLogin);
+        }
+        catch (Exception exception)
+        {
+            _appleLoginPending = false;
+            ShowAppleLoginError("Apple sign-in could not start. Please try again.");
+            Debug.LogWarning("Apple sign-in start failed: " + exception.GetType().Name);
+        }
+    #endif
+    }
+
+    public void logIn()
+    {
+        Debug.Log("LOGIN BUTTON PRESSED");
+        Debug.Log("LOGIN username=" + usernameLogIn.text);
+        Debug.Log("LOGIN password empty? " + string.IsNullOrEmpty(passwordLogIn.text));
+        if (usernameLogIn.text.Trim() == String.Empty || passwordLogIn.text.Trim() == String.Empty)
+        {
+            HandleConditionWithAlertMessages();
+            return;
+        }
+
+        try
+        {
+            _authApiController.PerformLogin(usernameLogIn.text, passwordLogIn.text,
+                (OnSuccess) =>
+                {
+                    ProgressSync.Instance.GetApi<AuthAPIController>().RenewSavedSession();
+                    _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
+                },
+                (OnFailure) =>
+                {
+                    _loadingScreen.EndLoading();
+                    if (OnFailure != null && OnFailure.ErrorMessage == ErrorMessages.s_emailNotVerifiedCode)
+                        _authApiController.ResendVerification(usernameLogIn.text.Trim());
+                    HandleConditionWithAlertMessages(OnFailure);
+                }
+            );
+        }
+        catch (UserException e)
+        {
+            Debug.Log(e.Message);
+        }
+    }
+
+    public void signUp()
+
+    {
+        AlertMessageContainer alertMessageContainer = null;
+
+        if(usernameSignUp.text.Trim() == String.Empty || emailSignUp.text.Trim() == String.Empty || firstPasswordSignUp.text.Trim() == String.Empty || secondPasswordSignUp.text.Trim() == String.Empty)
+        {
+            HandleConditionWithAlertMessages(null, false);
+            return;
+        }
+
+        if (usernameSignUp.text.Trim().Length < 5 || usernameSignUp.text.Trim().Length > 25)
+        {
+            alertMessageContainer = new AlertMessageContainer() { ErrorMessage = ErrorMessages.s_shortUsernameCode, StatusCode = null };
+            HandleConditionWithAlertMessages(alertMessageContainer);
+            return;
+        }
+
+        if (firstPasswordSignUp.text.Trim().Length < 8 || firstPasswordSignUp.text.Trim().Length > 20)
+        {
+            alertMessageContainer = new AlertMessageContainer() { ErrorMessage = ErrorMessages.s_shortPasswordCode, StatusCode = null };
+            HandleConditionWithAlertMessages(alertMessageContainer);
+            return;
+        }
+
+        if (!_validationUtilities.IsValidEmail(emailSignUp.text.Trim()))
+        {
+            alertMessageContainer = new AlertMessageContainer() { ErrorMessage = ErrorMessages.s_invalidEmailCode, StatusCode = null };
+            HandleConditionWithAlertMessages(alertMessageContainer);
+            return;
+        }
+
+        if(firstPasswordSignUp.text.Trim() != secondPasswordSignUp.text.Trim())
+        {
+            alertMessageContainer = new AlertMessageContainer() { ErrorMessage = ErrorMessages.s_passwordsShouldMatchCode, StatusCode = null };
+            HandleConditionWithAlertMessages(alertMessageContainer);
+            return;
+        }
+
+        if(toggleTermsAndConditions.isOn == false)
+        {
+            alertMessageContainer = new AlertMessageContainer() { ErrorMessage = ErrorMessages.s_toggleNotClicked, StatusCode = null };
+            HandleConditionWithAlertMessages(alertMessageContainer);
+            return;
+        }
+
+        try
+        {
+            _authApiController.PerformSignup(usernameSignUp.text, firstPasswordSignUp.text, emailSignUp.text,
+                (OnSuccess) =>
+                {
+                    if (OnSuccess != null && OnSuccess.verificationRequired)
+                    {
+                        // No session until the address is confirmed: send the user to the login screen with instructions.
+                        _loadingScreen.EndLoading();
+                        goToScreen("logIn");
+                        var note = errorLogin.GetComponent<Text>();
+                        note.text = OnSuccess.mailSent ? ErrorMessages.s_checkYourEmailMessage : ErrorMessages.s_mailNotSentMessage;
+                        errorLogin.SetActive(true);
+                        return;
+                    }
+                    _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
+                },
+
+                (OnFailure) =>
+                {
+                    _loadingScreen.EndLoadingWithDelay();
+                    HandleConditionWithAlertMessages(OnFailure, false);
+                }
+            );
+        }
+        catch (UserException e)
+        {
+            Debug.Log(e.Message);
+        }
+    }
+
+    private bool restoringSession,retrySavedSession;
+    private void OnApplicationFocus(bool focused) {
+        if(focused && retrySavedSession && !restoringSession && _dataController!=null && !String.IsNullOrEmpty(_dataController.Token))getUser();
+    }
+    public void getUser()
+    {
+        if(restoringSession)return;
+        string original = _dataController.Token;
+        if (String.IsNullOrEmpty(original)) return;
+        ShowSavedSession();
+        restoringSession=true;retrySavedSession=false;
+        try
+        {
+            _userAPIController.GetUser(
+                (OnSuccess) =>
+                {
+                    if (_dataController.Token != original) return;
+                    ProgressSync.Instance.GetApi<AuthAPIController>().RenewSavedSession();
+                    // Keep the opaque restoring view until the menu has actually replaced this scene.
+                    _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu);
+                },
+                (OnFailure) =>
+                {
+                    RestoreFailed(original, OnFailure);
+                }
+            );
+        }
+        catch (UserException e)
+        {
+            RestoreFailed(original, null);
+        }
+    }
+
+    private void RestoreFailed(string original, AlertMessageContainer failure)
+    {
+        if (PlayerPrefs.GetString("token") != original) return;
+        restoringSession = false;
+        if (_loadingScreen != null) _loadingScreen.EndLoading();
+        if (failure != null && failure.StatusCode == "401")
+        {
+            UseAnotherAccount();
+            errorLogin.GetComponent<Text>().text = "Please sign in again.";
+            errorLogin.SetActive(true);
+        }
+        else
+        {
+            retrySavedSession = true;
+            sessionRetryDelay = 10;
+            savedSessionView.RetryAvailable();
+        }
+    }
+
+    public void forgotPassword()
+    {
+        if (!_validationUtilities.IsValidEmail(emailForgotPassword.text.Trim()))
+        {
+            // alertMessageContainer = new AlertMessageContainer() { ErrorMessage = ErrorMessages.s_invalidEmailCode, StatusCode = null };
+            // HandleConditionWithAlertMessages(alertMessageContainer);
+            return;
+        }
+
+        try
+        {
+            _authApiController.ForgotPassword(emailForgotPassword.text,
+                (OnSuccess) =>
+                {
+                    forgotPasswordText.gameObject.SetActive(true);
+                },
+                (OnFailure) =>
+                {
+                    forgotPasswordText.text = "this email doesn't exist";
+                    forgotPasswordText.gameObject.SetActive(true);
+                    // HandleConditionWithAlertMessages(OnFailure);
+                }
+            );
+        }
+        catch (UserException e)
+        {
+            Debug.Log(e.Message);
+        }
+    }
+
+    public void goToScreen(string screen)
+    {
+        switch(screen)
+        {
+            case "logIn":
+                signUpScreen.SetActive(false);
+                forgotPasswordScreen.SetActive(false);
+                logInScreen.SetActive(true);
+                break;
+            case "signUp":
+                logInScreen.SetActive(false);
+                forgotPasswordScreen.SetActive(false);
+                signUpScreen.SetActive(true);
+                break;
+            case "forgotPassword":
+                logInScreen.SetActive(false);
+                signUpScreen.SetActive(false);
+                forgotPasswordScreen.SetActive(true);
+                break;
+        }
+    }
+
+    private void HandleConditionWithAlertMessages(AlertMessageContainer response = null, bool isLogin = true, bool isSocialLogin = false)
+    {
+        if(isSocialLogin)
+        {
+            errorLogin.GetComponent<Text>().text = ErrorMessages.s_somethingWentWrong;
+            errorLogin.SetActive(true);
+        }
+
+        if (response != null) 
+        {
+            if(response.ErrorMessage == ErrorMessages.s_invalidCredentials)
+            {
+                errorLogin.GetComponent<Text>().text = ErrorMessages.s_wrongCredentials;
+                errorLogin.SetActive(true);
+            }
+            else if(response.ErrorMessage == ErrorMessages.s_userRegisterBadInputCode)
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_userRegisterBadInputMessage;
+                errorSignUp.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_invalidEmailCode)
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_invalidEmailMessage;
+                errorSignUp.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_shortUsernameCode)
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_shortUsernameMessage;
+                errorSignUp.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_shortPasswordCode)
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_shortPasswordMessage;
+                errorSignUp.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_passwordsShouldMatchCode)
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_passwordsShouldMatchMessage;
+                errorSignUp.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_toggleNotClicked)
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_toggleNotClickedMessage;
+                errorSignUp.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_emailNotVerifiedCode)
+            {
+                errorLogin.GetComponent<Text>().text = ErrorMessages.s_emailNotVerifiedMessage;
+                errorLogin.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_tooManyRequestsCode)
+            {
+                var target = isLogin ? errorLogin : errorSignUp;
+                target.GetComponent<Text>().text = ErrorMessages.s_tooManyRequestsMessage;
+                target.SetActive(true);
+            }
+            else if (response.ErrorMessage == ErrorMessages.s_invalidProviderCode)
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_invalidProviderMessage;
+                errorSignUp.SetActive(true);
+            }
+            else
+            {
+                errorSignUp.GetComponent<Text>().text = response.ErrorMessage;
+                errorSignUp.SetActive(true);
+            }
+        }
+        else 
+        {
+            if(isLogin)
+            {
+                errorLogin.GetComponent<Text>().text = ErrorMessages.s_fillAllFields;
+                errorLogin.SetActive(true);
+            }
+            else 
+            {
+                errorSignUp.GetComponent<Text>().text = ErrorMessages.s_fillAllFields;
+                errorSignUp.SetActive(true);
+            }
+        }
+    }
+
+    private void InitCallback()
+    {
+        Debug.Log("Facebook SDK disabled");
+    }
+
+    private void OnHideUnity(bool isGameShown)
+    {
+        Time.timeScale = isGameShown ? 1 : 0;
+    }
+
+    private void AuthCallback(object result)
+    {
+        Debug.Log("Facebook login disabled");
+    }
+
+    private void GetFbUserIdAndLogin(object result)
+    {
+        Debug.Log("Facebook login disabled");
+    }
+
+
+    private void DisplayFriends(object result)
+    {
+        Debug.Log("Facebook disabled");
+    }
+
+    private void DisplayProfilePic(object result)
+    {
+        Debug.Log("Facebook disabled");
+    }
+
+    private void ShowAppleLoginError(string message)
+    {
+        if (_loadingScreen != null) _loadingScreen.EndLoading();
+        errorLogin.GetComponent<Text>().text = message;
+        errorLogin.SetActive(true);
+    }
+
+    private void OnAppleLogin(SignInWithApple.CallbackArgs args)
+    {
+        _appleLoginPending = false;
+        if (!String.IsNullOrEmpty(args.error))
+        {
+            ShowAppleLoginError(args.error);
+            Debug.LogWarning("Apple sign-in: native authorization did not complete.");
+            return;
+        }
+        UserInfo userInfo = args.userInfo;
+        if (String.IsNullOrEmpty(userInfo.userId) || String.IsNullOrEmpty(userInfo.idToken))
+        {
+            ShowAppleLoginError("Apple did not return valid sign-in details. Please try again.");
+            return;
+        }
+        errorLogin.GetComponent<Text>().text = "Signing in...";
+        errorLogin.SetActive(true);
+        try
+        {
+            _authApiController.PerformSocialLogin(userInfo.userId, userInfo.idToken, "APPLE",
+                (OnSuccess) => { ProgressSync.Instance.GetApi<AuthAPIController>().RenewSavedSession(); _loadingScreen.GoToSceneWithLoading(SceneName.s_gameMenu); },
+                (OnFailure) => { ShowAppleLoginError("Unable to sign in to Memotopia. Please try again."); });
+        }
+        catch (Exception exception)
+        {
+            ShowAppleLoginError("Unable to sign in to Memotopia. Please try again.");
+            Debug.LogWarning("Apple sign-in completion failed: " + exception.GetType().Name);
+        }
+    }
+
+    public void linkBtn()
+    {
+        Application.OpenURL("https://memotopia.com/terms.html");
+    }
+}
