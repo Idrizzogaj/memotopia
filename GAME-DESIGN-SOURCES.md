@@ -63,3 +63,11 @@ Primary sources checked (new relative to the preceding balance research):
 - Skatteverket, electronic services and normal 25% VAT: https://www4.skatteverket.se/rattsligvagledning/edition/2026.12/409182.html . Gross consumer price is not developer proceeds; no account-specific net revenue estimate is asserted.
 
 No new memory-efficacy claims or measured conversion/retention results are implied. Original design research above remains the basis for the gameplay discussion.
+
+## 2026-11-23: Saga map ambient electricity and background
+
+- Approved user requests: original glossy neurons (flat variant explicitly rejected), continuous upward 1-100 map in five 20-stop sections, completed/current cells colored and future cells grey, automatic post-victory return plus electrical next-cell reveal, spontaneous small vibrations/discharges, Statistics below Videos/Tips.
+- Apple Human Interface Guidelines, Motion (new): https://developer.apple.com/design/human-interface-guidelines/motion — purposeful, brief feedback and optional/cancellable movement. Supports a short unlock transition and a motion toggle, not a claim that random motion improves memory.
+- Microsoft Xbox Accessibility Guideline 117 (new): https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/117 — moving UI backgrounds/visual distractions should be stoppable. Supports the map's persistent Motion On/Off setting.
+- W3C WCAG 2.1 Understanding SC 2.3.1 (new): https://www.w3.org/WAI/WCAG21/Understanding/three-flashes-or-below-threshold — limit flashing intensity/area/frequency. Implementation uses tiny travelling cyan pulses with no full-screen flash or luminance strobe. This is design guidance, not a formal photosensitivity compliance test.
+- Own visual judgment: a pale turquoise/lavender field with faint static neural lines fits the app palette. Guidelines do not establish that this background or timing is universally best, and no empirical memory benefit is claimed.

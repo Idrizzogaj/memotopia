@@ -12,7 +12,7 @@ using UnityEngine.UI;
 // Editor-only checks. Run in the isolated Saga validation project, never against production accounts.
 public static class SagaValidation
 {
-    const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+    const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
     static object Get(object source, string field) { return source.GetType().GetField(field, Flags).GetValue(source); }
     static void Call(object source, string method, params object[] args) { source.GetType().GetMethod(method, Flags).Invoke(source, args); }
     static void Check(bool value, string message) { if (!value) throw new Exception("Saga: " + message); }
@@ -83,7 +83,16 @@ public static class SagaValidation
             var mapPage = (GameObject)Get(page, "page");
             Check(mapPage.activeSelf, "Saga tile did not open map.");
             var levels = mapPage.GetComponentsInChildren<Button>(true).Where(b => b.name.StartsWith("Saga level ")).ToArray();
-            Check(levels.Length == 20 && levels.All(b => b.interactable) && Enumerable.Range(1,SagaRoute.Count).All(SagaRoute.Unlocked), "All 100 development stops must be open.");
+            Check(levels.Length == 100 && levels.All(b => b.interactable) && Enumerable.Range(1,SagaRoute.Count).All(SagaRoute.Unlocked), "All 100 development stops must be open.");
+            var scroll=(ScrollRect)Get(page,"mapScroll");
+            Check(menu.statisticsBackground.rectTransform.anchorMax.y<menu.videosBackground.rectTransform.anchorMin.y && menu.statisticsBackground.rectTransform.anchorMax.y<menu.tipsBackground.rectTransform.anchorMin.y,"Statistics must be below Videos and Tips.");
+            Check(!scroll.horizontal && scroll.vertical && scroll.verticalNormalizedPosition<.001f,"Map must start at bottom, then scroll upwards.");
+            for(int block=0;block<5;block++){
+                scroll.verticalNormalizedPosition=block/4f;Canvas.ForceUpdateCanvases();
+                for(int n=block*20+1;n<=block*20+20;n++)Check(levels.First(b=>b.name=="Saga level "+n).GetComponentInChildren<Text>().text==n.ToString(),"Map stop number must not restart at 1.");
+                Capture(canvas,camera,800,1734,"saga-map-section-"+(block+1));
+            }
+            scroll.verticalNormalizedPosition=0;
             Check(Resources.Load<Sprite>("Saga/Neuron") != null, "Neuron sprite not imported.");
             Capture(canvas, camera, 800, 1734, "saga-map-phone");
             Capture(canvas,camera,800,1734,"saga-map-20-visible");
@@ -280,11 +289,13 @@ public static class SagaValidation
         camera.cullingMask=1<<30;
         foreach(var graphic in canvas.GetComponentsInChildren<Graphic>(true))graphic.SetAllDirty();
         Canvas.ForceUpdateCanvases();
+        foreach(var sagaPage in canvas.GetComponentsInChildren<SagaPage>(true))Call(sagaPage,"LayoutMap");
+        Canvas.ForceUpdateCanvases();
         var target=new RenderTexture(width,height,24);camera.targetTexture=target;camera.Render();
         var prior=RenderTexture.active;RenderTexture.active=target;
         var texture=new Texture2D(width,height,TextureFormat.RGBA32,false);texture.ReadPixels(new Rect(0,0,width,height),0,0);texture.Apply();
-        if(name.StartsWith("saga-map-"))
-            Check(texture.GetPixels32().Count(p=>p.r>200 && p.g>140 && p.g<250 && p.b<180)>200,"Axons/myelin missing from map render.");
+        if(name=="saga-map-phone")
+            Check(texture.GetPixels32().Count(p=>p.r>200 && p.g>140 && p.g<250 && p.b<180)>200,"Active neuron's myelin missing from map render.");
         if(name=="saga-pairs-recall-phone")Check(texture.GetPixels32().Count(p=>p.r<245 && p.r>215 && p.g>220 && p.b>220)>1000,"Pairs card backs missing from render.");
         string path=Environment.GetEnvironmentVariable("SAGA_REVIEW_OUTPUT");
         if(string.IsNullOrEmpty(path))path="../SagaReview";

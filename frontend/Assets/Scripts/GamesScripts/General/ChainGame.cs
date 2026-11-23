@@ -120,6 +120,7 @@ public sealed class ChainGame : GamesScript
     private SagaPairsBoard pairsBoard;
     private SagaBoxesBoard boxesBoard;
     private Action<SagaLevel> sagaNext;
+    private Action sagaWon;
     private Color RoundTheme { get { return saga==null?Theme:SagaRoute.ColorFor(saga.Game); } }
     private Action sagaClosed;
     private float studySeconds;
@@ -148,11 +149,11 @@ public sealed class ChainGame : GamesScript
         ShowLevels();
     }
     public void OpenSaga(int value, Action closed) { OpenSaga(SagaGame.Chain,value,closed); }
-    public void OpenSaga(SagaGame game,int value, Action closed,Action<SagaLevel> nextStage=null) {
+    public void OpenSaga(SagaGame game,int value, Action closed,Action<SagaLevel> nextStage=null,Action won=null) {
         int stop=SagaRoute.Stop(game,value);
         if(overlay!=null || SprintRuntime.Active || !SagaRoute.Unlocked(stop))return;
         if(game==SagaGame.Says)throw new InvalidOperationException("Says uses its original SaysGame controller.");
-        saga=new SagaLevel(game,value);sagaClosed=closed;sagaNext=nextStage;
+        saga=new SagaLevel(game,value);sagaClosed=closed;sagaNext=nextStage;sagaWon=won;
         CreateOverlay();
         StartLevel(value);
     }
@@ -209,14 +210,14 @@ public sealed class ChainGame : GamesScript
         } else Close();
     }
     private void ClearOriginalGame(){if(boxesBoard!=null){boxesBoard.Destroy();boxesBoard=null;}if(pairsBoard!=null){pairsBoard.Destroy();pairsBoard=null;}if(flashStudy!=null){flashStudy.Destroy();flashStudy=null;}if(originalGame!=null){originalGame.Destroy();originalGame=null;}if(quitDialog!=null){CardFaces.DestroyGenerated(quitDialog);quitDialog=null;}if(countdownPanel!=null){CardFaces.DestroyGenerated(countdownPanel);countdownPanel=null;}if(resultPanel!=null){CardFaces.DestroyGenerated(resultPanel);resultPanel=null;}}
-    private void Close() {
+    public void Close() {
         PracticeSession.Release(this);
         ClearOriginalGame();
         if(exactTheme!=null){CardFaces.DestroyGenerated(exactTheme);exactTheme=null;}
         StopAllCoroutines();CardFaces.EndSession();state=null;
         if(overlay!=null)CardFaces.DestroyGenerated(overlay.gameObject);
         overlay=null;
-        var closed=sagaClosed;sagaClosed=null;sagaNext=null;saga=null;recall=false;
+        var closed=sagaClosed;sagaClosed=null;sagaNext=null;sagaWon=null;saga=null;recall=false;
         if(closed!=null)closed();
     }
     private void OnDisable(){if(overlay!=null)Close();}
@@ -385,7 +386,7 @@ public sealed class ChainGame : GamesScript
         if(SprintRuntime.Active)return;
         if(saga!=null){
             if(state.Won)SagaProgress.Complete(saga.Game,owner,level,state.Hearts);
-            ClearOriginalGame();safe.gameObject.SetActive(true);recall=false;ClearBody();ShowOriginalResult();return;
+            ClearOriginalGame();safe.gameObject.SetActive(true);recall=false;ClearBody();ShowOriginalResult();if(state.Won && sagaWon!=null)sagaWon();return;
         }
         ClearOriginalGame();safe.gameObject.SetActive(true);
         recall=false;
@@ -428,6 +429,7 @@ public sealed class ChainGame : GamesScript
         if(athlete)foreach(var image in resultPanel.GetComponentsInChildren<Image>(true))if(image.name.IndexOf("Star",StringComparison.OrdinalIgnoreCase)>=0)image.gameObject.SetActive(false);
         if(saga!=null)ConfigureWinButtons(resultPanel,SagaRoute.Stop(saga.Game,level),()=>StartLevel(level),StartNextSaga,levels,SagaRoute.Count);
         else ConfigureWinButtons(resultPanel,level,()=>StartLevel(level),()=>StartLevel(level+1),levels);
+        if(sagaWon!=null)foreach(var button in resultPanel.GetComponentsInChildren<Button>(true))button.interactable=false;
     }
     private void StartNextSaga(){
         if(saga==null)return;
