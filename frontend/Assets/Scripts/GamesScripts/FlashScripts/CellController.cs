@@ -15,11 +15,17 @@ public class CellController : MonoBehaviour
         else
             Debug.LogError("Empty Function Delegate on CellController.cs");
 
-        transform.GetChild(0).transform.GetChild(0).transform.gameObject.SetActive(true);
-        Image picture = transform.GetChild(0).GetChild(0).GetComponent<Image>();
+        PresentImage(transform, choosenArtboardNumber);
+    }
+
+    // Shared with Saga's instance-scoped animation receiver; legacy events stay unchanged.
+    public static void PresentImage(Transform cell, int imageNumber)
+    {
+        cell.GetChild(0).GetChild(0).gameObject.SetActive(true);
+        Image picture = cell.GetChild(0).GetChild(0).GetComponent<Image>();
         // Numbers and words are shown as wide text (a card would be too small inside the diamond).
-        bool textFace = CardFaces.KindOf(choosenArtboardNumber) != CardKind.Image;
-        picture.sprite = textFace ? CardFaces.WideFace(choosenArtboardNumber) : CardFaces.Face(choosenArtboardNumber);
+        bool textFace = CardFaces.KindOf(imageNumber) != CardKind.Image;
+        picture.sprite = textFace ? CardFaces.WideFace(imageNumber) : CardFaces.Face(imageNumber);
         picture.preserveAspect = true;
         // The tile sprite includes a large shadow. Keep the entire opaque card
         // inside its white diamond face, including the card's four corners.
@@ -29,15 +35,20 @@ public class CellController : MonoBehaviour
         pictureRect.anchorMax = textFace ? new Vector2(0.70f, 0.56f) : new Vector2(0.63f, 0.64f);
         pictureRect.anchoredPosition = Vector2.zero;
         pictureRect.sizeDelta = Vector2.zero;
-        transform.GetComponent<Image>().color = new Color32(255, 255, 255, 255);
+        cell.GetComponent<Image>().color = new Color32(255, 255, 255, 255);
     }
 
     public void HideImage()
     {
-        transform.GetChild(0).transform.GetChild(0).transform.gameObject.SetActive(false);
-        gameObject.GetComponent<Image>().color = new Color32(255, 255, 255, 0);
+        HideFace(transform);
         if (afterShownImage != null)
             afterShownImage();
+    }
+
+    public static void HideFace(Transform cell)
+    {
+        cell.GetChild(0).GetChild(0).gameObject.SetActive(false);
+        cell.GetComponent<Image>().color = new Color32(255, 255, 255, 0);
     }
 
     public void AnimationFinished()

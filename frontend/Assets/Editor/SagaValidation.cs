@@ -17,7 +17,12 @@ public static class SagaValidation
     static void Call(object source, string method, params object[] args) { source.GetType().GetMethod(method, Flags).Invoke(source, args); }
     static void Check(bool value, string message) { if (!value) throw new Exception("Saga: " + message); }
     static ChainState State(ChainGame game) { return (ChainState)Get(game, "state"); }
-    static void Recall(ChainGame game) { for (int i = 0; i < State(game).Sequence.Length; i++) game.NextCard(); }
+    static void Recall(ChainGame game) {
+        var flash=(SagaFlashStudy)Get(game,"flashStudy");
+        if(flash!=null){int guard=0;while(Get(game,"flashStudy")!=null && guard++<30){var cell=flash.CurrentCell;cell.HideImage();cell.AnimationFinished();}return;}
+        if(Get(game,"boxesBoard")!=null){Call(game,"ShowRecall");return;}
+        int count=0;while(!(bool)Get(game,"recall") && count++<60)game.NextCard();
+    }
 
     public static void Validate()
     {
@@ -28,6 +33,10 @@ public static class SagaValidation
         ChallengeConstants.s_isChallenge = false;
         try
         {
+            foreach(var kind in SagaRoute.Games)for(int n=1;n<=20;n++){
+                PlayerPrefs.SetInt("saga."+kind.ToString().ToLowerInvariant()+".stars.v1.1999999801."+n,0);
+                PlayerPrefs.SetInt("saga."+kind.ToString().ToLowerInvariant()+".stars.v1.1999999802."+n,0);
+            }
             for(int n=1;n<=20;n++){
                 PlayerPrefs.SetInt("saga.chain.stars.v1.1999999801."+n,0);
                 PlayerPrefs.SetInt("saga.chain.stars.v1.1999999802."+n,0);
@@ -74,9 +83,11 @@ public static class SagaValidation
             var mapPage = (GameObject)Get(page, "page");
             Check(mapPage.activeSelf, "Saga tile did not open map.");
             var levels = mapPage.GetComponentsInChildren<Button>(true).Where(b => b.name.StartsWith("Saga level ")).ToArray();
-            Check(levels.Length == 20 && levels.All(b => b.interactable), "All 20 development stops must be open.");
+            Check(levels.Length == 20 && levels.All(b => b.interactable) && Enumerable.Range(1,SagaRoute.Count).All(SagaRoute.Unlocked), "All 100 development stops must be open.");
             Check(Resources.Load<Sprite>("Saga/Neuron") != null, "Neuron sprite not imported.");
             Capture(canvas, camera, 800, 1734, "saga-map-phone");
+            Capture(canvas,camera,800,1734,"saga-map-20-visible");
+            Check(!mapPage.GetComponentsInChildren<Text>(true).Any(t=>SagaRoute.Games.Any(g=>t.text.ToUpperInvariant().Contains(g.ToString().ToUpperInvariant()))),"No game captions on map.");
             canvasRect.sizeDelta = new Vector2(1200, 1600); camera.orthographicSize = 800;
             Capture(canvas, camera, 1200, 1600, "saga-map-tablet");
             canvasRect.sizeDelta = new Vector2(800, 1734); camera.orthographicSize = 867;
@@ -92,6 +103,7 @@ public static class SagaValidation
             Capture(canvas,camera,1200,1600,"saga-study-tablet");
             canvasRect.sizeDelta=new Vector2(800,1734);camera.orthographicSize=867;Canvas.ForceUpdateCanvases();
             Gameplay(game, canvas, camera);
+            FiveGames(page,game,canvas,camera);
             game.ShowLevels(); Check(mapPage.activeSelf, "Return to map failed.");
             Check(ChainProgress.Mask == 0 && Enumerable.Range(1,20).All(n => ChainProgress.Stars(n) == 0), "Saga modified Training progress.");
             Check(!GameManager.PendingAchievements.Any(k => k.StartsWith("chain-")), "Saga granted Chain achievements.");
@@ -104,7 +116,7 @@ public static class SagaValidation
             Check(State(training).Hearts == 5 && State(training).Sequence.Length == ChainState.CountForLevel(1), "Ordinary Chain rules changed.");
             Recall(training); Call(training, "TickTrainingClock", 1000f);
             Check(!State(training).Finished, "Training Practice timer changed."); Call(training, "Close");
-            Debug.Log("SAGA_VALIDATION_PASSED: 20 configurations, original menu controls, neuron map, 3 hearts, image-only timed Chain, shuffles, last-ten precedence, timeout, replay, next, local progress, account isolation, unchanged Training.");
+            Debug.Log("SAGA_VALIDATION_PASSED: 100 interleaved stages, five game adapters, original menu controls, neuron map, 3 hearts, image-only timed Chain, shuffles, last-ten precedence, timeout, replay, next, local progress, account isolation, unchanged Training.");
         }
         finally { CardFaces.EndSession(); UserConstants.s_user = oldUser; ChallengeConstants.s_isChallenge = oldChallenge; }
     }
@@ -127,6 +139,12 @@ public static class SagaValidation
         var sixteen = new SagaLevel(16);
         Check(sixteen.TimedShuffleDue(15,0,25) && sixteen.TimedShuffleDue(30,1,25) && sixteen.TimedShuffleDue(45,2,25), "Three timed shuffles.");
         Check(!sixteen.TimedShuffleDue(59,0,10) && sixteen.ShuffleAfterAnswer(10) && sixteen.ShuffleAfterAnswer(1) && !sixteen.ShuffleAfterAnswer(0), "Last-ten override.");
+        Check(SagaRoute.Count==100,"Five games times twenty levels.");
+        for(int stop=1;stop<=SagaRoute.Count;stop++){
+            var stage=SagaRoute.At(stop);
+            Check(stage.Game==SagaRoute.Games[(stop-1)%5] && stage.Number==(stop-1)/5+1,"Route order "+stop);
+            Check(SagaRoute.Stop(stage.Game,stage.Number)==stop,"Stable game/level route identity.");
+        }
         bool rejected = false; try { new SagaLevel(21); } catch (ArgumentOutOfRangeException) { rejected = true; }
         Check(rejected, "Level 21 must not exist.");
     }
@@ -153,8 +171,8 @@ public static class SagaValidation
         Capture(canvas,camera,800,1734,"saga-win-phone");
         var result=(GameObject)Get(game,"resultPanel");
         result.transform.GetChild(0).GetChild(12).GetComponent<Button>().onClick.Invoke();
-        Check(((SagaLevel)Get(game,"saga")).Number==7 && State(game).Hearts==3,"NEXT LEVEL must stay in Saga.");
-        game.StartLevel(11);Recall(game);Call(game,"TickTrainingClock",24f);Call(game,"TickTrainingClock",23f);
+        Check(((SagaLevel)Get(game,"saga")).Game==SagaGame.Flash && ((SagaLevel)Get(game,"saga")).Number==6 && State(game).Hearts==3,"NEXT LEVEL must follow interleaved Saga.");
+        game.ShowLevels();game.OpenSaga(SagaGame.Chain,11,mapClosed);Recall(game);Call(game,"TickTrainingClock",24f);Call(game,"TickTrainingClock",23f);
         Check((int)Get(game,"sagaShuffles")==2,"Level 11 needs two timed shuffles.");
         game.StartLevel(16);Recall(game);state=State(game);
         foreach(int id in state.Sequence.Take(15).ToArray())game.Choose(id);
@@ -183,14 +201,77 @@ public static class SagaValidation
         Check(state.TimedOut && !state.Won && SagaProgress.Stars(1)==0,"Recall timeout must lose without progress.");
         game.StartLevel(20);Recall(game);state=State(game);foreach(int id in state.Sequence)game.Choose(id);
         result=(GameObject)Get(game,"resultPanel");
-        Check(result.transform.GetChild(0).GetChild(12).GetComponentInChildren<Text>().text=="LEVELS","Level 20 must not offer 21.");
-        game.StartLevel(5);Check((float)Get(game,"studySeconds")==80f,"Level 5 exception.");
+        Check(result.transform.GetChild(0).GetChild(12).GetComponentInChildren<Text>().text=="NEXT LEVEL","Chain 20 must lead to Flash 20.");
+        game.ShowLevels();game.OpenSaga(SagaGame.Chain,5,mapClosed);Check((float)Get(game,"studySeconds")==80f,"Level 5 exception.");
         var originalUser=UserConstants.s_user;UserConstants.s_user=new User{id=1999999802};
         game.Choose(State(game).Sequence[0]);
         Check(!game.IsSagaOpen && SagaProgress.Stars(6)==0,"Account change must abort without credit.");
         UserConstants.s_user=originalUser;
         // Restart so the caller can check the normal map-return callback.
         game.OpenSaga(1,mapClosed);
+    }
+
+
+    static void FiveGames(SagaPage page,ChainGame game,Canvas canvas,Camera camera)
+    {
+        game.ShowLevels();
+        var mapPage=(GameObject)Get(page,"page");
+        foreach(var kind in SagaRoute.Games){
+            foreach(int level in new[]{1,5,6,11,16,20}){
+                int stop=SagaRoute.Stop(kind,level);
+                Call(page,"PlayStage",stop);
+                if(kind==SagaGame.Says){
+                    var says=(SaysGame)Get(page,"says");
+                    Check(says.IsSagaOpen && (int)Get(says,"hearts")==3,"Says entry and hearts.");
+                    var sequence=(int[])Get(says,"sequence");Check(sequence.Length==new SagaLevel(kind,level).ImageCount,"Says count.");
+                    says.BeginPlayback();says.Tick(2+sequence.Length*2.25f+.8f);says.Tick(1);
+                    Check((bool)Get(says,"input"),"Says playback and RECALL transition.");
+                    foreach(int digit in sequence)says.Choose(digit);
+                    Check(SagaProgress.Stars(kind,level)==3,"Says progress.");
+                    if(level==20){
+                        var popup=(GameObject)Get(says,"popup");
+                        Check(popup.transform.GetChild(0).GetChild(12).GetComponentInChildren<Text>().text=="LEVELS","Final stop must not offer level 21.");
+                    }
+                    says.Close();continue;
+                }
+                var config=new SagaLevel(kind,level);
+                Check(State(game).Sequence.Length==config.ImageCount && State(game).Hearts==3,"Entry count/hearts "+kind+" "+level);
+                if(kind==SagaGame.Flash){
+                    var flash=(SagaFlashStudy)Get(game,"flashStudy");
+                    Check(flash!=null && flash.CurrentCell!=null && flash.CurrentCell.GetComponent<Animator>().speed==1,"Native Flash speed.");
+                    Call(game,"TickSagaStudyClock",1000f);Call(game,"TickTrainingClock",1000f);
+                    Check(!(bool)Get(game,"recall") && !State(game).Finished,"Flash study must not time out.");
+                    if(level==1)Capture(canvas,camera,800,1734,"saga-flash-study-phone");
+                    Recall(game);Check(flash.ShownCount==config.ImageCount,"Flash must show every picture.");
+                    Check((float)Get(game,"recallSeconds")==config.Seconds,"Flash gets a fresh recall budget.");
+                }else Recall(game);
+                var state=State(game);var images=(int[])state.Sequence.Clone();
+                if(kind==SagaGame.Pairs){
+                    var board=(SagaPairsBoard)Get(game,"pairsBoard");
+                    var visibleCards=board.Root.GetComponentsInChildren<Button>().Where(b=>b.name.StartsWith("Saga pair ")).ToArray();
+                    Check(visibleCards.Length==config.ImageCount && visibleCards.All(b=>b.image.rectTransform.rect.width>100),"Pairs cards must be active and visible.");
+                    if(level==1)Capture(canvas,camera,800,1734,"saga-pairs-recall-phone");
+                    for(int i=0;i<images.Length;i+=2){board.Choose(images[i]);board.Choose(images[i+1]);}
+                }else if(kind==SagaGame.Boxes){
+                    var board=(SagaBoxesBoard)Get(game,"boxesBoard");
+                    if(level==1)Capture(canvas,camera,800,1734,"saga-boxes-recall-phone");
+                    for(int i=0;i<images.Length;i++)board.Place(images[i],i);
+                }else foreach(int id in images)game.Choose(id);
+                Check(state.Won && SagaProgress.Stars(kind,level)>0,"Win and separate progress "+kind+" "+level);
+                var result=(GameObject)Get(game,"resultPanel");
+                result.transform.GetChild(0).GetChild(12).GetComponent<Button>().onClick.Invoke();
+                var next=SagaRoute.At(stop+1);
+                if(next.Game==SagaGame.Says){
+                    var says=(SaysGame)Get(page,"says");Check(says.IsSagaOpen,"Boxes NEXT must open Says.");says.Close();
+                }else{
+                    var active=(SagaLevel)Get(game,"saga");
+                    Check(active.Game==next.Game && active.Number==next.Number,"NEXT follows route from "+kind+" "+level);game.ShowLevels();
+                }
+            }
+        }
+        // Restore a visible map for the caller's existing navigation assertions.
+        Call(page,"ShowMap");
+        mapPage.GetComponentsInChildren<Button>(true).First(b=>b.name=="Saga level 1").onClick.Invoke();
     }
 
     static void Capture(Canvas canvas, Camera camera, int width, int height, string name)
@@ -204,6 +285,7 @@ public static class SagaValidation
         var texture=new Texture2D(width,height,TextureFormat.RGBA32,false);texture.ReadPixels(new Rect(0,0,width,height),0,0);texture.Apply();
         if(name.StartsWith("saga-map-"))
             Check(texture.GetPixels32().Count(p=>p.r>200 && p.g>140 && p.g<250 && p.b<180)>200,"Axons/myelin missing from map render.");
+        if(name=="saga-pairs-recall-phone")Check(texture.GetPixels32().Count(p=>p.r<245 && p.r>215 && p.g>220 && p.b>220)>1000,"Pairs card backs missing from render.");
         string path=Environment.GetEnvironmentVariable("SAGA_REVIEW_OUTPUT");
         if(string.IsNullOrEmpty(path))path="../SagaReview";
         Directory.CreateDirectory(path);File.WriteAllBytes(Path.Combine(path,name+".png"),texture.EncodeToPNG());

@@ -5,10 +5,10 @@ using UnityEngine.UI;
 // Uses exported original scene hierarchies. No replacement buttons, card frames or grids.
 public sealed class ChainOriginalPresentation {
  private Text recallClock,timerCaption;
- public GameObject Root;public Image Study;public Button Next;public RectTransform Grid;public Button Cell;
+ public GameObject Root;public Image Study,StudySecond;public Button Next;public RectTransform Grid;public Button Cell;
  Transform Find(string name){return Root.GetComponentsInChildren<Transform>(true).First(t=>t.name==name);}
  void Active(string name,bool value){foreach(var t in Root.GetComponentsInChildren<Transform>(true).Where(t=>t.name==name))t.gameObject.SetActive(value);}
- public ChainOriginalPresentation(Transform parent,bool study,UnityEngine.Events.UnityAction quit,UnityEngine.Events.UnityAction next,Material theme){
+ public ChainOriginalPresentation(Transform parent,bool study,UnityEngine.Events.UnityAction quit,UnityEngine.Events.UnityAction next,Material theme,bool paired=false){
   Root=Object.Instantiate(Resources.Load<GameObject>("Prefabs/"+(study?"ExactPairsChainStudy":"ExactFlashChainRecall")),parent,false);
   var r=(RectTransform)Root.transform;r.localScale=Vector3.one;r.anchorMin=Vector2.zero;r.anchorMax=Vector2.one;r.offsetMin=r.offsetMax=Vector2.zero;r.anchoredPosition3D=Vector3.zero;
   foreach(var b in Root.GetComponentsInChildren<Button>(true)){b.onClick=new Button.ButtonClickedEvent();if(b.name=="Exact Quit")b.onClick.AddListener(quit);}
@@ -18,12 +18,13 @@ public sealed class ChainOriginalPresentation {
    bool tablet=Mathf.RoundToInt(r.rect.width/r.rect.height*4)==3;
    Active("Exact study screen",!tablet);Active("Unused tablet study",tablet);Active("Unused pairs recall",false);
    Study=Find(tablet?"Exact tablet study image":"Exact study image").GetComponent<Image>();
-   Find(tablet?"Exact tablet second image":"Exact second image").parent.gameObject.SetActive(false);
+   StudySecond=Find(tablet?"Exact tablet second image":"Exact second image").GetComponent<Image>();
+   StudySecond.transform.parent.gameObject.SetActive(paired);
    foreach(var layout in Study.GetComponentsInParent<LayoutGroup>())layout.enabled=false;
    var card=(RectTransform)Study.transform.parent;var originalCardSize=card.rect.size;
    // The original Pairs card pivots on its right edge. Centre the frame itself,
    // not that edge, while preserving the original frame and image dimensions.
-   card.anchorMin=card.anchorMax=card.pivot=new Vector2(.5f,.5f);card.sizeDelta=originalCardSize;card.anchoredPosition=Vector2.zero;
+   if(!paired){card.anchorMin=card.anchorMax=card.pivot=new Vector2(.5f,.5f);card.sizeDelta=originalCardSize;card.anchoredPosition=Vector2.zero;}
    Active("BackgroundImage",false);
    // The full-screen Chain overlay already supplies the purple background. The copied Pairs
    // background has its own inset/texture and can expose turquoise bands on device aspect ratios.

@@ -169,7 +169,7 @@ public class GamesScript : MonoBehaviour
     // Shared by all training results, including Chain: preserve the original buttons and layout.
     public static void ConfigureWinButtons(GameObject panel, int completedLevel,
         UnityEngine.Events.UnityAction replayAction, UnityEngine.Events.UnityAction nextAction,
-        UnityEngine.Events.UnityAction levelsAction)
+        UnityEngine.Events.UnityAction levelsAction, int levelCount = 20)
     {
         var container = panel.transform.GetChild(0);
         var replay = container.GetChild(11).GetComponent<Button>();
@@ -181,9 +181,9 @@ public class GamesScript : MonoBehaviour
         replay.onClick = new Button.ButtonClickedEvent();
         replay.onClick.AddListener(replayAction);
         next.onClick = new Button.ButtonClickedEvent();
-        next.GetComponentInChildren<Text>().text = completedLevel < 20 ? "NEXT LEVEL" : "LEVELS";
-        next.onClick.AddListener(completedLevel < 20 ? nextAction : levelsAction);
-        if (completedLevel < 20)
+        next.GetComponentInChildren<Text>().text = completedLevel < levelCount ? "NEXT LEVEL" : "LEVELS";
+        next.onClick.AddListener(completedLevel < levelCount ? nextAction : levelsAction);
+        if (completedLevel < levelCount)
         {
             var levels = Instantiate(next.gameObject, container);
             levels.name = "LevelsButton";

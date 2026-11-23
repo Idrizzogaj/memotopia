@@ -1,55 +1,56 @@
-# Memotopia Saga
+# Memotopia Saga � handoff 2026-11-23
 
-Work branch: `codex/saga`, based on the fetched `origin/codex/focus-2.1.0`.
+Branch: `codex/saga`, originally based on the fetched `origin/codex/focus-2.1.0`. No other branch is pushed.
 
-## Approved scope (2026-11-23)
+## Current approved scope
 
-- Add Memotopia Saga above Training and Challenge on the home screen.
-- White map background, turquoise neuron cell bodies with purple numbered nuclei, axons with segmented gold myelin. Follow Idriz's attached route and approved image concept.
-- All stops are selectable during development. Ordered unlocking comes later.
-- Start with Chain; Flash and Says follow later.
-- Use the existing Chain presentation, input, sequence rules, countdown, quit confirmation, and result prefabs. Saga changes image count, phase times, hearts, and recall placement only.
+- One Saga entry above the existing home controls. Statistics, Training, Challenge, Videos, Tips and side-menu controls remain.
+- Five games in this exact order at each difficulty level: **Chain, Flash, Pairs, Boxes, Says**. Complete all five at level 1, then all five at level 2, through level 20: **100 stops**.
+- `SagaRoute.Games` defines ordering; game and local level identify saved results. Changing route order does not rewrite game-level progress.
+- All stops/sections remain open during development. Ordered unlocking is implemented as the previous route stop having a completion result; release policy is still undecided.
+- Use the approved original 20-neuron image, recoloured in a repeating turquoise/yellow/blue/pink/violet pattern. The user rejected the sharper isolated-cell map and requested no game labels, only numbers 1-20.
+- `Resources/Saga/Map20.png` is the approved colour revision, stored in the repository. It includes the route, gold myelin, numbers, title and painted Back label. Native transparent hit targets overlay its nuclei and Back area.
+- The 100-stop route is presented in five sections of 20. Section controls show 1/5 through 5/5; each section retains the image's numbers 1-20. Internal game/level identity is independent of section numbering.
 
-| Levels | Pictures | Seconds for each phase | Timed recall shuffles |
-| --- | --- | --- | --- |
-| 1-5 | 10 | 90, 88, 86, 84, 80 | 0 |
-| 6-10 | 15 | 80, 78, 76, 74, 72 | 1 |
-| 11-15 | 20 | 70, 68, 66, 64, 62 | 2 |
-| 16-20 | 25 | 60, 58, 56, 54, 52 | Up to 3, then the last-ten rule |
+## Games and initial balance
 
-- All rounds start with three hearts. Each wrong answer costs one heart. Zero hearts or recall timeout loses; full sequence completion wins.
-- Memorization starts after the existing READY/STEADY/GO sequence. NEXT works as before. Expiry starts recall with its own complete time budget.
-- Regular recall shuffles are evenly spaced through the time budget: halfway, thirds, or quarters.
-- On levels 16-20, once ten pictures remain, pending timed shuffles are skipped. Placements then shuffle after every correct answer (including the answer that leaves ten). Wrong answers do not shuffle. A fast player need not encounter all three timed shuffles.
-- Shuffles move the actual existing cells to different slots without changing the answer sequence, image identity, callbacks, hearts, timer, or which answers are already cleared.
+| Local levels | Chain/Flash pictures | Pairs: learned pairs | Boxes placements | Says signals | Seconds per recall |
+| --- | --- | --- | --- | --- | --- |
+| 1-5 | 10 | 4 | Existing levels 1-5: 2,3,4,4,5 | 3,3,4,4,5 | 90,88,86,84,80 |
+| 6-10 | 15 | 6 | Existing levels 6-10: 6,6,8,8,9 | 5,6,6,7,7 | 80,78,76,74,72 |
+| 11-15 | 20 | 8 | Existing levels 11-15: 10,12,12,15,15 | 8,8,9,9,10 | 70,68,66,64,62 |
+| 16-20 | 25 | 10 | Existing levels 16-20: 15,16,20,20,22 | 10,11,11,12,12 | 60,58,56,54,52 |
 
-## Implementation
+The Pairs/Boxes/Says values are an intentionally gentle first tuning, not empirically validated equivalent difficulty. Sources and limits are recorded in `GAME-DESIGN-SOURCES.md`. User explicitly reintroduced Pairs, superseding its original exclusion.
 
-- `SagaPage.Attach` runs after the existing menu startup and adds the tile once.
-- Statistics, Training, Challenge, Videos, Tips, title and side-menu controls are all retained. The three original tall rows get smaller bounds to fit the extra Saga row above Statistics. Existing artwork and callbacks are reused unchanged.
-- `SagaMapGraphic` draws axons and myelin; the new `Resources/Saga/Neuron` sprite is reused for all numbered stops. The generated asset is in the repository, not referenced from a temporary path.
-- The page uses the existing safe-area container, supports scrolling, and closes with Back or Escape.
-- `ChainGame.OpenSaga` configures the same Chain engine and original views. Saga always uses pictures; Training content settings and Practice preference are left intact.
-- `SagaLevel` defines all configurations and shuffle timing. `SagaProgress` stores best stars (remaining hearts, 1-3) under `saga.chain.stars.v1.<owner>.<level>`. Wins, replay, NEXT LEVEL, and return-to-map are wired; level 20 returns to the map instead of offering 21.
-- Saga does not write Training progress, Practice records, XP or Memory Athlete badges. Account changes abort active rounds. No server calls or new achievement keys are introduced.
-- Progress is **device-local**, not server-synced. Access/payment and XP/badge policy still need a decision before release. Development deliberately keeps all levels open through `SagaProgress.DevelopmentAllLevelsOpen`.
+- All Saga rounds start with three hearts; wrong answers consume one. Full completion wins; zero hearts or recall expiry loses.
+- Chain keeps its original NEXT presentation, with a study budget equal to the recall budget.
+- Flash uses its original scene hierarchy, `FlashCellScale` controller/clip, random study locations and the original `CellController.PresentImage` helper. It shows the entire automatic sequence at native speed; **only recall counts down**. Instance event receivers avoid changing legacy global Flash events. The native template has 24 study cells: a clean duplicate at an existing location handles the 25th picture without omitting it or inventing a new board.
+- Pairs reuses the original two-image study layout, original card prefab, back faces, flip animation and the actual native ScrollRect content (not the inactive legacy CardContent object). Recall matches the learned associations, not identical images. An incorrect pair turns back after 0.5 seconds and costs one Saga heart.
+- Boxes reuses exported phone/tablet scene hierarchies, native per-level board geometry, perspective pictures and native drag/tray gestures. Study locations remain fixed; recall places pictures into their original boxes. The exported shells contain no live legacy managers. Recall can start early through the original control, or automatically when the study budget ends.
+- Says uses the existing SaysGame keypad, highlighting, playback, RECALL transition, wrong/right feedback and result prefabs. The whole signal sequence plays before recall; Training Practice mode does not disable the Saga recall deadline.
+- Chain/Flash recall placement shuffles: none for local levels 1-5; once halfway for 6-10; twice at thirds for 11-15; up to three at quarters for 16-20. Once ten pictures remain on levels 16-20, skip pending timed shuffles and shuffle after each correct answer. Incorrect answers do not shuffle. Shuffles never change the answer sequence.
+- Boxes targets and Says keys do not shuffle. Pairs retains its native matching layout; the Chain/Flash shuffle layer is not applied to these different mechanics.
+- Replay, NEXT LEVEL and return-to-map use original result prefabs. NEXT follows the five-game route. Stop 100 returns to the map, never level 21.
 
-## Validation and next work
+## Progress and pending product decisions
 
-- Source compilation passed with Unity 2022 references and with legacy preprocessor paths/C# 7.3. This does not replace compilation against the actual Unity 2019 iOS project.
-- `SagaValidation.Validate` is an editor-only integration suite guarded to run in a separate project named `MemotopiaSagaValidation`. It exercises real menu, map, Chain and result callbacks with synthetic accounts; captures phone/tablet layouts. Validation state stays in the isolated test product's preferences.
-- Validation project uses Unity 2022.3.62f2, copied assets and packages, and empty receipt-key test stubs. The original repo Unity version, Android staging project, signing configuration and Mac are unchanged.
-- Final editor integration run passed (`SAGA_VALIDATION_PASSED`, process exit 0). Phone and tablet captures were inspected, including the visible tablet study timer and the actual axon/myelin render. A render assertion also checks that myelin is present.
-- Isolated test project: `C:/Users/IdrZog_MEM/SagaReview-20261123`. Review PNGs are outside Git under the current Codex visualization directory's `saga-validation/review/`. No APK/AAB/IPA or store build was produced.
-- Ask Idriz "Ska jag bygga?" before each build. No store builds or publication.
-- Verify layout and navigation on phone and tablet before treating the UI as approved.
-- Confirm final release unlock requirements, access, rewards and server sync separately. Do not treat the development unlock override as release-ready policy.
-- Keep Unity 2019.3.12f1 and Unity 2022.3.62f2 compatibility. Do not change the separate Android staging project without coordinating its files.
+- Best Saga stars are remaining hearts (1-3), persisted locally per account under `saga.<game>.stars.v1.<owner>.<level>`. Original Chain/Flash key strings are preserved. No historical times are fabricated.
+- Existing Training progress, Practice records, XP, Memory Athlete badges and server keys are not modified by Saga. Account changes abort active rounds; writes check ownership.
+- **Device-local only:** no server sync or new achievement IDs. Access, XP/badges, final unlocking and release version remain undecided.
+- Idriz is considering a separate **Memotopia Zaga** app, first 20 stops free and the next 80 unlocked for roughly SEK 39. This is discussion only: **no new app identity, repository, paywall, purchase product, store submission or entitlement change has been authorised or implemented**. Maintain a shared implementation until a decision is made.
 
-## Flash preparation
+## Validation and environment
 
-- Idriz requested Flash with the same neuron artwork, another game colour, and the same Saga difficulty logic.
-- Map order is not decided: Chain 1-20 followed by a sliding transition to Flash 1-20; separate game maps; or alternating Chain 1, Flash 1, Chain 2, Flash 2, etc.
-- `SagaGame` and `SagaLevel(game, number)` share the existing count/time/heart/shuffle configuration without conflating each game's identity. Existing `SagaLevel(number)` calls still mean Chain.
-- `SagaProgress` now has game-scoped overloads. Existing `saga.chain.stars.v1` keys are preserved exactly; Flash uses `saga.flash.stars.v1`. This is preparation only: no Flash map navigation or playable Saga Flash has been wired yet.
-- Two questions have been presented to Idriz: which initial map order to use, and whether Flash should spread its automatic presentation across the entire memorization budget or retain its current animation speed. Do not silently replace Flash with Chain's manual NEXT study screen.
+- Isolated editor project: `C:/Users/IdrZog_MEM/SagaReview-20261123`, product `MemotopiaSagaValidation`, Unity 2022.3.62f2. It uses copied assets/packages, synthetic accounts, dummy receipt-key classes and legacy Input settings. These stubs/settings never go into the production project or Git.
+- `SagaValidation.Validate` checks all 100 route identities, every game's representative level groups, real UI callbacks, victories, next-game transitions, result handling, independent saves and original Training behavior. It also renders phone/tablet previews. Passed after the approved bitmap map and live Pairs ScrollRect content correction; phone/tablet screenshots reviewed.
+- `SagaPlayDriver.Begin` is an editor-only runtime driver, excluded from player builds. It validates the real, full-speed 25-picture Flash animation and native Boxes drag/drop. Passed: all 25 pictures display in original order before recall, static Flash handlers remain unchanged, and native Boxes drag/drop completes the round. The isolated runtime test locks assembly reloads because Google dependency updates otherwise interrupt its coroutines.
+- A full C# 7.3 source check with legacy API preprocessor paths passes against the available Unity 2022 references. This is not a substitute for compilation against Unity 2019.3.12f1 on the Mac.
+- No APK/AAB/IPA, installation, store build, server operation, Unity upgrade or signing change has been performed. Android staging is unchanged. Read-only SSH confirmed the Mac and paired iPhone are reachable. The Mac has only 1.1 GiB free; waiting for permission to remove the three regenerable build folders below.
+- Idriz explicitly authorised an iPhone test build/install on 2026-11-23; do not ask for build permission again for this test. Store submissions remain unauthorised. Never handle signing passwords. Use included allowance only and stop at 90% usage.
+
+## Pending iPhone build
+
+- Mac: idrizzogaj@192.168.1.209, Unity 2019.3.12f1. Existing Mac repo branch work/ios is heavily dirty/divergent: do not pull, reset or overwrite it. Prepare an isolated copy preserving native integration/settings.
+- Awaiting explicit deletion approval for only /Users/idrizzogaj/Projects/memotopia/ios-build/CompileCheck (1.6 GB), DeviceBuild (2.1 GB), Sprint-2026110307 (2.3 GB). Preserve the release xcarchive and all source/signing files. Nothing has been deleted.
+- Latest runtime log: C:/Users/IdrZog_MEM/SagaReview-20261123/play-five-6.log; final integration log: validate-final-map.log. Native iOS compilation/install still pending.
