@@ -96,11 +96,22 @@ public static class CardFaces
     /// <summary>Call when a game round is set up. Challenges always use pictures, for now.</summary>
     public static void BeginSession()
     {
+        BeginSession(false);
+    }
+
+    // Saga always uses pictures, without overwriting the player's Training content settings.
+    public static void BeginImageSession()
+    {
+        BeginSession(true);
+    }
+
+    private static void BeginSession(bool imagesOnly)
+    {
         if(SprintRuntime.Active){BeginSprintSession(SprintRuntime.Current.Battle.tier,SprintRuntime.Current.StageSeed);return;}
         sprint=false;
         ClearCache();
-        var c = ChallengeConstants.s_isChallenge ? Choice.Images : Selected;
-        bool challenge = ChallengeConstants.s_isChallenge;
+        var c = imagesOnly || ChallengeConstants.s_isChallenge ? Choice.Images : Selected;
+        bool challenge = imagesOnly || ChallengeConstants.s_isChallenge;
         deck = (c & Choice.Deck) != 0 && !challenge;
         digits = !challenge && AdvancedUnlocked ? MemorySettings.Digits : 2;
         imageNumbers = !challenge && MemorySettings.ShowImageNumbers;
