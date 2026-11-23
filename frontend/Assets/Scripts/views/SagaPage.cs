@@ -8,6 +8,8 @@ public class SagaPage : MonoBehaviour
     private ChainGame chain;
     private int owner;
     private SaysGame says;
+    private SagaBossGame boss;
+    private FocusGame focus;
     private readonly System.Collections.Generic.List<Button> stageButtons = new System.Collections.Generic.List<Button>();
     private ScrollRect mapScroll;
     private RectTransform mapContent;
@@ -56,6 +58,8 @@ public class SagaPage : MonoBehaviour
         host.transform.SetParent(menu.homeScreen.GetComponentInParent<Canvas>().rootCanvas.transform,false);
         controller.chain=host.AddComponent<ChainGame>();
         controller.says=host.AddComponent<SaysGame>();
+        controller.boss=host.AddComponent<SagaBossGame>();
+        controller.focus=host.AddComponent<FocusGame>();
     }
 
     private static void Place(RectTransform rect, float bottom, float top)
@@ -114,6 +118,7 @@ public class SagaPage : MonoBehaviour
                 button.onClick.AddListener(()=>PlayStage(stop));stageButtons.Add(button);
                 var label=ChainGame.Label(node.transform,stop.ToString(),new Vector2(.26f,.20f),new Vector2(.74f,.80f),38,Color.white);
                 label.fontStyle=FontStyle.Bold;label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=38;label.raycastTarget=false;
+                if(SagaRoute.At(stop).Game==SagaGame.Boss || SagaRoute.At(stop).Game==SagaGame.FocusBoss){var badge=ChainGame.Panel(node.transform,"Boss marker",new Vector2(.66f,.66f),new Vector2(.98f,.98f),Color.white).GetComponent<Image>();badge.sprite=Resources.Load<Sprite>("GamesResources/Levels/Asset 15");badge.preserveAspect=true;badge.raycastTarget=false;}
             }
         }
         Canvas.ForceUpdateCanvases();LayoutMap();mapScroll.verticalNormalizedPosition=0;
@@ -131,23 +136,29 @@ public class SagaPage : MonoBehaviour
         Canvas.ForceUpdateCanvases();mapScroll.verticalNormalizedPosition=position;
     }
     private void PlayStage(int stop){
-        if(!SagaRoute.Unlocked(stop) || chain.IsSagaOpen || says.IsSagaOpen)return;
+        if(!SagaRoute.Unlocked(stop) || chain.IsSagaOpen || says.IsSagaOpen || boss.IsOpen || focus.IsSagaOpen)return;
         if(victory!=null){StopCoroutine(victory);victory=null;}revealingStop=0;
         playingStop=stop;frontierBefore=CurrentStop();
         StopAmbient();
         var stage=SagaRoute.At(stop);
         page.SetActive(false);
-        if(stage.Game==SagaGame.Says)says.OpenSaga(stage.Number,ShowMap,()=>{says.Close();PlayStage(stop+1);},OnWon);
+        int focusKind=System.Array.IndexOf(SagaRoute.FocusGames,stage.Game);
+        if(stage.Game==SagaGame.Boss || stage.Game==SagaGame.FocusBoss)boss.Open(stage.Number,ShowMap,OnWon,stage.Game==SagaGame.FocusBoss);
+        else if(focusKind>=0)focus.OpenSaga(new SagaFocusLevel(focusKind,stage.Number),ShowMap,OnWon);
+        else if(stage.Game==SagaGame.Says)says.OpenSaga(stage.Number,ShowMap,()=>{says.Close();PlayStage(stop+1);},OnWon);
         else chain.OpenSaga(stage.Game,stage.Number,ShowMap,following=>PlayStage(SagaRoute.Stop(following.Game,following.Number)),OnWon);
-        if(!chain.IsSagaOpen && !says.IsSagaOpen)ShowMap();
+        if(!chain.IsSagaOpen && !says.IsSagaOpen && !boss.IsOpen && !focus.IsSagaOpen)ShowMap();
     }
     private void ShowMap(){
         if(page==null || owner!=GameManager.AchievementUserId)return;
         page.SetActive(true);page.transform.SetAsLastSibling();RefreshProgress();
     }
     private void RefreshProgress(){
-        for(int i=0;i<stageButtons.Count;i++)stageButtons[i].interactable=SagaRoute.Unlocked(i+1);
         int current=CurrentStop();
+        for(int i=0;i<stageButtons.Count;i++){
+            stageButtons[i].interactable=SagaRoute.Unlocked(i+1);
+            var badge=stageButtons[i].transform.Find("Boss marker");if(badge!=null)badge.GetComponent<Image>().color=Completed(i+1) || i+1==current?new Color(1,.78f,.20f):new Color(.65f,.65f,.65f);
+        }
         for(int block=0;block<mapThemes.Count;block++){
             var cells=new Vector4[20];
             for(int i=0;i<20;i++){
@@ -172,7 +183,7 @@ public class SagaPage : MonoBehaviour
         }
         if(owner!=GameManager.AchievementUserId){victory=null;yield break;}
         revealingStop=unlock?completed+1:0;revealProgress=0;
-        if(chain.IsSagaOpen)chain.Close();if(says.IsSagaOpen)says.Close();ShowMap();
+        if(chain.IsSagaOpen)chain.Close();if(says.IsSagaOpen)says.Close();if(boss.IsOpen)boss.Close();if(focus.IsSagaOpen)focus.Close();ShowMap();
         int destination=unlock?completed+1:completed;
         float from=mapScroll.verticalNormalizedPosition,to=((destination-1)/20)/(float)Mathf.Max(1,sections.Count-1);
         mapScroll.StopMovement();

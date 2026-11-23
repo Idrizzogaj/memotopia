@@ -71,3 +71,20 @@ No new memory-efficacy claims or measured conversion/retention results are impli
 - Microsoft Xbox Accessibility Guideline 117 (new): https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/117 — moving UI backgrounds/visual distractions should be stoppable. Supports the map's persistent Motion On/Off setting.
 - W3C WCAG 2.1 Understanding SC 2.3.1 (new): https://www.w3.org/WAI/WCAG21/Understanding/three-flashes-or-below-threshold — limit flashing intensity/area/frequency. Implementation uses tiny travelling cyan pulses with no full-screen flash or luminance strobe. This is design guidance, not a formal photosensitivity compliance test.
 - Own visual judgment: a pale turquoise/lavender field with faint static neural lines fits the app palette. Guidelines do not establish that this background or timing is universally best, and no empirical memory benefit is claimed.
+
+## 2026-11-23: proposed Focus block after memory boss (not yet approved)
+
+- Proposal: six memory games +memory boss, then four existing Focus games +Focus boss, twelve stops per tier /240 if repeated20times. Focus needs explicit score/completion goals; its current90second score-attack completion is not a sufficient boss sub-task definition. No Focus route changes implemented yet.
+- Rubinstein/Meyer/Evans2001 (reused), primary experiment: https://www.apa.org/pubs/journals/releases/xhp274763.pdf — switching costs depend on rules and are reduced by cues; supports a clear Memory->Focus transition.
+- Brunmair/Richter2019 (reused), primary meta-analysis: https://pubmed.ncbi.nlm.nih.gov/31556629/ — interleaving benefits vary with materials/tasks; does not establish a general cognitive-training benefit for this app.
+- Michael Booth/Valve2009, The AI Systems of Left4Dead (NEW): https://steamcdn-a.akamaihd.net/apps/valve/2009/ai_systems_of_l4d_mike_booth.pdf — first-party example of peaks and valleys in intensity. Using a gentler first Focus task after a boss is an inference across genres, not an experimentally established Memotopia balance rule.
+- Own judgment: coherent blocks make modes readable while offering variety. Actual score targets and total boss time must be tested. Existing Focus rules/Training records remain untouched.
+
+## 2026-11-23: late boss time and Focus tier grouping
+
+- Late boss proposal (not yet applied):90seconds for tiers1-15,120for16-20. Exact thresholds are agent judgment to be playtested independently for memory and Focus, not a research-proven optimum. Current approved implementation still starts with90seconds throughout.
+- Sweetser/Wyeth2005, GameFlow (NEW): https://doi.org/10.1145/1077246.1077253 — clear goals and challenge matched to skill; limited evaluation context, not proof of our timings.
+- Microsoft XAG108 (reused): https://learn.microsoft.com/en-us/xbox/accessibility/xbox-accessibility-guidelines/108 — supports tuning difficulty components independently.
+- Valve/Booth2009 (reused): https://steamcdn-a.akamaihd.net/apps/valve/2009/ai_systems_of_l4d_mike_booth.pdf — developer example of pacing intensity, not direct evidence for a memory app.
+- Grouping recommendation1 was explicitly accepted via annotation51453439-3ae4-480d-8b03-7592c4c77b13: four groups of FIVE levels across all Focus games, matching existing memory/time tiers.
+- Apple HIG Design principles (NEW for grouping): https://developer.apple.com/design/human-interface-guidelines/design-principles/ — familiar and consistent patterns. Together with GameFlow clear goals and Rubinstein/Meyer/Evans2001 task-cue findings https://www.apa.org/pubs/journals/releases/xhp274763.pdf, this supports the consistency rationale. None establishes that four groups universally outperform five.

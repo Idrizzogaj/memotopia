@@ -18,10 +18,11 @@ public sealed class SagaFlashStudy
     private readonly Action finished;
     private int position;
     private bool disposed, paused;
+    private readonly float playbackSpeed;
 
-    public SagaFlashStudy(Transform parent,int[] images,UnityEngine.Events.UnityAction quit,Material theme,Action finished)
+    public SagaFlashStudy(Transform parent,int[] images,UnityEngine.Events.UnityAction quit,Material theme,Action finished,float playbackSpeed=1,int hearts=SagaLevel.Hearts)
     {
-        sequence=(int[])images.Clone();this.finished=finished;
+        sequence=(int[])images.Clone();this.finished=finished;this.playbackSpeed=playbackSpeed;
         Root=UnityEngine.Object.Instantiate(Resources.Load<GameObject>("Prefabs/ExactFlashChainRecall"),parent,false);
         var rect=(RectTransform)Root.transform;rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;
         rect.offsetMin=rect.offsetMax=Vector2.zero;rect.localScale=Vector3.one;rect.anchoredPosition3D=Vector3.zero;
@@ -42,7 +43,7 @@ public sealed class SagaFlashStudy
         }
         for(int i=0;i<5;i++){
             var heart=all.FirstOrDefault(t=>t.name=="Exact heart "+i);
-            if(heart==null)continue;heart.gameObject.SetActive(i<SagaLevel.Hearts);
+            if(heart==null)continue;heart.gameObject.SetActive(i<hearts);
             var image=heart.GetComponent<Image>();if(image!=null)image.material=theme;
         }
         var cells=all.First(t=>t.name=="Unused active cells");
@@ -68,7 +69,7 @@ public sealed class SagaFlashStudy
         var animator=cell.gameObject.AddComponent<Animator>();
         animator.runtimeAnimatorController=Resources.Load<RuntimeAnimatorController>("Prefabs/Flash/FlashCellScale");
         if(animator.runtimeAnimatorController==null)throw new InvalidOperationException("Original Flash animation controller is missing.");
-        animator.speed=paused?0:1;animators.Add(animator);
+        animator.speed=paused?0:playbackSpeed;animators.Add(animator);
         if(Application.isPlaying)animator.SetTrigger("Play");
         else CurrentCell.ShowImage();
     }
@@ -76,7 +77,7 @@ public sealed class SagaFlashStudy
     public bool Accepts(SagaFlashCell cell) { return !disposed && !paused && CurrentCell==cell; }
     public void DidShow(int image) { ShownCount++;ShownImages.Add(image); }
     public void FinishedCell(SagaFlashCell cell) { if(Accepts(cell))Advance(); }
-    public void SetPaused(bool value) { paused=value;foreach(var animator in animators)if(animator!=null)animator.speed=value?0:1; }
+    public void SetPaused(bool value) { paused=value;foreach(var animator in animators)if(animator!=null)animator.speed=value?0:playbackSpeed; }
     public void Destroy()
     {
         disposed=true;CurrentCell=null;

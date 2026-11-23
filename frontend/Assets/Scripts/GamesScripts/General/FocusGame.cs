@@ -7,6 +7,29 @@ using UnityEngine.UI;
 
 // Native Focus training with account-scoped device records and standard achievement sync.
 public sealed class FocusGame : MonoBehaviour {
+ SagaFocusLevel saga;SagaRoundContext sagaContext;Action sagaClosed,sagaWon;int sagaHearts;
+ readonly List<Image> sagaLives=new List<Image>();
+ public bool IsSagaOpen {get{return saga!=null && overlay!=null;}}
+ public void OpenSaga(SagaFocusLevel config,Action closed,Action won,SagaRoundContext context=null){
+  if(SprintRuntime.Active)return;
+  Show(config.Kind);
+  saga=config;sagaClosed=closed;sagaWon=won;sagaContext=context;
+  sagaHearts=context!=null?context.StartingHearts:5;
+  best=-1;practice=false;remaining=config.Seconds;
+  minus.gameObject.SetActive(false);plus.gameObject.SetActive(false);
+  start.onClick=new Button.ButtonClickedEvent();start.onClick.AddListener(Begin);start.gameObject.SetActive(true);
+  var canvas=GetComponentInParent<Canvas>().rootCanvas;var safe=canvas.GetComponent<MobileSafeArea>();
+  overlay.transform.SetParent(safe!=null && safe.Content!=null?safe.Content:canvas.transform,false);
+  var rect=(RectTransform)overlay.transform;rect.anchorMin=Vector2.zero;rect.anchorMax=new Vector2(1,context!=null?.87f:1);rect.offsetMin=rect.offsetMax=Vector2.zero;
+  Canvas.ForceUpdateCanvases();
+  var heart=Resources.Load<GameObject>("Prefabs/ExactFlashChainRecall").GetComponentsInChildren<Image>(true).First(i=>i.name=="Exact heart 0").sprite;
+  for(int i=0;i<5;i++){
+   var image=ChainGame.Panel(overlay.transform,"Saga focus heart "+i,new Vector2(.34f+i*.065f,.965f),new Vector2(.39f+i*.065f,.995f),Color.white).GetComponent<Image>();
+   image.sprite=heart;image.preserveAspect=true;sagaLives.Add(image);
+  }
+  Prepare();Hud();Feedback("Reach "+config.Target+" points");
+  if(context!=null)Begin();
+ }
  public static readonly Color Teal=new Color32(0,112,122,255),Green=new Color32(22,131,84,255),Red=new Color32(206,56,88,255);
  readonly System.Random random=new System.Random();readonly List<string> earned=new List<string>();
  GameObject overlay,body,popup;Text clock,levelText,scoreText,scoreLabel,message,rule,answerText,questionText,roundText;Button start,minus,plus,help;
@@ -42,23 +65,23 @@ public sealed class FocusGame : MonoBehaviour {
  void SelectLevel(int delta){if(playing)return;startLevel=level=Mathf.Clamp(startLevel+delta,1,FocusRules.Maximum(kind));flashPart=0;Prepare();}
  void Primary(){if(playing&&practice)Finish();else StartWithGuide();}
  public void StartWithGuide(){if(overlay==null||playing)return;if(FocusHowTo.Needed(owner,kind))FocusHowTo.Open(overlay.transform,owner,kind,Begin);else Begin();}
- public void Begin(){if(overlay==null)return;SaveRun(false);flashPart=0;runOwner=owner;practice=MemorySettings.Practice;if(practice)earned.Clear();practiceRun=practice?PracticeSession.Begin(this,"Focus."+FocusRules.Names[kind],startLevel,true):null;runId=practice?null:FocusStats.Begin(runOwner,kind,startLevel);StopAllCoroutines();Remove(popup);popup=null;level=startLevel;score=correct=errors=streak=0;remaining=90;playing=true;transition=false;last=Time.realtimeSinceStartup;start.gameObject.SetActive(practice);start.GetComponentInChildren<Text>().text=practice?"Finish":"START";help.gameObject.SetActive(false);minus.interactable=plus.interactable=false;Earn("focus-first");Earn(FocusAchievements.First[kind]);Prepare();Feedback(best>=0?"Score to beat: "+best:"GO!");}
+ public void Begin(){if(overlay==null)return;SaveRun(false);flashPart=0;runOwner=owner;practice=saga==null && MemorySettings.Practice;if(practice)earned.Clear();practiceRun=practice?PracticeSession.Begin(this,"Focus."+FocusRules.Names[kind],startLevel,true):null;runId=practice || saga!=null?null:FocusStats.Begin(runOwner,kind,startLevel);StopAllCoroutines();Remove(popup);popup=null;level=startLevel;score=correct=errors=streak=0;if(saga!=null)sagaHearts=sagaContext!=null?sagaContext.StartingHearts:5;remaining=sagaContext!=null?sagaContext.Remaining:saga!=null?saga.Seconds:90;playing=true;transition=false;last=Time.realtimeSinceStartup;start.gameObject.SetActive(practice);start.GetComponentInChildren<Text>().text=practice?"Finish":"START";help.gameObject.SetActive(false);minus.interactable=plus.interactable=false;Earn("focus-first");Earn(FocusAchievements.First[kind]);Prepare();Feedback(best>=0?"Score to beat: "+best:"GO!");}
  void Update(){if(overlay!=null && owner!=GameManager.AchievementUserId){Close();return;}float now=Time.realtimeSinceStartup;if(playing){if(popup==null)Tick(Mathf.Max(0,now-last));else if(practiceRun!=null)practiceRun.Tick(Mathf.Max(0,now-last));}last=now;if(message!=null && now>messageUntil)message.text="";}
  public void Tick(float elapsed){
-  if(!playing)return;if(practiceRun!=null)practiceRun.Tick(elapsed);if(!practice)remaining=Mathf.Max(0,remaining-elapsed);if(!practice&&remaining<=0){Finish();return;}
+  if(!playing)return;if(practiceRun!=null)practiceRun.Tick(elapsed);if(!practice)remaining=sagaContext!=null?sagaContext.Remaining:Mathf.Max(0,remaining-elapsed);if(!practice&&remaining<=0){Finish();return;}
   if(kind==2 && flashWatching){flashRemaining=Mathf.Max(0,flashRemaining-elapsed);if(flashRemaining<=0)HideFlashNumbers();}
   if(kind==1 && !transition)foreach(var arena in arenas)foreach(var ball in arena.Balls){
    bool armed=ball.State.Armed;int wall=ball.State.Step(Mathf.Min(elapsed,.06f));
-   if(wall>=0){if(!armed && ball.State.Hits<arena.Target){Award(false);Flash(arena.Walls[wall],Red);}ball.State.Armed=false;}
+   if(wall>=0){if(!armed && ball.State.Hits<arena.Target){Award(false);Flash(arena.Walls[wall],Red);if(!playing)return;}ball.State.Armed=false;}
    PlaceBall(ball,arena.Target);
   }
   Hud();
  }
- void Hud(){if(clock==null)return;clock.text=practice?PracticeSession.Clock(this):Mathf.CeilToInt(remaining).ToString();clock.color=!practice&&remaining<=10?Red:Teal;levelText.text=level.ToString();scoreText.text=score.ToString();if(scoreLabel!=null)scoreLabel.text=best>=0?"Score · best "+best:"Score";roundText.text=(practice?"Practice · ":"")+"Level "+(playing?level:startLevel)+(kind==2?" · "+(flashPart+1)+"/3":"");}
+ void Hud(){if(clock==null)return;for(int i=0;i<sagaLives.Count;i++)sagaLives[i].gameObject.SetActive(i<sagaHearts);clock.text=practice?PracticeSession.Clock(this):Mathf.CeilToInt(remaining).ToString();clock.color=!practice&&remaining<=10?Red:Teal;levelText.text=(saga!=null?saga.Number:level).ToString();scoreText.text=saga!=null?score+" / "+saga.Target:score.ToString();if(scoreLabel!=null)scoreLabel.text=saga!=null?"Goal "+saga.Target:best>=0?"Score · best "+best:"Score";roundText.text=(practice?"Practice · ":"")+"Level "+(playing?level:startLevel)+(kind==2?" · "+(flashPart+1)+"/3":"");}
  void Feedback(string value){if(message!=null)message.text=value;messageUntil=Time.realtimeSinceStartup+1.2f;}
- void Award(bool right){if(right){if(practiceRun!=null)practiceRun.Progress(level);score++;correct++;streak=0;Feedback("+1");}else{errors++;streak++;score--;Feedback("−1");WrongFeedback.Vibrate();}Hud();if(!right&&score<=-10&&playing){lostFocus=true;Finish();lostFocus=false;}}
+ void Award(bool right){if(saga!=null && !playing)return;if(right){if(practiceRun!=null)practiceRun.Progress(level);score++;correct++;streak=0;Feedback("+1");}else{errors++;streak++;score--;Feedback("−1");WrongFeedback.Vibrate();if(saga!=null)sagaHearts--;}Hud();if(saga!=null && sagaHearts<=0 && playing){FinishSaga(false);return;}if(saga!=null && playing && score>=saga.Target){FinishSaga(true);return;}if(!right&&score<=-10&&playing){lostFocus=true;Finish();lostFocus=false;}}
  bool lostFocus;int best=-1;
- void RefreshBest(){best=-1;if(owner<=0)return;var game=FocusStats.Read(owner).games[kind];if(game.hasBest)best=game.bestScore;}
+ void RefreshBest(){best=-1;if(saga!=null || owner<=0)return;var game=FocusStats.Read(owner).games[kind];if(game.hasBest)best=game.bestScore;}
  void Prepare(){
   transition=false;flashWatching=false;arenas.Clear();for(int i=body.transform.childCount-1;i>=0;i--)Remove(body.transform.GetChild(i).gameObject);Hud();
   if(kind==0){MathBoard();return;}if(kind==1){BoxesBoard();return;}NumbersBoard();
@@ -72,7 +95,7 @@ public sealed class FocusGame : MonoBehaviour {
  void NewQuestion(){sum=FocusRules.Question(level,random);answer="";questionText.text=sum.A+" "+sum.Operator+" "+sum.B;answerText.text="?";rule.text="Up to "+sum.Limit+"  ·  "+(questionIndex+1)+" / "+sum.Count;}
  public void MathKey(string key){if(!playing || transition)return;
   if(key=="Clear")answer="";
-  else if(key=="OK"){int parsed;if(!int.TryParse(answer,out parsed))return;if(parsed==sum.Answer){Award(true);questionIndex++;if(questionIndex>=sum.Count){NextLevel();return;}NewQuestion();}else{Award(false);answer="";}}
+  else if(key=="OK"){int parsed;if(!int.TryParse(answer,out parsed))return;if(parsed==sum.Answer){Award(true);if(!playing)return;questionIndex++;if(questionIndex>=sum.Count){NextLevel();return;}NewQuestion();}else{Award(false);answer="";}}
   else if(answer.Length<4)answer+=key;
   answerText.text=answer.Length==0?"?":answer;
  }
@@ -122,8 +145,8 @@ public sealed class FocusGame : MonoBehaviour {
  }
  void HideFlashNumbers(){flashWatching=false;foreach(var button in body.GetComponentsInChildren<Button>())if(button.name.StartsWith("Token ")){var text=button.GetComponentInChildren<Text>();if(text!=null)text.text="";}rule.text="Recall · "+(FocusRules.NumberMode(kind,level,flashPart)==0?"Green ↑":FocusRules.NumberMode(kind,level,flashPart)==1?"Red ↓":"Alternate Green ↑, Red ↓");}
  public void Choose(int key,Button button,Text text){if(!playing || transition || flashWatching || !button.interactable)return;
-  if(sequence[cursor]==key){text.text="";button.interactable=false;var color=button.image.color;color.a=.25f;button.image.color=color;cursor++;Award(true);if(cursor==sequence.Length)NextLevel();}
-  else{Award(false);if(kind==2 && streak>=5){level=Mathf.Max(1,level-1);flashPart=0;streak=0;Prepare();Feedback("Five errors · Level "+level);}}
+  if(sequence[cursor]==key){text.text="";button.interactable=false;var color=button.image.color;color.a=.25f;button.image.color=color;cursor++;Award(true);if(!playing)return;if(cursor==sequence.Length)NextLevel();}
+  else{Award(false);if(!playing)return;if(kind==2 && streak>=5){level=Mathf.Max(1,level-1);flashPart=0;streak=0;Prepare();Feedback("Five errors · Level "+level);}}
  }
  void BoxesBoard(){
   var spec=FocusRules.Boxes(level);rule.text="Tap the next wall before impact  ·  +1 / −1";Canvas.ForceUpdateCanvases();var size=((RectTransform)body.transform).rect.size;
@@ -151,7 +174,7 @@ public sealed class FocusGame : MonoBehaviour {
  void PlaceBall(NativeBall ball,int target){ball.Image.rectTransform.anchorMin=ball.Image.rectTransform.anchorMax=ball.State.Position;ball.Image.rectTransform.anchoredPosition=Vector2.zero;ball.Image.color=ball.State.Armed?Green:ball.State.Hits>=target?Color.gray:Red;if(ball.Halo!=null)ball.Halo.gameObject.SetActive(ball.State.Armed);}
  void Counts(Arena arena){arena.Count.text=string.Join("  ",arena.Balls.Select(b=>b.State.Hits+"/"+arena.Target).ToArray());}
  void Wall(Arena arena,int wall){if(!playing || transition)return;var ball=arena.Balls.Where(b=>b.State.Hits<arena.Target && !b.State.Armed && b.State.NextWall()==wall).OrderBy(b=>b.State.Arrival()).FirstOrDefault();if(ball==null){Award(false);Flash(arena.Walls[wall],Red);return;} // guessing a wall costs a point and vibrates
-  ball.State.Armed=true;ball.State.Hits++;Award(true);Flash(arena.Walls[wall],Green);
+  ball.State.Armed=true;ball.State.Hits++;Award(true);if(!playing)return;Flash(arena.Walls[wall],Green);
   // Single big box only: a correct tap sends the ball back, so the next wall comes sooner.
   if(arenas.Count==1){ball.State.Bounce(wall);ball.State.Armed=false;}
   PlaceBall(ball,arena.Target);Counts(arena);if(arenas.All(a=>a.Balls.All(b=>b.State.Hits>=a.Target)))NextLevel();}
@@ -163,11 +186,21 @@ public sealed class FocusGame : MonoBehaviour {
   var prompt=content.GetComponentsInChildren<Text>(true).Where(t=>!t.transform.IsChildOf(content.GetChild(2)) && !t.transform.IsChildOf(content.GetChild(3))).ToArray();if(prompt.Length>0)prompt[0].text=prompt.Length==1?first+"\n"+second:first;if(prompt.Length>1)prompt[1].text=second;
   var a=content.GetChild(2).GetComponent<Button>();var b=content.GetChild(3).GetComponent<Button>();a.onClick=new Button.ButtonClickedEvent();b.onClick=new Button.ButtonClickedEvent();a.GetComponentInChildren<Text>().text=left;b.GetComponentInChildren<Text>().text=right;a.onClick.AddListener(no);b.onClick.AddListener(yes);
  }
- void Earn(string key){if(!practice&&!string.IsNullOrEmpty(key) && GameManager.AchievementUserId>0 && GameManager.UnlockAchievement(key))earned.Add(key);}
+ void Earn(string key){if(saga==null && !practice&&!string.IsNullOrEmpty(key) && GameManager.AchievementUserId>0 && GameManager.UnlockAchievement(key))earned.Add(key);}
  void SaveRun(bool complete){if(practiceRun!=null)practiceRun.Stop();if(string.IsNullOrEmpty(runId))return;FocusStats.End(runOwner,runId,level,score,correct,errors,90-remaining,complete);runId=null;}
- void Finish(){SaveRun(true);RefreshBest();playing=false;transition=false;StopAllCoroutines();Hud();Dialog(lostFocus?"LOST FOCUS":practice?"Practice complete":"BRAINS OUT!","Score "+score+"\n"+correct+" correct · "+errors+" errors","Home","Replay",Close,Begin);if(Application.isPlaying&&!practice){foreach(string key in earned)BadgePopup.ShowFor(this,key);earned.Clear();if(!string.IsNullOrEmpty(PlayerPrefs.GetString("token")))ProgressSync.Instance.GetApi<Assets.Script.Controllers.AchievementsAPIController>().FlushPending();}}
+ void Finish(){if(saga!=null){FinishSaga(false);return;}SaveRun(true);RefreshBest();playing=false;transition=false;StopAllCoroutines();Hud();Dialog(lostFocus?"LOST FOCUS":practice?"Practice complete":"BRAINS OUT!","Score "+score+"\n"+correct+" correct · "+errors+" errors","Home","Replay",Close,Begin);if(Application.isPlaying&&!practice){foreach(string key in earned)BadgePopup.ShowFor(this,key);earned.Clear();if(!string.IsNullOrEmpty(PlayerPrefs.GetString("token")))ProgressSync.Instance.GetApi<Assets.Script.Controllers.AchievementsAPIController>().FlushPending();}}
+ void FinishSaga(bool success){
+  if(!playing)return;playing=false;transition=false;StopAllCoroutines();Hud();
+  if(sagaContext!=null){sagaContext.Report(success,sagaHearts);return;}
+  if(success)SagaProgress.Complete(saga.Game,owner,saga.Number,SagaProgress.StarsFromFocusHearts(sagaHearts));
+  Remove(popup);popup=Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/"+(success?"WinPanel":"LosePanel")),overlay.transform,false);var content=popup.transform.GetChild(0);
+  if(!success){var replay=content.GetChild(2).GetComponent<Button>();var back=content.GetChild(3).GetComponent<Button>();replay.onClick=new Button.ButtonClickedEvent();back.onClick=new Button.ButtonClickedEvent();replay.onClick.AddListener(Begin);back.onClick.AddListener(Close);return;}
+  content.GetChild(0).GetChild(0).GetComponent<Text>().text="FOCUS "+FocusRules.Names[kind].ToUpperInvariant()+" · "+saga.Number;
+  content.GetChild(10).GetChild(0).GetComponent<Text>().text=score.ToString();foreach(var stars in popup.GetComponentsInChildren<StarFillScript>(true))stars.EarnedStarsOverride=SagaProgress.StarsFromFocusHearts(sagaHearts);
+  foreach(var button in popup.GetComponentsInChildren<Button>(true))button.interactable=false;if(sagaWon!=null)sagaWon();
+ }
  void Quit(){if(!playing){Close();return;}if(popup!=null)return;Dialog("Are you sure you","want to quit?","No","Yes",()=>{Remove(popup);popup=null;last=Time.realtimeSinceStartup;},Close);}
- public void Close(){SaveRun(false);PracticeSession.Release(this);practiceRun=null;bool wasOpen=overlay!=null;playing=false;StopAllCoroutines();Remove(overlay);overlay=body=popup=null;arenas.Clear();if(wasOpen)Application.targetFrameRate=priorFrameRate;}
+ public void Close(){var closed=sagaClosed;sagaClosed=sagaWon=null;saga=null;sagaContext=null;sagaLives.Clear();SaveRun(false);PracticeSession.Release(this);practiceRun=null;bool wasOpen=overlay!=null;playing=false;StopAllCoroutines();Remove(overlay);overlay=body=popup=null;arenas.Clear();if(wasOpen)Application.targetFrameRate=priorFrameRate;if(closed!=null)closed();}
  static void Remove(GameObject value){if(value!=null){value.SetActive(false);CardFaces.DestroyGenerated(value);}}
  void OnDisable(){Close();}
 }

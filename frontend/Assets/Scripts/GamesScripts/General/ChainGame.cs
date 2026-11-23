@@ -119,6 +119,9 @@ public sealed class ChainGame : GamesScript
     private SagaFlashStudy flashStudy;
     private SagaPairsBoard pairsBoard;
     private SagaBoxesBoard boxesBoard;
+    private SagaSortBoard sortBoard;
+    private SagaRoundContext sagaContext;
+    private float recallBudget;
     private Action<SagaLevel> sagaNext;
     private Action sagaWon;
     private Color RoundTheme { get { return saga==null?Theme:SagaRoute.ColorFor(saga.Game); } }
@@ -149,11 +152,11 @@ public sealed class ChainGame : GamesScript
         ShowLevels();
     }
     public void OpenSaga(int value, Action closed) { OpenSaga(SagaGame.Chain,value,closed); }
-    public void OpenSaga(SagaGame game,int value, Action closed,Action<SagaLevel> nextStage=null,Action won=null) {
+    public void OpenSaga(SagaGame game,int value, Action closed,Action<SagaLevel> nextStage=null,Action won=null,SagaRoundContext context=null) {
         int stop=SagaRoute.Stop(game,value);
         if(overlay!=null || SprintRuntime.Active || !SagaRoute.Unlocked(stop))return;
-        if(game==SagaGame.Says)throw new InvalidOperationException("Says uses its original SaysGame controller.");
-        saga=new SagaLevel(game,value);sagaClosed=closed;sagaNext=nextStage;sagaWon=won;
+        if(game==SagaGame.Says || Array.IndexOf(SagaRoute.Games,game)<0)throw new InvalidOperationException("This Saga game uses its own controller.");
+        saga=new SagaLevel(game,value);sagaClosed=closed;sagaNext=nextStage;sagaWon=won;sagaContext=context;
         CreateOverlay();
         StartLevel(value);
     }
@@ -161,6 +164,7 @@ public sealed class ChainGame : GamesScript
         owner=GameManager.AchievementUserId;
         var canvas=GetComponentInParent<Canvas>().rootCanvas;
         overlay=(RectTransform)Panel(canvas.transform,"Chain overlay",Vector2.zero,Vector2.one,RoundTheme).transform;
+        if(sagaContext!=null)overlay.anchorMax=new Vector2(1,.87f);
         safe=(RectTransform)Panel(overlay,"Safe area",Vector2.zero,Vector2.one,Color.clear).transform;
         ApplySafeArea();
         title=Label(safe,"",Vector2.zero,Vector2.zero,14,Purple);title.gameObject.SetActive(false);
@@ -174,25 +178,27 @@ public sealed class ChainGame : GamesScript
     }
     private void Update() {
         if(overlay!=null && GameManager.AchievementUserId!=owner){Close();return;}
+        if(sagaContext!=null && state!=null && !state.Finished && sagaContext.Remaining<=0){state.Expire();EndRound();return;}
         if(overlay!=null && Input.GetKeyDown(KeyCode.Escape))Back();
-        if(quitDialog==null){if(pairsBoard!=null)pairsBoard.Tick(Time.deltaTime);if(boxesBoard!=null)boxesBoard.Tick();}
+        if(quitDialog==null){if(pairsBoard!=null)pairsBoard.Tick(Time.deltaTime);if(boxesBoard!=null)boxesBoard.Tick();if(sortBoard!=null)sortBoard.Tick();}
         if(TickSagaStudyClock(Time.deltaTime))return;
         if(saga==null && PracticeMode.Untimed&&originalGame!=null)originalGame.ShowPracticeClock(PracticeSession.Clock(this));
         TickTrainingClock(Time.deltaTime);
     }
     private bool TickSagaStudyClock(float elapsed){
-        if(saga==null || saga.Game==SagaGame.Flash || recall || (originalGame==null && boxesBoard==null) || state==null || state.Finished || quitDialog!=null)return false;
+        if(saga==null || saga.Game==SagaGame.Flash || recall || (originalGame==null && boxesBoard==null && sortBoard==null) || state==null || state.Finished || quitDialog!=null)return false;
         studySeconds=Mathf.Max(0,studySeconds-elapsed);
-        if(boxesBoard!=null)boxesBoard.ShowClock(Mathf.CeilToInt(studySeconds));else originalGame.ShowStudyClock(Mathf.CeilToInt(studySeconds));
+        int shown=Mathf.CeilToInt(sagaContext!=null?sagaContext.Remaining:studySeconds);
+        if(boxesBoard!=null)boxesBoard.ShowClock(shown);else if(sortBoard!=null)sortBoard.ShowClock(shown);else originalGame.ShowStudyClock(shown);
         if(studySeconds>0)return false;
-        ShowRecall();return true;
+        if(saga.SharedStudyRecallClock){state.Expire();EndRound();}else ShowRecall();return true;
     }
     private void TickTrainingClock(float elapsed){
-        if(SprintRuntime.Active || !recall || state==null || state.Finished || (originalGame==null && pairsBoard==null && boxesBoard==null) || quitDialog!=null)return;
+        if(SprintRuntime.Active || !recall || state==null || state.Finished || (originalGame==null && pairsBoard==null && boxesBoard==null && sortBoard==null) || quitDialog!=null)return;
         if(saga==null && PracticeMode.Untimed){originalGame.ShowPracticeClock(PracticeSession.Clock(this));return;}
-        recallSeconds=Mathf.Max(0,recallSeconds-elapsed);ShowRecallClock();
+        recallSeconds=sagaContext!=null?sagaContext.Remaining:Mathf.Max(0,recallSeconds-elapsed);ShowRecallClock();
         if(recallSeconds<=0){state.Expire();EndRound();return;}
-        if(saga!=null && saga.TimedShuffleDue(saga.Seconds-recallSeconds,sagaShuffles,state.Sequence.Length-state.Position)){
+        if(saga!=null && saga.TimedShuffleDue(recallBudget-recallSeconds,sagaShuffles,state.Sequence.Length-state.Position)){
             sagaShuffles++;ShuffleRecallPositions();
         }
     }
@@ -209,7 +215,7 @@ public sealed class ChainGame : GamesScript
             yes.onClick.AddListener(()=>{CardFaces.DestroyGenerated(quitDialog);quitDialog=null;StopAllCoroutines();CardFaces.EndSession();ShowLevels();});
         } else Close();
     }
-    private void ClearOriginalGame(){if(boxesBoard!=null){boxesBoard.Destroy();boxesBoard=null;}if(pairsBoard!=null){pairsBoard.Destroy();pairsBoard=null;}if(flashStudy!=null){flashStudy.Destroy();flashStudy=null;}if(originalGame!=null){originalGame.Destroy();originalGame=null;}if(quitDialog!=null){CardFaces.DestroyGenerated(quitDialog);quitDialog=null;}if(countdownPanel!=null){CardFaces.DestroyGenerated(countdownPanel);countdownPanel=null;}if(resultPanel!=null){CardFaces.DestroyGenerated(resultPanel);resultPanel=null;}}
+    private void ClearOriginalGame(){if(sortBoard!=null){sortBoard.Destroy();sortBoard=null;}if(boxesBoard!=null){boxesBoard.Destroy();boxesBoard=null;}if(pairsBoard!=null){pairsBoard.Destroy();pairsBoard=null;}if(flashStudy!=null){flashStudy.Destroy();flashStudy=null;}if(originalGame!=null){originalGame.Destroy();originalGame=null;}if(quitDialog!=null){CardFaces.DestroyGenerated(quitDialog);quitDialog=null;}if(countdownPanel!=null){CardFaces.DestroyGenerated(countdownPanel);countdownPanel=null;}if(resultPanel!=null){CardFaces.DestroyGenerated(resultPanel);resultPanel=null;}}
     public void Close() {
         PracticeSession.Release(this);
         ClearOriginalGame();
@@ -217,7 +223,7 @@ public sealed class ChainGame : GamesScript
         StopAllCoroutines();CardFaces.EndSession();state=null;
         if(overlay!=null)CardFaces.DestroyGenerated(overlay.gameObject);
         overlay=null;
-        var closed=sagaClosed;sagaClosed=null;sagaNext=null;sagaWon=null;saga=null;recall=false;
+        var closed=sagaClosed;sagaClosed=null;sagaNext=null;sagaWon=null;sagaContext=null;saga=null;recall=false;
         if(closed!=null)closed();
     }
     private void OnDisable(){if(overlay!=null)Close();}
@@ -283,9 +289,9 @@ public sealed class ChainGame : GamesScript
         StopAllCoroutines();if(saga!=null || PracticeMode.Untimed)firstEarned=false;level=value;recall=false;studyIndex=0;sagaShuffles=0;
         if(saga!=null)CardFaces.BeginImageSession();else CardFaces.BeginSession();
         int[] pool=Enumerable.Range(1,CardFaces.ContentCount).ToArray();Shuffle(pool);
-        state=new ChainState(pool.Take(saga!=null?saga.ImageCount:SprintRuntime.Active?SprintRuntime.Current.Size:ChainState.CountForLevel(level==MemoryAthlete.Level?20:level)).ToArray(),saga!=null?SagaLevel.Hearts:level==MemoryAthlete.Level?1:5);
+        state=new ChainState(pool.Take(saga!=null?saga.ImageCount:SprintRuntime.Active?SprintRuntime.Current.Size:ChainState.CountForLevel(level==MemoryAthlete.Level?20:level)).ToArray(),sagaContext!=null?sagaContext.StartingHearts:saga!=null?SagaLevel.Hearts:level==MemoryAthlete.Level?1:5);
         ClearBody();body.GetComponent<Image>().color=new Color32(248,246,255,255);title.text=level==MemoryAthlete.Level?"MEMORY ATHLETE":"CHAIN • "+level;
-        if(Application.isPlaying)StartCoroutine(Countdown());else ShowStudy();
+        if(Application.isPlaying && sagaContext==null)StartCoroutine(Countdown());else ShowStudy();
     }
     private IEnumerator Countdown() {
         if(SprintRuntime.Active){yield return SprintRuntime.ReadyIntro();ShowStudy();yield break;}
@@ -306,17 +312,18 @@ public sealed class ChainGame : GamesScript
         ClearBody();ClearOriginalGame();safe.gameObject.SetActive(false);
         if(exactTheme==null){exactTheme=new Material(Resources.Load<Shader>("MemotopiaTheme"));exactTheme.SetColor("_ThemeColor",RoundTheme);}
         if(saga!=null && saga.Game==SagaGame.Flash){
-            flashStudy=new SagaFlashStudy(overlay,state.Sequence,Back,exactTheme,ShowRecall);return;
+            flashStudy=new SagaFlashStudy(overlay,state.Sequence,Back,exactTheme,ShowRecall,sagaContext!=null?SagaRoundContext.FlashPlaybackSpeed:1,state.Hearts);return;
         }
+        if(saga!=null && saga.Game==SagaGame.Sort){studySeconds=sagaContext!=null?sagaContext.StudyLimit(saga):saga.StudySeconds;sortBoard=new SagaSortBoard(overlay,state.Sequence,Back,exactTheme,ChooseSort,CanRecallInput);sortBoard.ShowClock(Mathf.CeilToInt(studySeconds));sortBoard.Hearts(state.Hearts);return;}
         if(saga!=null && saga.Game==SagaGame.Boxes){
-            studySeconds=saga.Seconds;boxesBoard=new SagaBoxesBoard(overlay,saga,state.Sequence,Back,ShowRecall,ChooseBox,CanRecallInput);boxesBoard.ShowClock(saga.Seconds);return;
+            studySeconds=saga.StudySeconds;boxesBoard=new SagaBoxesBoard(overlay,saga,state.Sequence,Back,ShowRecall,ChooseBox,CanRecallInput);boxesBoard.ShowClock(saga.Seconds);boxesBoard.Hearts(state.Hearts);return;
         }
         originalGame=new ChainOriginalPresentation(overlay,true,Back,NextCard,exactTheme,saga!=null && saga.Game==SagaGame.Pairs);
         studyCard=originalGame.Study;next=originalGame.Next;NextCard();
-        if(saga!=null){studySeconds=saga.Seconds;originalGame.ShowStudyClock(saga.Seconds);originalGame.Hearts(state.Hearts);}
+        if(saga!=null){studySeconds=saga.StudySeconds;originalGame.ShowStudyClock(saga.StudySeconds);originalGame.Hearts(state.Hearts);}
     }
     public void NextCard() {
-        if(saga!=null && saga.Game==SagaGame.Flash)return;
+        if(saga!=null && (saga.Game==SagaGame.Flash || saga.Game==SagaGame.Sort))return;
         if(SprintRuntime.Active && !SprintRuntime.Current.Ready)return;
         if(quitDialog!=null)return;
         int index;
@@ -330,11 +337,14 @@ public sealed class ChainGame : GamesScript
 
     }
     private void ShowRecall() {
-        if(boxesBoard!=null){recall=true;boxesBoard.BeginRecall();recallSeconds=saga.Seconds;ShowRecallClock();UpdateProgress();return;}
+        float budget=sagaContext!=null?sagaContext.Remaining:saga!=null && saga.SharedStudyRecallClock?studySeconds:saga!=null?saga.Seconds:180;
+        recallBudget=budget;
+        if(sortBoard!=null){recall=true;sortBoard.BeginRecall();recallSeconds=budget;ShowRecallClock();UpdateProgress();return;}
+        if(boxesBoard!=null){recall=true;boxesBoard.BeginRecall();recallSeconds=budget;ShowRecallClock();UpdateProgress();return;}
         recall=true;ClearBody();ClearOriginalGame();safe.gameObject.SetActive(false);
-        if(saga!=null && saga.Game==SagaGame.Pairs){pairsBoard=new SagaPairsBoard(overlay,state.Sequence,Back,exactTheme,ChoosePair);recallSeconds=saga.Seconds;ShowRecallClock();UpdateProgress();return;}
+        if(saga!=null && saga.Game==SagaGame.Pairs){pairsBoard=new SagaPairsBoard(overlay,state.Sequence,Back,exactTheme,ChoosePair);recallSeconds=budget;ShowRecallClock();UpdateProgress();return;}
         originalGame=new ChainOriginalPresentation(overlay,false,Back,NextCard,exactTheme);
-        if(!SprintRuntime.Active){recallSeconds=saga!=null?saga.Seconds:180;originalGame.ShowRecallClock((int)recallSeconds,saga==null && PracticeMode.Untimed);}
+        if(!SprintRuntime.Active){recallSeconds=budget;originalGame.ShowRecallClock((int)recallSeconds,saga==null && PracticeMode.Untimed);}
         int[] shuffled=(int[])state.Sequence.Clone();Shuffle(shuffled);
         foreach(int id in shuffled){int captured=id;
             var tile=UnityEngine.Object.Instantiate(originalGame.Cell,originalGame.Grid,false);tile.name="Recall "+id;
@@ -379,11 +389,19 @@ public sealed class ChainGame : GamesScript
     private bool CanRecallInput(){return recall && quitDialog==null && state!=null && !state.Finished && owner==GameManager.AchievementUserId;}
     private bool ChoosePair(int first,int second){if(!CanRecallInput())return false;bool correct=state.ChoosePair(first,second);UpdateProgress();if(state.Finished)EndRound();return correct;}
     private bool ChooseBox(int id,int slot){if(!CanRecallInput())return false;bool correct=state.Place(id,slot);UpdateProgress();if(state.Finished)EndRound();return correct;}
-    private void ShowRecallClock(){int seconds=Mathf.CeilToInt(recallSeconds);if(originalGame!=null)originalGame.ShowRecallClock(seconds,saga==null && PracticeMode.Untimed);if(pairsBoard!=null)pairsBoard.ShowClock(seconds);if(boxesBoard!=null)boxesBoard.ShowClock(seconds);}
-    private void UpdateProgress() {if(originalGame!=null)originalGame.Hearts(SprintRuntime.Active?0:state.Hearts);if(pairsBoard!=null)pairsBoard.Hearts(state.Hearts);if(boxesBoard!=null)boxesBoard.Hearts(state.Hearts);}
+    private bool ChooseSort(int[] order){
+        if(!CanRecallInput() || order.Length!=state.Sequence.Length)return false;
+        bool correct=order.SequenceEqual(state.Sequence);
+        if(correct){for(int i=0;i<order.Length;i++)state.Place(order[i],i);}
+        else{int wrong=0;while(order[wrong]==state.Sequence[wrong])wrong++;state.Place(order[wrong],wrong);}
+        UpdateProgress();if(state.Finished)EndRound();return correct;
+    }
+    private void ShowRecallClock(){int seconds=Mathf.CeilToInt(recallSeconds);if(originalGame!=null)originalGame.ShowRecallClock(seconds,saga==null && PracticeMode.Untimed);if(pairsBoard!=null)pairsBoard.ShowClock(seconds);if(boxesBoard!=null)boxesBoard.ShowClock(seconds);if(sortBoard!=null)sortBoard.ShowClock(seconds);}
+    private void UpdateProgress() {if(originalGame!=null)originalGame.Hearts(SprintRuntime.Active?0:state.Hearts);if(pairsBoard!=null)pairsBoard.Hearts(state.Hearts);if(boxesBoard!=null)boxesBoard.Hearts(state.Hearts);if(sortBoard!=null)sortBoard.Hearts(state.Hearts);}
     private void EndRound() {
         var practice=PracticeSession.Get(this);if(practice!=null)practice.Stop();
         if(SprintRuntime.Active)return;
+        if(sagaContext!=null){var context=sagaContext;ClearOriginalGame();recall=false;context.Report(state.Won,state.Hearts);return;}
         if(saga!=null){
             if(state.Won)SagaProgress.Complete(saga.Game,owner,level,state.Hearts);
             ClearOriginalGame();safe.gameObject.SetActive(true);recall=false;ClearBody();ShowOriginalResult();if(state.Won && sagaWon!=null)sagaWon();return;
@@ -437,7 +455,7 @@ public sealed class ChainGame : GamesScript
         if(stop>=SagaRoute.Count){ShowLevels();return;}
         var nextLevel=SagaRoute.At(stop+1);
         if(sagaNext!=null){var nextAction=sagaNext;Close();nextAction(nextLevel);return;}
-        if(nextLevel.Game==SagaGame.Says){ShowLevels();return;}
+        if(nextLevel.Game==SagaGame.Says || Array.IndexOf(SagaRoute.Games,nextLevel.Game)<0){ShowLevels();return;}
         saga=nextLevel;StartLevel(nextLevel.Number);
     }
     internal static Font Font {get {

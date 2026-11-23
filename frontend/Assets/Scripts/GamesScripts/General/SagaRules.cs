@@ -1,22 +1,26 @@
 using System;
 using UnityEngine;
 
-public enum SagaGame { Chain, Flash, Pairs, Boxes, Says }
+public enum SagaGame { Chain, Flash, Pairs, Boxes, Says, Sort, Boss, FocusPairs, FocusBoxes, FocusFlash, FocusChain, FocusBoss }
 
 public static class SagaRoute
 {
-    public static readonly SagaGame[] Games = {SagaGame.Chain,SagaGame.Flash,SagaGame.Pairs,SagaGame.Boxes,SagaGame.Says};
-    public static int Count { get { return Games.Length*20; } }
+    public static readonly SagaGame[] Games = {SagaGame.Chain,SagaGame.Flash,SagaGame.Pairs,SagaGame.Boxes,SagaGame.Says,SagaGame.Sort};
+    public static readonly SagaGame[] FocusGames={SagaGame.FocusPairs,SagaGame.FocusBoxes,SagaGame.FocusFlash,SagaGame.FocusChain};
+    public const float BossSeconds=90;
+    public static int Count { get { return 12*20; } }
     public static readonly Color FlashColor = new Color32(254,191,75,255);
     public static SagaLevel At(int stop)
     {
         if(stop<1 || stop>Count)throw new ArgumentOutOfRangeException("stop");
-        return new SagaLevel(Games[(stop-1)%Games.Length],(stop-1)/Games.Length+1);
+        int index=(stop-1)%12;
+        return new SagaLevel(index<6?Games[index]:index==6?SagaGame.Boss:index==11?SagaGame.FocusBoss:FocusGames[index-7],(stop-1)/12+1);
     }
     public static int Stop(SagaGame game,int level)
     {
         new SagaLevel(game,level);
-        return (level-1)*Games.Length+Array.IndexOf(Games,game)+1;
+        int index=Array.IndexOf(Games,game);if(index<0)index=game==SagaGame.Boss?6:game==SagaGame.FocusBoss?11:7+Array.IndexOf(FocusGames,game);
+        return (level-1)*12+index+1;
     }
     public static Color ColorFor(SagaGame game) {
         switch(game){
@@ -24,6 +28,10 @@ public static class SagaRoute
             case SagaGame.Pairs:return new Color32(36,189,224,255);
             case SagaGame.Boxes:return new Color32(234,24,100,255);
             case SagaGame.Says:return ChainGame.Purple;
+            case SagaGame.Sort:return new Color32(242,139,55,255);
+            case SagaGame.Boss:return new Color32(95,42,161,255);
+            case SagaGame.FocusPairs:case SagaGame.FocusBoxes:case SagaGame.FocusFlash:case SagaGame.FocusChain:return FocusGame.Teal;
+            case SagaGame.FocusBoss:return new Color32(15,94,117,255);
             default:return ChainGame.Theme;
         }
     }
@@ -39,7 +47,8 @@ public static class SagaRoute
 public sealed class SagaLevel
 {
     public readonly SagaGame Game;
-    public readonly int Number, ImageCount, Seconds, TimedShuffles;
+    public readonly int Number, ImageCount, Seconds, StudySeconds, TimedShuffles;
+    public bool SharedStudyRecallClock {get{return Game==SagaGame.Pairs;}}
     public bool ShuffleLastTen { get { return Number >= 16; } }
     public const int Hearts = 3;
 
@@ -56,10 +65,15 @@ public sealed class SagaLevel
         ImageCount = 10 + group * 5;
         Seconds = 90 - group * 10 - offset * 2;
         if (number == 5) Seconds = 80;
+        StudySeconds=Seconds;
         TimedShuffles = group;
-        if(game==SagaGame.Pairs){ImageCount=(4+group*2)*2;TimedShuffles=0;}
+        if(game==SagaGame.Pairs){ImageCount=number*2;Seconds=StudySeconds=90;TimedShuffles=0;}
         if(game==SagaGame.Boxes){ImageCount=new[]{2,3,4,4,5,6,6,8,8,9,10,12,12,15,15,15,16,20,20,22}[number-1];TimedShuffles=0;}
         if(game==SagaGame.Says){ImageCount=3+(number-1)/2;TimedShuffles=0;}
+        if(game==SagaGame.Sort){ImageCount=5+group*5;Seconds=90;StudySeconds=new[]{10,9,8,7,5,20,19,18,17,15,25,24,23,22,20,30,28,26,24,20}[number-1];TimedShuffles=0;}
+        if(game==SagaGame.Boss){ImageCount=0;Seconds=StudySeconds=(int)SagaRoute.BossSeconds;TimedShuffles=0;}
+        if(Array.IndexOf(SagaRoute.FocusGames,game)>=0){var focus=new SagaFocusLevel(Array.IndexOf(SagaRoute.FocusGames,game),number);ImageCount=0;Seconds=focus.Seconds;StudySeconds=0;TimedShuffles=0;}
+        if(game==SagaGame.FocusBoss){ImageCount=0;Seconds=(int)SagaRoute.BossSeconds;StudySeconds=0;TimedShuffles=0;}
     }
 
     public static void ValidateGame(SagaGame game)
@@ -83,6 +97,7 @@ public sealed class SagaLevel
 // Separate, account-scoped local progress. Never shares Training keys or server game IDs.
 public static class SagaProgress
 {
+    public static int StarsFromFocusHearts(int hearts){return hearts>=5?3:hearts>=3?2:1;}
     public static readonly bool DevelopmentAllLevelsOpen = true;
     private static string Key(SagaGame game, int owner, int level)
     {
