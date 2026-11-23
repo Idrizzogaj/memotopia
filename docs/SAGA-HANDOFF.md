@@ -45,3 +45,11 @@ Work branch: `codex/saga`, based on the fetched `origin/codex/focus-2.1.0`.
 - Verify layout and navigation on phone and tablet before treating the UI as approved.
 - Confirm final release unlock requirements, access, rewards and server sync separately. Do not treat the development unlock override as release-ready policy.
 - Keep Unity 2019.3.12f1 and Unity 2022.3.62f2 compatibility. Do not change the separate Android staging project without coordinating its files.
+
+## Flash preparation
+
+- Idriz requested Flash with the same neuron artwork, another game colour, and the same Saga difficulty logic.
+- Map order is not decided: Chain 1-20 followed by a sliding transition to Flash 1-20; separate game maps; or alternating Chain 1, Flash 1, Chain 2, Flash 2, etc.
+- `SagaGame` and `SagaLevel(game, number)` share the existing count/time/heart/shuffle configuration without conflating each game's identity. Existing `SagaLevel(number)` calls still mean Chain.
+- `SagaProgress` now has game-scoped overloads. Existing `saga.chain.stars.v1` keys are preserved exactly; Flash uses `saga.flash.stars.v1`. This is preparation only: no Flash map navigation or playable Saga Flash has been wired yet.
+- Two questions have been presented to Idriz: which initial map order to use, and whether Flash should spread its automatic presentation across the entire memorization budget or retain its current animation speed. Do not silently replace Flash with Chain's manual NEXT study screen.

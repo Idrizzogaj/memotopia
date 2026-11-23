@@ -31,7 +31,13 @@ public static class SagaValidation
             for(int n=1;n<=20;n++){
                 PlayerPrefs.SetInt("saga.chain.stars.v1.1999999801."+n,0);
                 PlayerPrefs.SetInt("saga.chain.stars.v1.1999999802."+n,0);
+                PlayerPrefs.SetInt("saga.flash.stars.v1.1999999801."+n,0);
+                PlayerPrefs.SetInt("saga.flash.stars.v1.1999999802."+n,0);
             }
+            SagaProgress.Complete(SagaGame.Flash,1999999801,2,3);
+            Check(SagaProgress.Stars(SagaGame.Flash,2)==3 && SagaProgress.Stars(SagaGame.Chain,2)==0,"Flash progress must not overwrite Chain.");
+            SagaProgress.Complete(SagaGame.Chain,1999999801,3,2);
+            Check(SagaProgress.Stars(SagaGame.Chain,3)==2 && SagaProgress.Stars(SagaGame.Flash,3)==0,"Chain progress must not overwrite Flash.");
             Rules();
             EditorSceneManager.OpenScene("Assets/_Scenes/GameMenu.unity");
             var menu = Resources.FindObjectsOfTypeAll<MenuNavigation>().First(n => n.gameObject.scene.IsValid());
@@ -111,6 +117,8 @@ public static class SagaValidation
             var level = new SagaLevel(n);
             Check(level.Seconds == seconds[n-1] && level.ImageCount == 10 + (n-1)/5*5, "Configuration " + n);
             Check(level.TimedShuffles == (n-1)/5, "Shuffle count " + n);
+            var flash=new SagaLevel(SagaGame.Flash,n);
+            Check(flash.Game==SagaGame.Flash && flash.Seconds==level.Seconds && flash.ImageCount==level.ImageCount && flash.TimedShuffles==level.TimedShuffles,"Flash shared configuration " + n);
         }
         var six = new SagaLevel(6);
         Check(!six.TimedShuffleDue(39.9f,0,15) && six.TimedShuffleDue(40,0,15), "One shuffle at halfway.");
