@@ -76,3 +76,7 @@ Branch: codex/saga. Start point: fetched origin/codex/focus-2.1.0, including unp
 - Use only subscription allowance; pause at90percent. Usage read late session showed27percent weekly used, ordinary allowance still available. Never consume credits or redeem resets.
 
 - New manual command for test2.2.0 build2026112401: bash ~/Projects/memotopia-saga-test-20261123/ios-build/sign-install-saga-2026112401.sh. Prepare/sync source before handing it off. This script performs Unity export, interactive keychain unlock, Xcode build/sign/verify and owner-iPhone installation; it never publishes to stores. Script/logs/builds remain outside Git. Original Mac work/ios source remains untouched; only its expendable PlayerDataCache was cleared with cleanup approval.
+
+## Build command ready (2026-11-24)
+
+Source719e75c was pushed to codex/saga and synced as tracked Assets into the isolated Mac copy. FocusGame.cs, SagaRules.cs and SagaPage.cs match their Git blobs after CRLF normalization. Local-only MemotopiaBuild.cs overrides testversion2.2.0/build2026112401/exportSaga-2026112401. New sign-install script syntax passed bash-n; Unity2019 executable/privacy source exist. Free space7.5GiB after sync. The new app build has NOT been started; owner requested the command to run himself. Initial installed build2026112301 is saved as CRC-verified Installed-2026112301.zip. Latest player source compile-focus-final.log passed C#7.3 legacy paths. Source code commit remains719e75c; this later documentation update changes no app code.
