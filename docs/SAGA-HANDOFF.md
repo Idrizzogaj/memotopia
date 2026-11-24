@@ -30,7 +30,7 @@ Branch: codex/saga. Start point: fetched origin/codex/focus-2.1.0, including unp
 ## Focus configuration
 
 - Reuse native FocusGame, starting at native level1 and retaining its automatic within-round difficulty progression. Saga tier controls goal/time, not the native starting level. This was explicitly approved.
-- All four games use time schedule:[20,19,18,17,15,30,29,28,27,25,40,39,38,37,35,60,58,56,54,50]. Same five-step endpoint pattern as SORT.
+- Base Focus time schedule:[20,19,18,17,15,30,29,28,27,25,40,39,38,37,35,60,58,56,54,50]. Owner exception on2026-11-25: Focus Pairs levels1-5 all get20seconds. Focus Pairs6-20 and all other Focus games retain the base schedule.
 - Targets by five-level group: Pairs10/15/20/30; Boxes20/30/40/60; Flash10/20/30/50 (50 explicitly corrected from40); Chain30/50/70/100 (supersedes earlier five-value draft).
 - Correct+1, wrong-1 as native Focus, plus5hearts in Saga only. Five errors fail even if score remains positive. Reaching the target ends the Saga round immediately. Timeout also fails.
 - Saga Focus ignores Practice for timing, does not write FocusStats sessions/bests, does not earn/flush Training achievements or XP, and does not mutate existing Training settings. Normal Focus retains its native90second score-attack and existing lost-focus behavior.
@@ -38,10 +38,10 @@ Branch: codex/saga. Start point: fetched origin/codex/focus-2.1.0, including unp
 
 ## Bosses
 
-- Both currently start with one90second deadline, centrally configured in SagaRoute.BossSeconds. Timer includes all study, recall, transitions and quit dialogs. Random permutation without replacement; completion icons fill by game identity. Child successes never save individual ordinary-level progress.
+- First memory boss (local tier1, global stop7) gets120seconds total, explicitly requested on2026-11-25. Later memory bosses and all Focus bosses retain90seconds. SagaLevel selects the budget; SagaBossGame uses that same value for its intro, HUD and actual shared deadline. SagaRoute.BossSeconds remains the90second default. Timer includes all study, recall, transitions and quit dialogs. Random permutation without replacement; completion icons fill by game identity. Child successes never save individual ordinary-level progress.
 - Memory boss uses the previous six games at the same local tier,3shared hearts. Boss-only automatic playback: Flash speed4, Says speed4.5; SORT study capped5seconds. Counts and ordinary-round timing remain unchanged. Owner approved shortening these automatic phases to make the shared clock feasible.
 - Focus boss uses the four preceding Focus goals at the same tier,5shared hearts. Native Focus gameplay/playback unchanged. Boss expires/fails at deadline or exhausted shared hearts.
-- Late boss suggestion:90seconds for tiers1-15 and120for16-20. This is a proposed test setting, NOT yet applied/approved; user said120might be needed after testing. Do not claim the prototype is balanced for human play. Exact timings/goals need phone testing.
+- Earlier suggestion to extend120seconds to tiers16-20 is NOT applied/approved; the only approved120second exception is the first memory boss. Do not claim the prototype is balanced for human play. Exact timings/goals need phone testing.
 
 ## Map and home UI
 
@@ -125,3 +125,11 @@ Idriz ran sign-install-saga-2026112401.sh in Mac Terminal and entered the keycha
 - The next install completed successfully (ios-build/install-2402-service-reset.log/json). Scoped devicectl apps query at23:45local verified2.2.0/build2026112402 on the owner iPhone. This is direct evidence of installation, not just an Xcode success. App launch requested afterward. No new build, signing, store upload or data reset outside the requested Saga test policy.
 - Source in2402is1efff18, including shared Saga result/navigation fix, original Flash3-to32curve, Boxes5/10/15/20 and once-per-build Saga reset. Later22b8632Flash7/12/20/30 and connected nerve signal are NOT in2402. Owner now needs to test whether MAP/replay/automatic return works on the actual updated app; do not claim the result bug is resolved on-device before their test.
 - Apple primary report supporting bounded CoreDeviceService restart as a developer-tools recovery measure (different Xcode27simulator-cache case; do not claim it establishes this exact bug): https://developer.apple.com/forums/thread/829680. In this session installation succeeded only after the service restart; underlying root cause was not proven.
+
+## Owner timing changes (2026-11-25)
+
+- Owner clarified that the requested20seconds applies to Focus Pairs, not memory Pairs. Focus Pairs levels1-5 now all get20seconds per ordinary round. Goals, five hearts, levels6-20, other Focus games and memory Pairs remain unchanged.
+- First memory boss now has one shared120second deadline across all six games, retaining three shared hearts. Subsequent memory bosses and every Focus boss stay90seconds. Boss Flash playback remains4x; the reported excessive speed is still open and no replacement speed has been approved.
+- validate-focus-pairs20-20261125.log passed native Focus Pairs level5 remaining playable at15seconds and timing out at20, other Focus level5 rounds expiring at15, and existing all80 targets/native callbacks/hearts/save-isolation checks.
+- play-boss-first120-20261125.log passed the first memory boss120second intro/HUD/shared child deadline and timeout, later-memory/Focus90second checks, plus the existing six-game tier20 boss flow. compile-pairs20-boss120-20261125.log passed C#7.3 with legacy Unity defines against available2022references; this is not an actual Unity2019iOS export.
+- These changes are for the next owner test build. Installed iPhone build2026112402 is unchanged. No new player build, install, store upload or server change was performed.

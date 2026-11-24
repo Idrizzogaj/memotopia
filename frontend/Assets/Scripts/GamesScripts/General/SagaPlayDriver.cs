@@ -230,7 +230,14 @@ public sealed class SagaPlayDriver : MonoBehaviour
         Check(((ChainState)Get(carriedChain,"state")).Hearts==2,"Boss child must inherit the remaining hearts.");
         var flashStudy=(SagaFlashStudy)Get(carriedChain,"flashStudy");Check(flashStudy.Root.GetComponentsInChildren<Image>().Count(i=>i.name.StartsWith("Exact heart "))==2,"Flash study must show carried hearts.");carriedChain.Close();
         var carriedSays=(SaysGame)Get(boss,"says");carriedSays.OpenSaga(1,()=>{},null,null,carry);Check((int)Get(carriedSays,"hearts")==2,"Says must inherit remaining boss hearts.");carriedSays.Close();
-        boss.Open(1,()=>{},()=>{throw new Exception("Expired boss won.");});boss.StartBoss();boss.GetType().GetField("deadline",Flags).SetValue(boss,Time.realtimeSinceStartup-1);yield return null;yield return null;
+        boss.Open(2,()=>{},()=>{});Check(((Text)Get(boss,"clock")).text.Contains("90 s"),"Later memory bosses retain90seconds.");boss.Close();
+        boss.Open(1,()=>{},()=>{},true);Check(((Text)Get(boss,"clock")).text.Contains("90 s"),"Focus boss remains90seconds.");boss.Close();
+        boss.Open(1,()=>{},()=>{throw new Exception("Expired boss won.");});
+        Check(((Text)Get(boss,"clock")).text.Contains("120 s") && ((GameObject)Get(boss,"intro")).GetComponentsInChildren<Text>().Any(t=>t.text.Contains("120 seconds total")),"First memory boss must show120seconds in HUD and intro.");
+        boss.StartBoss();Check(boss.Remaining>118 && boss.Remaining<=120,"First memory boss starts one120second deadline.");
+        var firstSays=(SaysGame)Get(boss,"says");var firstContext=(SagaRoundContext)(firstSays.IsSagaOpen?Get(firstSays,"sagaContext"):Get((ChainGame)Get(boss,"chain"),"sagaContext"));
+        Check(Mathf.Abs(firstContext.Remaining-boss.Remaining)<.1f,"The first child must share the120second boss deadline.");
+        boss.GetType().GetField("deadline",Flags).SetValue(boss,Time.realtimeSinceStartup-1);yield return null;yield return null;
         Check(!(bool)Get(boss,"running") && SagaProgress.Stars(SagaGame.Boss,1)==0,"Boss deadline must fail without saving progress.");boss.Close();
         Debug.Log("SAGA_BOSS_PLAY_PASSED: six randomized native games, level20 actual animation/drag-drop, one90second deadline, all six icons, boss-only progress, expiration.");
     }

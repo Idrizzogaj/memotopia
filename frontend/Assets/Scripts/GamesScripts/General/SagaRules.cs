@@ -72,7 +72,7 @@ public sealed class SagaLevel
         if(game==SagaGame.Boxes){ImageCount=5+group*5;TimedShuffles=0;}
         if(game==SagaGame.Says){ImageCount=3+(number-1)/2;TimedShuffles=0;}
         if(game==SagaGame.Sort){ImageCount=5+group*5;Seconds=90;StudySeconds=new[]{10,9,8,7,5,20,19,18,17,15,25,24,23,22,20,30,28,26,24,20}[number-1];TimedShuffles=0;}
-        if(game==SagaGame.Boss){ImageCount=0;Seconds=StudySeconds=(int)SagaRoute.BossSeconds;TimedShuffles=0;}
+        if(game==SagaGame.Boss){ImageCount=0;Seconds=StudySeconds=number==1?120:(int)SagaRoute.BossSeconds;TimedShuffles=0;}
         if(Array.IndexOf(SagaRoute.FocusGames,game)>=0){var focus=new SagaFocusLevel(Array.IndexOf(SagaRoute.FocusGames,game),number);ImageCount=0;Seconds=focus.Seconds;StudySeconds=0;TimedShuffles=0;}
         if(game==SagaGame.FocusBoss){ImageCount=0;Seconds=(int)SagaRoute.BossSeconds;StudySeconds=0;TimedShuffles=0;}
     }

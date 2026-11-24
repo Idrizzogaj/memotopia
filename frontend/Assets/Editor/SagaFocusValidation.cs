@@ -23,6 +23,14 @@ public static class SagaFocusValidation
         var host=new GameObject("Focus controller",typeof(RectTransform));host.transform.SetParent(root.transform,false);var game=host.AddComponent<FocusGame>();
         string stats=PlayerPrefs.GetString("focus.stats.device.v1.1999999820","");string badges=PlayerPrefs.GetString("achievements.verified.v2.1999999820","");
         try{
+            // Pairs level5 gets a full20seconds; the other Focus games still expire at15.
+            game.OpenSaga(new SagaFocusLevel(0,5),()=>{},()=>{throw new Exception("Unanswered Pairs round won.");});game.Begin();game.Tick(15);
+            Check((bool)Get(game,"playing") && (float)Get(game,"remaining")==5 && ((Text)Get(game,"clock")).text=="5","Focus Pairs level5 remains playable after15seconds.");
+            game.Tick(5);Check(!(bool)Get(game,"playing"),"Focus Pairs expires after the complete20second budget.");game.Close();
+            for(int other=1;other<4;other++){
+                game.OpenSaga(new SagaFocusLevel(other,5),()=>{},()=>{throw new Exception("Unanswered Focus round won.");});game.Begin();game.Tick(15);
+                Check(!(bool)Get(game,"playing"),"Other Focus level5rounds retain15seconds.");game.Close();
+            }
             int[][] targets={new[]{10,15,20,30},new[]{20,30,40,60},new[]{10,20,30,50},new[]{30,50,70,100}};
             for(int kind=0;kind<4;kind++)for(int n=1;n<=20;n++){
                 var level=new SagaFocusLevel(kind,n);Check(level.Target==targets[kind][(n-1)/5],"Target groups.");
