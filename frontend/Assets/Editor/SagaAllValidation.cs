@@ -5,6 +5,7 @@ public static class SagaAllValidation
 {
     public static void Validate(){
         if(Application.productName!="MemotopiaSagaValidation")throw new InvalidOperationException("Use the isolated validation project.");
+        SagaTestResetValidation.Validate();
         SagaValidation.Validate();
         SagaFocusValidation.Validate();
         System.IO.Directory.CreateDirectory(System.IO.Path.GetFullPath("../ChainReuseFix"));

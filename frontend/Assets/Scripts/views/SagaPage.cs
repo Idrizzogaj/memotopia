@@ -77,6 +77,7 @@ public class SagaPage : MonoBehaviour
     private void Open(MenuNavigation menu)
     {
         owner=GameManager.AchievementUserId;
+        SagaProgress.PrepareTestInstall(owner);
         if(page!=null){ShowMap();return;}
         var canvas=menu.homeScreen.GetComponentInParent<Canvas>().rootCanvas;
         var area=canvas.GetComponent<MobileSafeArea>();

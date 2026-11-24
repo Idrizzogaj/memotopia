@@ -98,6 +98,24 @@ public sealed class SagaLevel
 // Separate, account-scoped local progress. Never shares Training keys or server game IDs.
 public static class SagaProgress
 {
+    // Enabled only in the isolated iPhone test copy, never in normal builds.
+    private static readonly bool ResetOnNewTestBuild = false;
+    public static void PrepareTestInstall(int owner)
+    {
+        if (ResetOnNewTestBuild) ResetForTestBuild(owner, Application.buildGUID);
+    }
+    private static bool ResetForTestBuild(int owner, string build)
+    {
+        if (owner <= 0 || owner != GameManager.AchievementUserId || string.IsNullOrEmpty(build)) return false;
+        string marker = "saga.test.reset-build.v1." + owner;
+        if (PlayerPrefs.GetString(marker, "") == build) return false;
+        foreach (SagaGame game in Enum.GetValues(typeof(SagaGame)))
+            for (int level = 1; level <= 20; level++) PlayerPrefs.DeleteKey(Key(game, owner, level));
+        PlayerPrefs.SetString(marker, build);
+        PlayerPrefs.Save();
+        return true;
+    }
+
     public static int StarsFromFocusHearts(int hearts){return hearts>=5?3:hearts>=3?2:1;}
     public static readonly bool DevelopmentAllLevelsOpen = true;
     private static string Key(SagaGame game, int owner, int level)
