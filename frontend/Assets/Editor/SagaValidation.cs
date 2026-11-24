@@ -19,7 +19,7 @@ public static class SagaValidation
     static ChainState State(ChainGame game) { return (ChainState)Get(game, "state"); }
     static void Recall(ChainGame game) {
         var flash=(SagaFlashStudy)Get(game,"flashStudy");
-        if(flash!=null){int guard=0;while(Get(game,"flashStudy")!=null && guard++<30){var cell=flash.CurrentCell;cell.HideImage();cell.AnimationFinished();}return;}
+        if(flash!=null){int guard=0;while(Get(game,"flashStudy")!=null && guard++<60){var cell=flash.CurrentCell;cell.HideImage();cell.AnimationFinished();}return;}
         if(Get(game,"boxesBoard")!=null){Call(game,"ShowRecall");return;}
         if(Get(game,"sortBoard")!=null){Call(game,"TickSagaStudyClock",(float)Get(game,"studySeconds"));return;}
         int count=0;while(!(bool)Get(game,"recall") && count++<60)game.NextCard();
@@ -141,7 +141,7 @@ public static class SagaValidation
             Check(level.Seconds == seconds[n-1] && level.ImageCount == 10 + (n-1)/5*5, "Configuration " + n);
             Check(level.TimedShuffles == (n-1)/5, "Shuffle count " + n);
             var flash=new SagaLevel(SagaGame.Flash,n);
-            Check(flash.Game==SagaGame.Flash && flash.Seconds==level.Seconds && flash.ImageCount==level.ImageCount && flash.TimedShuffles==level.TimedShuffles,"Flash shared configuration " + n);
+            Check(flash.Game==SagaGame.Flash && flash.Seconds==level.Seconds && flash.ImageCount==new[]{3,4,5,6,7,8,9,10,11,12,14,16,18,20,21,22,24,26,28,32}[n-1] && flash.TimedShuffles==level.TimedShuffles,"Flash native count and Saga timing " + n);
         }
         var six = new SagaLevel(6);
         Check(!six.TimedShuffleDue(39.9f,0,15) && six.TimedShuffleDue(40,0,15), "One shuffle at halfway.");
@@ -162,6 +162,7 @@ public static class SagaValidation
         int[] sortSeconds={10,9,8,7,5,20,19,18,17,15,25,24,23,22,20,30,28,26,24,20};
         for(int n=1;n<=20;n++){
             var sort=new SagaLevel(SagaGame.Sort,n);Check(sort.StudySeconds==sortSeconds[n-1] && sort.ImageCount==5+5*((n-1)/5),"SORT configuration.");
+            var boxes=new SagaLevel(SagaGame.Boxes,n);Check(boxes.ImageCount==5+5*((n-1)/5),"Approved Boxes five-level count groups.");
             var pairs=new SagaLevel(SagaGame.Pairs,n);Check(pairs.ImageCount==2*n && pairs.Seconds==90 && pairs.SharedStudyRecallClock,"Pairs count/shared clock.");
         }
         float now=0;int reports=0;var context=new SagaRoundContext(90,(win,lives)=>reports++,()=>now);
@@ -189,9 +190,10 @@ public static class SagaValidation
         Check(state.Won && SagaProgress.Stars(6)==2,"Saga win/stars not saved.");
         Capture(canvas,camera,800,1734,"saga-win-phone");
         var result=(GameObject)Get(game,"resultPanel");
-        result.transform.GetChild(0).GetChild(12).GetComponent<Button>().onClick.Invoke();
-        Check(((SagaLevel)Get(game,"saga")).Game==SagaGame.Flash && ((SagaLevel)Get(game,"saga")).Number==6 && State(game).Hearts==3,"NEXT LEVEL must follow interleaved Saga.");
-        game.ShowLevels();game.OpenSaga(SagaGame.Chain,11,mapClosed);Recall(game);Call(game,"TickTrainingClock",24f);Call(game,"TickTrainingClock",23f);
+        CheckResult(result,SagaRoute.Stop(SagaGame.Chain,6),true);
+        Click(result.transform.GetChild(0).GetChild(12).GetComponent<Button>());
+        Check(!game.IsSagaOpen,"MAP must close the completed Saga game.");
+        game.OpenSaga(SagaGame.Chain,11,mapClosed);Recall(game);Call(game,"TickTrainingClock",24f);Call(game,"TickTrainingClock",23f);
         Check((int)Get(game,"sagaShuffles")==2,"Level 11 needs two timed shuffles.");
         game.StartLevel(16);Recall(game);state=State(game);
         foreach(int id in state.Sequence.Take(15).ToArray())game.Choose(id);
@@ -210,7 +212,7 @@ public static class SagaValidation
         game.StartLevel(1);Recall(game);state=State(game);
         game.Choose(state.Sequence[1]);game.Choose(state.Sequence[1]);game.Choose(state.Sequence[1]);
         Check(state.Finished && !state.Won && state.Hearts==0,"Three errors must lose.");
-        result=(GameObject)Get(game,"resultPanel");result.transform.GetChild(0).GetChild(2).GetComponent<Button>().onClick.Invoke();
+        result=(GameObject)Get(game,"resultPanel");CheckResult(result,1,false);Click(result.transform.GetChild(0).GetChild(2).GetComponent<Button>());
         Check(State(game).Hearts==3 && State(game).Sequence.Length==10,"Replay must reset the round.");
         Call(game,"Back"); Check(Get(game,"quitDialog")!=null,"Quit confirmation missing.");
         float seconds=(float)Get(game,"studySeconds");Call(game,"TickSagaStudyClock",10f);
@@ -220,7 +222,7 @@ public static class SagaValidation
         Check(state.TimedOut && !state.Won && SagaProgress.Stars(1)==0,"Recall timeout must lose without progress.");
         game.StartLevel(20);Recall(game);state=State(game);foreach(int id in state.Sequence)game.Choose(id);
         result=(GameObject)Get(game,"resultPanel");
-        Check(result.transform.GetChild(0).GetChild(12).GetComponentInChildren<Text>().text=="NEXT LEVEL","Chain 20 must lead to Flash 20.");
+        CheckResult(result,SagaRoute.Stop(SagaGame.Chain,20),true);
         game.ShowLevels();game.OpenSaga(SagaGame.Chain,5,mapClosed);Check((float)Get(game,"studySeconds")==80f,"Level 5 exception.");
         var originalUser=UserConstants.s_user;UserConstants.s_user=new User{id=1999999802};
         game.Choose(State(game).Sequence[0]);
@@ -249,7 +251,7 @@ public static class SagaValidation
                     Check(SagaProgress.Stars(kind,level)==3,"Says progress.");
                     if(level==20){
                         var popup=(GameObject)Get(says,"popup");
-                        Check(popup.transform.GetChild(0).GetChild(12).GetComponentInChildren<Text>().text=="NEXT LEVEL","Says 20 leads to SORT 20.");
+                        CheckResult(popup,SagaRoute.Stop(SagaGame.Says,20),true);
                     }
                     says.Close();continue;
                 }
@@ -263,9 +265,15 @@ public static class SagaValidation
                     if(level==1)Capture(canvas,camera,800,1734,"saga-flash-study-phone");
                     Recall(game);Check(flash.ShownCount==config.ImageCount,"Flash must show every picture.");
                     Check((float)Get(game,"recallSeconds")==config.Seconds,"Flash gets a fresh recall budget.");
+                    var clock=((ChainOriginalPresentation)Get(game,"originalGame")).Root.GetComponentsInChildren<Text>().First(t=>t.name=="Exact recall timer");
+                    Canvas.ForceUpdateCanvases();
+                    Check(clock.enabled && clock.text==config.Seconds.ToString() && clock.cachedTextGenerator.vertexCount>4,"Visible Flash recall digits.");
+                    Call(game,"TickTrainingClock",1f);Check(clock.text==(config.Seconds-1).ToString(),"Flash recall digits count down.");
+                    if(level==1)Capture(canvas,camera,800,1734,"saga-flash-recall-phone");
                 }else {
                     if(kind==SagaGame.Pairs){Call(game,"TickSagaStudyClock",17f);Check((float)Get(game,"studySeconds")==73,"Pairs study consumes shared clock.");}
                     if(kind==SagaGame.Sort && level==1)Capture(canvas,camera,800,1734,"saga-sort-study-phone");
+                    if(kind==SagaGame.Boxes){var board=(SagaBoxesBoard)Get(game,"boxesBoard");Check(board.Root.GetComponentsInChildren<Image>().Count(i=>i.name=="ImgPref" && i.enabled)==config.ImageCount,"Every Boxes picture must be visible during study.");}
                     Recall(game);
                     if(kind==SagaGame.Pairs)Check((float)Get(game,"recallSeconds")==73,"Pairs recall must not reset the clock.");
                 }
@@ -292,20 +300,46 @@ public static class SagaValidation
                 }else foreach(int id in images)game.Choose(id);
                 Check(state.Won && SagaProgress.Stars(kind,level)>0,"Win and separate progress "+kind+" "+level);
                 var result=(GameObject)Get(game,"resultPanel");
-                result.transform.GetChild(0).GetChild(12).GetComponent<Button>().onClick.Invoke();
+                CheckResult(result,stop,true);
+                Click(result.transform.GetChild(0).GetChild(12).GetComponent<Button>());
+                Check(mapPage.activeSelf && !game.IsSagaOpen,"MAP returns from "+kind+" "+level);
+                Call(page,"PlayStage",stop+1);
                 var next=SagaRoute.At(stop+1);
                 if(next.Game==SagaGame.Boss){var boss=(SagaBossGame)Get(page,"boss");Check(boss.IsOpen,"SORT next opens boss.");if(level==1)Capture(canvas,camera,800,1734,"saga-boss-start-phone");boss.Close();}
                 else if(next.Game==SagaGame.Says){
-                    var says=(SaysGame)Get(page,"says");Check(says.IsSagaOpen,"Boxes NEXT must open Says.");says.Close();
+                    var says=(SaysGame)Get(page,"says");Check(says.IsSagaOpen,"Map entry must open Says.");says.Close();
                 }else{
                     var active=(SagaLevel)Get(game,"saga");
-                    Check(active.Game==next.Game && active.Number==next.Number,"NEXT follows route from "+kind+" "+level);game.ShowLevels();
+                    Check(active.Game==next.Game && active.Number==next.Number,"Map follows route from "+kind+" "+level);game.ShowLevels();
                 }
             }
         }
+        // The newly approved Boxes count groups must fit the existing iPad boards too.
+        ((RectTransform)canvas.transform).sizeDelta=new Vector2(1200,1600);camera.orthographicSize=800;Canvas.ForceUpdateCanvases();
+        foreach(int level in new[]{1,6,11,16,20}){
+            int stop=SagaRoute.Stop(SagaGame.Boxes,level);Call(page,"PlayStage",stop);
+            var board=(SagaBoxesBoard)Get(game,"boxesBoard");var state=State(game);
+            Check(board.Root.name.StartsWith("BoxesSceneIpad") && board.Root.GetComponentsInChildren<Image>().Count(i=>i.name=="ImgPref" && i.enabled)==new SagaLevel(SagaGame.Boxes,level).ImageCount,"Tablet Boxes study count/layout.");
+            if(level==1)Capture(canvas,camera,1200,1600,"saga-boxes-study-tablet");
+            Recall(game);var images=(int[])state.Sequence.Clone();for(int i=0;i<images.Length;i++)board.Place(images[i],i);
+            Check(state.Won,"Tablet Boxes layout is solvable.");var result=(GameObject)Get(game,"resultPanel");CheckResult(result,stop,true);Click(result.transform.GetChild(0).GetChild(12).GetComponent<Button>());
+        }
+        ((RectTransform)canvas.transform).sizeDelta=new Vector2(800,1734);camera.orthographicSize=867;Canvas.ForceUpdateCanvases();
         // Restore a visible map for the caller's existing navigation assertions.
         Call(page,"ShowMap");
         mapPage.GetComponentsInChildren<Button>(true).First(b=>b.name=="Saga level 1").onClick.Invoke();
+    }
+
+    static void Click(Button button){
+        Check(button.gameObject.activeInHierarchy && button.IsInteractable(),"Result button must accept a pointer click.");
+        button.OnPointerClick(new UnityEngine.EventSystems.PointerEventData(null){button=UnityEngine.EventSystems.PointerEventData.InputButton.Left});
+    }
+    static void CheckResult(GameObject panel,int stop,bool won){
+        var view=panel.GetComponent<SagaResultView>();
+        Check(view!=null && view.Stop==stop && view.Won==won,"Shared result identity.");
+        Check(panel.GetComponentsInChildren<Text>().Any(t=>t.text=="SAGA LEVEL "+stop),"Result uses global Saga number.");
+        var buttons=panel.GetComponentsInChildren<Button>();
+        Check(buttons.Length==2 && buttons.All(b=>b.IsInteractable()),"REPLAY and MAP remain usable.");
     }
 
     static void Capture(Canvas canvas, Camera camera, int width, int height, string name)

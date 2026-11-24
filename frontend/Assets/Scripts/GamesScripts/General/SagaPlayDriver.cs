@@ -61,7 +61,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         while(study==null){study=(SagaFlashStudy)Get(game,"flashStudy");yield return null;}
         int[] sequence=(int[])((ChainState)Get(game,"state")).Sequence.Clone();
         while(!(bool)Get(game,"recall"))yield return null;
-        Check(study.ShownCount==25 && study.ShownImages.SequenceEqual(sequence),"Original Flash animation must display all 25 pictures in order.");
+        Check(study.ShownCount==32 && study.ShownImages.SequenceEqual(sequence),"Original Flash animation must display all 32 pictures in order.");
         Check((float)Get(game,"recallSeconds")>49 && (float)Get(game,"recallSeconds")<=52,"Recall countdown starts after the entire sequence.");
         Check(CellController.onShowImage==oldShow && CellController.afterShownImage==oldHide && CellController.onAnimationFinished==oldFinish,"Flash global event handlers changed.");
         foreach(int id in sequence)game.Choose(id);
@@ -80,15 +80,21 @@ public sealed class SagaPlayDriver : MonoBehaviour
             var drop=board.Root.GetComponentsInChildren<SagaBoxesDrop>(true).First(d=>d.Slot==i);
             drop.OnDrop(data);item.OnEndDrag(data);yield return null;
         }
-        Check(state.Won,"Native Boxes drag/drop must solve the board.");
-        Debug.Log("SAGA_PLAY_PASSED: original full-speed Flash animation, all 25 pictures before recall, untouched static events, native Boxes drag/drop.");
+        Check(state.Won && sequence.Length==5,"Native Boxes level1 must use five images and solve by drag/drop.");
+        var result=(GameObject)Get(game,"resultPanel");
+        Check(result.GetComponent<SagaResultView>().Stop==4 && result.GetComponentsInChildren<Text>().Any(t=>t.text=="SAGA LEVEL 4"),"Boxes result global Saga level4.");
+        var mapButton=result.transform.GetChild(0).GetChild(12).GetComponent<Button>();
+        Check(mapButton.IsInteractable(),"Boxes MAP button enabled.");mapButton.OnPointerClick(new PointerEventData(system));
+        Check(!game.IsSagaOpen,"Boxes MAP pointer click closes result.");
+        Debug.Log("SAGA_PLAY_PASSED: original full-speed Flash animation, all 32 pictures before recall, untouched static events, native Boxes drag/drop.");
         EditorApplication.Exit(0);
     }
     IEnumerator ValidateMap(Transform canvas){
         UserConstants.s_user=new User{id=1999999818,username="Map runtime validation"};
         for(int n=1;n<=SagaRoute.Count;n++){var stage=SagaRoute.At(n);PlayerPrefs.SetInt("saga."+stage.Game.ToString().ToLowerInvariant()+".stars.v1.1999999818."+stage.Number,n<20?3:0);}
         int oldMotion=PlayerPrefs.GetInt("saga.motion.v1",1);PlayerPrefs.SetInt("saga.motion.v1",1);
-        var menuObject=new GameObject("Isolated menu",typeof(RectTransform));menuObject.transform.SetParent(canvas,false);
+        // Match GameMenu: MenuNavigation is a scene root, outside the Canvas.
+        var menuObject=new GameObject("Isolated menu",typeof(RectTransform));
         var menu=menuObject.AddComponent<MenuNavigation>();menu.enabled=false;
         menu.homeScreen=ChainGame.Panel(canvas,"Home",Vector2.zero,Vector2.one,Color.white);
         menu.trainingBackground=ChainGame.Panel(menu.homeScreen.transform,"Training",Vector2.zero,Vector2.one,Color.white).GetComponent<Image>();
@@ -115,6 +121,17 @@ public sealed class SagaPlayDriver : MonoBehaviour
         limit=Time.realtimeSinceStartup+8;
         while(!map.activeSelf || Get(page,"victory")!=null){Check(Get(page,"pulse")==null,"Motion off must suppress unlock pulse.");Check(Time.realtimeSinceStartup<limit,"Reduced-motion return timeout.");yield return null;}
         Check(themes[1].GetVectorArray("_Cells")[1].z==1,"Reduced-motion completion still unlocks next stage.");
+        // A manual replay must cancel the completed round's pending auto-return.
+        page.GetType().GetMethod("PlayStage",Flags).Invoke(page,new object[]{8});focus.Begin();yield return SolveFocus(focus);
+        var result=(GameObject)Get(focus,"popup");var view=result.GetComponent<SagaResultView>();
+        Check(view.Stop==8 && result.GetComponentsInChildren<Text>().Any(t=>t.text=="SAGA LEVEL 8"),"Focus shared Saga result title.");
+        var replay=result.transform.GetChild(0).GetChild(11).GetComponent<Button>();Check(replay.IsInteractable(),"Focus REPLAY enabled.");replay.OnPointerClick(new PointerEventData(null));
+        yield return new WaitForSecondsRealtime(5.5f);
+        Check(focus.IsSagaOpen && (bool)Get(focus,"playing") && !map.activeSelf && Get(page,"victory")==null,"Old victory must not close a replay.");focus.Close();
+        page.GetType().GetMethod("PlayStage",Flags).Invoke(page,new object[]{8});focus.Begin();yield return SolveFocus(focus);
+        result=(GameObject)Get(focus,"popup");var mapButton=result.transform.GetChild(0).GetChild(12).GetComponent<Button>();
+        Check(mapButton.IsInteractable(),"Focus MAP enabled.");mapButton.OnPointerClick(new PointerEventData(null));yield return null;
+        Check(map.activeSelf && !focus.IsSagaOpen && Get(page,"victory")==null,"Manual MAP must return immediately and stop pending auto-return.");
         PlayerPrefs.SetInt("saga.motion.v1",oldMotion);PlayerPrefs.Save();
         Debug.Log("SAGA_MAP_PLAY_PASSED:240stops, actual Focus Pairs/Boxes wins, automatic return, 20-21 scroll, grey/color reveal, electrical pulse, spontaneous discharge, motion-off cancellation.");
     }
@@ -198,7 +215,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         }
         Check(won && SagaProgress.Stars(SagaGame.Boss,20)==2,"Boss level20 must be completable inside90seconds and preserve the lost heart.");
         foreach(var game in SagaRoute.Games)Check(SagaProgress.Stars(game,20)==0,"Boss child must not save ordinary Saga progress.");
-        Check(flashCount>=24,"Boss Flash must display entire25-image sequence before recall.");
+        Check(flashCount>=31,"Boss Flash must display entire32-image sequence before recall.");
         var fills=(System.Collections.Generic.Dictionary<SagaGame,Image>)Get(boss,"fills");Check(fills.Values.All(i=>i.fillAmount==1),"All six completion icons filled.");
         boss.Close();
         var carry=new SagaRoundContext(Time.realtimeSinceStartup+90,(success,lives)=>{},null,2);

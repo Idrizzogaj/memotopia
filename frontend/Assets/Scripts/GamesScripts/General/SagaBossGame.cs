@@ -74,13 +74,8 @@ public sealed class SagaBossGame : MonoBehaviour
         if(!running)return;running=false;StopAllCoroutines();CloseChildren();
         int stars=focusMode?SagaProgress.StarsFromFocusHearts(hearts):hearts;
         if(success)SagaProgress.Complete(focusMode?SagaGame.FocusBoss:SagaGame.Boss,owner,level,stars);
-        result=Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/"+(success?"WinPanel":"LosePanel")),overlay.transform,false);
-        var content=result.transform.GetChild(0);
-        if(!success){var replay=content.GetChild(2).GetComponent<Button>();var back=content.GetChild(3).GetComponent<Button>();replay.onClick=new Button.ButtonClickedEvent();back.onClick=new Button.ButtonClickedEvent();replay.onClick.AddListener(StartBoss);back.onClick.AddListener(Close);return;}
-        content.GetChild(0).GetChild(0).GetComponent<Text>().text=Title+" "+level;content.GetChild(10).GetChild(0).GetComponent<Text>().text=order.Length.ToString();
-        foreach(var star in result.GetComponentsInChildren<StarFillScript>(true))star.EarnedStarsOverride=stars;
-        foreach(var button in result.GetComponentsInChildren<Button>(true))button.interactable=false;
-        if(won!=null)won();
+        result=SagaResultView.Show(overlay.transform,SagaRoute.Stop(focusMode?SagaGame.FocusBoss:SagaGame.Boss,level),success,success?stars:0,order.Length.ToString(),StartBoss,Close);
+        if(success && won!=null)won();
     }
     void ChildClosed(){if(!switching)Close();}
     void CloseChildren(){switching=true;if(chain!=null)chain.Close();if(says!=null)says.Close();if(focus!=null)focus.Close();switching=false;}

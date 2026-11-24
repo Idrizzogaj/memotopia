@@ -11,12 +11,12 @@ Branch: codex/saga. Start point: fetched origin/codex/focus-2.1.0, including unp
 
 ## Memory configuration
 
-- Chain/Flash use10/15/20/25 images by five-level group.
+- Chain uses10/15/20/25 images by five-level group. Flash now follows the native Flash count curve:[3,4,5,6,7,8,9,10,11,12,14,16,18,20,21,22,24,26,28,32]. The earlier inherited Chain counts made early Flash incorrectly difficult.
 - Chain study and recall have SEPARATE budgets:[90,88,86,84,80,80,78,76,74,72,70,68,66,64,62,60,58,56,54,52]. Level5 intentionally jumps84->80. NEXT advances study without waiting out the budget. Ordinary Chain does NOT use the boss shared clock.
-- Flash uses the exact native automatic animation at speed1, showing every picture including the25th. Only recall counts down. No forced study deadline or NEXT.
+- Flash uses the exact native automatic animation at speed1, showing every picture including all32 at level20. Only recall counts down. No forced study deadline or NEXT.
 - Chain/Flash recall: levels1-5 no shuffles;6-10 once halfway;11-15 twice at thirds;16-20 up to3timed shuffles, but once10remain cancel pending timed shuffles and reshuffle after each correct answer. Incorrect answers never reshuffle.
 - Pairs now has1-20 learned pairs at levels1-20. One90second budget covers study+recall. Starting recall MUST retain the remaining study budget; no reset. Native associated pairs, not identical-image matching.
-- Boxes retains original layouts/counts:[2,3,4,4,5,6,6,8,8,9,10,12,12,15,15,15,16,20,20,22]. Native perspective pictures and drag/drop. Locations stay fixed.
+- Boxes uses5/10/15/20 images by five-level group, explicitly confirmed after phone feedback. Select the smallest existing native board with enough picture slots for the group. Native perspective pictures and drag/drop. Locations stay fixed.
 - Says retains its native playback/keypad. Sequence length3+floor((level-1)/2), recall-only countdown. No new Training achievements or server IDs.
 
 ## SORT (Saga-only)
@@ -84,3 +84,10 @@ Source719e75c was pushed to codex/saga and synced as tracked Assets into the iso
 ## iPhone installation verified (2026-11-24)
 
 Idriz ran sign-install-saga-2026112401.sh in Mac Terminal and entered the keychain password himself. Unity2019.3.12f1 export and Xcode Release build succeeded. A scoped devicectl apps query for com.retention.memotopia verified version2.2.0/bundle2026112401 installed on the owner iPhone. Source commit719e75c, with local-only build metadata overrides. No store upload or server change. User now needs human playtesting of flow, scoring and boss difficulty; automated tests do not establish balance. Never capture the Terminal password.
+
+## Phone feedback fixes (2026-11-24, after build2026112401)
+
+- All ordinary memory/Focus games and both bosses use SagaResultView. Win AND loss titles use SAGA LEVEL plus the global map stop, never the native game title/local tier. Keep the original result artwork, native replay icon and star reveal; MAP is always enabled alongside replay. Training results are unchanged.
+- Actual GameMenu stores MenuNavigation/SagaPage on a scene root outside the Canvas. The previous auto-return searched Canvas from that controller and threw NullReferenceException, leaving disabled result buttons. ReturnAndUnlock now gets Canvas from its map view and observes the specific Saga result. A manual MAP/replay consumes that result and cancels its old auto-return, preventing it from closing the new round.
+- Flash recall timer explicitly activates/enables its native Text, with fitting/overflow allowed so glyphs are not dropped by native text clipping. Only recall counts down, as agreed. The isolated render shows89 after a one-second tick from90. Phone rendering of this fix still needs a new build.
+- Final validation: validate-boxes-final.log passed240route integration, approved Boxes5/10/15/20 on phone and iPad boards, every memory type at tier boundaries, visible/decreasing Flash clock, global result labels, pointer-click MAP/replay, all80Focus goals and unchanged native Focus. play-results-Begin.log passed actual full-speed32picture Flash and five-picture Boxes drag/drop/MAP at stop4. play-results-BeginMap.log passed the real scene-root controller arrangement, auto return/electric unlock and manual replay/MAP cancellation. play-results-BeginFocusBoss.log passed the four Focus games. play-boxes-boss-final.log passed all6memory games after the final Boxes update, shared deadline/hearts, native animation/drag-drop, isolated progress and timeout. compile-boxes-final.log passed C#7.3/legacy Unity defines against available references. Phone build2026112401 remains installed; these fixes still need a new phone build. Native replay artwork is an image-only icon and must not assume a child Text.

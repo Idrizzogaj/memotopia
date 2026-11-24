@@ -45,7 +45,7 @@ public sealed class ChainOriginalPresentation {
   foreach(var image in Root.GetComponentsInChildren<Image>(true).Where(i=>i.name.StartsWith("Exact heart "))){image.color=Color.white;image.material=theme;}
  }
  public void ShowRecallClock(int seconds,bool untimed=false){
-  if(recallClock==null)return;recallClock.color=ChainGame.Purple;recallClock.text=untimed?"∞":Mathf.Max(0,seconds).ToString();
+  if(recallClock==null)return;recallClock.gameObject.SetActive(true);recallClock.enabled=true;recallClock.resizeTextForBestFit=true;recallClock.resizeTextMinSize=18;recallClock.resizeTextMaxSize=44;recallClock.horizontalOverflow=HorizontalWrapMode.Overflow;recallClock.verticalOverflow=VerticalWrapMode.Overflow;recallClock.color=ChainGame.Purple;recallClock.text=untimed?"∞":Mathf.Max(0,seconds).ToString();
   if(timerCaption!=null)timerCaption.gameObject.SetActive(true);
  }
  public void ShowStudyClock(int seconds){

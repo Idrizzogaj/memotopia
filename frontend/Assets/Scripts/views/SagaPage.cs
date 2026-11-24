@@ -175,8 +175,11 @@ public class SagaPage : MonoBehaviour
     private System.Collections.IEnumerator ReturnAndUnlock(){
         int completed=playingStop;bool unlock=completed==frontierBefore && completed<SagaRoute.Count && !Completed(completed+1);
         // Let the existing victory/stars play before returning to the route.
-        var stars=GetComponentInParent<Canvas>().rootCanvas.GetComponentsInChildren<StarFillScript>();
+        var canvas=page.GetComponentInParent<Canvas>().rootCanvas;
+        var result=System.Linq.Enumerable.FirstOrDefault(canvas.GetComponentsInChildren<SagaResultView>(),view=>view.Won);
+        var stars=result!=null?result.GetComponentsInChildren<StarFillScript>():new StarFillScript[0];
         for(float elapsed=0;elapsed<5;elapsed+=Time.unscaledDeltaTime){
+            if(result==null || result.Consumed || !result.gameObject.activeInHierarchy){victory=null;yield break;}
             bool finished=true;
             foreach(var fill in stars)if(fill!=null && fill.EarnedStarsOverride>0){var last=fill.EarnedStarsOverride>=3?fill.rightStar:fill.EarnedStarsOverride==2?fill.midStar:fill.leftStar;if(last.GetComponent<Image>().fillAmount<.99f)finished=false;}
             if(elapsed>=1 && finished)break;yield return null;

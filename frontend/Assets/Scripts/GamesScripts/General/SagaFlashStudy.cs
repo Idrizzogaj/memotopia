@@ -49,8 +49,8 @@ public sealed class SagaFlashStudy
         var cells=all.First(t=>t.name=="Unused active cells");
         foreach(Transform cell in cells){CellController.HideFace(cell);unused.Add(cell);}
         if(unused.Count==0)throw new InvalidOperationException("Original Flash study grid is empty.");
-        // The exported native board has 24 cells. Saga can show 25 pictures: reuse
-        // an existing location with a clean copy, never omit the last picture.
+        // The exported native board has 24 cells. Higher native Flash levels
+        // reuse a location with a clean copy, never omit a picture.
         while(unused.Count<sequence.Length){
             var extra=UnityEngine.Object.Instantiate(unused[0].gameObject,cells,false);
             extra.name="Extra native Flash cell";CellController.HideFace(extra.transform);unused.Add(extra.transform);

@@ -25,7 +25,10 @@ public sealed class SagaBoxesBoard
         layout=Root.GetComponent<SagaBoxesLayout>();
         foreach(var button in Root.GetComponentsInChildren<Button>(true))if(button.name=="Saga Quit")button.onClick.AddListener(quit);
         foreach(var item in Root.GetComponentsInChildren<Transform>(true))if(item.name=="HowToPlay" || item.name=="ReadySteadyGo")item.gameObject.SetActive(false);
-        board=layout.Boards[level.Number-1];board.SetActive(true);
+        // Saga groups reuse the smallest original board that fits their picture count.
+        board=layout.Boards.Where(b=>b.GetComponentsInChildren<Image>(true).Count(i=>i.name=="ImgPref")>=sequence.Length).OrderBy(b=>b.GetComponentsInChildren<Image>(true).Count(i=>i.name=="ImgPref")).FirstOrDefault();
+        if(board==null)throw new InvalidOperationException("No native Boxes layout supports this image count.");
+        board.SetActive(true);
         var images=board.GetComponentsInChildren<Image>(true).Where(i=>i.name=="ImgPref").ToArray();
         if(images.Length<sequence.Length)throw new InvalidOperationException("Original Boxes layout has too few cells.");
         for(int i=0;i<images.Length;i++){

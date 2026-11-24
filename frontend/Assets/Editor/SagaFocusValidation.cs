@@ -40,7 +40,11 @@ public static class SagaFocusValidation
                     else if(kind==1){object chosenArena=null,chosenBall=null;foreach(var arena in (IList)Get(game,"arenas")){foreach(var ball in (IList)Get(arena,"Balls")){var state=(FocusRules.Ball)Get(ball,"State");if(!state.Armed && state.Hits<(int)Get(arena,"Target")){chosenArena=arena;chosenBall=ball;break;}}if(chosenBall!=null)break;}if(chosenBall==null)game.Tick(.05f);else Call(game,"Wall",chosenArena,((FocusRules.Ball)Get(chosenBall,"State")).NextWall());}
                     else{if((bool)Get(game,"flashWatching"))game.Tick(3.1f);if(!(bool)Get(game,"playing"))break;var sequence=(int[])Get(game,"sequence");int cursor=(int)Get(game,"cursor");var button=((GameObject)Get(game,"body")).GetComponentsInChildren<Button>().First(b=>b.name=="Token "+sequence[cursor]);button.onClick.Invoke();}
                 }
-                Check(completed && SagaProgress.Stars(config.Game,tier)==3,"Target completes Saga round and saves only its progress.");game.Close();
+                Check(completed && SagaProgress.Stars(config.Game,tier)==3,"Target completes Saga round and saves only its progress.");
+                var result=(GameObject)Get(game,"popup");var view=result.GetComponent<SagaResultView>();
+                Check(view.Stop==SagaRoute.Stop(config.Game,tier) && view.Won,"Focus shared Saga result.");
+                Check(result.GetComponentsInChildren<Text>().Any(t=>t.text=="SAGA LEVEL "+view.Stop),"Focus global result title.");
+                var mapButton=result.transform.GetChild(0).GetChild(12).GetComponent<Button>();Check(mapButton.IsInteractable(),"Focus MAP enabled.");mapButton.OnPointerClick(new UnityEngine.EventSystems.PointerEventData(null));Check(!game.IsSagaOpen,"Focus MAP exits.");
             }
             var first=new SagaFocusLevel(0,1);game.OpenSaga(first,()=>{},()=>{throw new Exception("Five errors won.");});game.Begin();
             for(int i=0;i<5;i++)Call(game,"Award",false);

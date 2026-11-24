@@ -193,11 +193,8 @@ public sealed class FocusGame : MonoBehaviour {
   if(!playing)return;playing=false;transition=false;StopAllCoroutines();Hud();
   if(sagaContext!=null){sagaContext.Report(success,sagaHearts);return;}
   if(success)SagaProgress.Complete(saga.Game,owner,saga.Number,SagaProgress.StarsFromFocusHearts(sagaHearts));
-  Remove(popup);popup=Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/"+(success?"WinPanel":"LosePanel")),overlay.transform,false);var content=popup.transform.GetChild(0);
-  if(!success){var replay=content.GetChild(2).GetComponent<Button>();var back=content.GetChild(3).GetComponent<Button>();replay.onClick=new Button.ButtonClickedEvent();back.onClick=new Button.ButtonClickedEvent();replay.onClick.AddListener(Begin);back.onClick.AddListener(Close);return;}
-  content.GetChild(0).GetChild(0).GetComponent<Text>().text="FOCUS "+FocusRules.Names[kind].ToUpperInvariant()+" · "+saga.Number;
-  content.GetChild(10).GetChild(0).GetComponent<Text>().text=score.ToString();foreach(var stars in popup.GetComponentsInChildren<StarFillScript>(true))stars.EarnedStarsOverride=SagaProgress.StarsFromFocusHearts(sagaHearts);
-  foreach(var button in popup.GetComponentsInChildren<Button>(true))button.interactable=false;if(sagaWon!=null)sagaWon();
+  Remove(popup);popup=SagaResultView.Show(overlay.transform,SagaRoute.Stop(saga.Game,saga.Number),success,success?SagaProgress.StarsFromFocusHearts(sagaHearts):0,score.ToString(),Begin,Close);
+  if(success && sagaWon!=null)sagaWon();
  }
  void Quit(){if(!playing){Close();return;}if(popup!=null)return;Dialog("Are you sure you","want to quit?","No","Yes",()=>{Remove(popup);popup=null;last=Time.realtimeSinceStartup;},Close);}
  public void Close(){var closed=sagaClosed;sagaClosed=sagaWon=null;saga=null;sagaContext=null;sagaLives.Clear();SaveRun(false);PracticeSession.Release(this);practiceRun=null;bool wasOpen=overlay!=null;playing=false;StopAllCoroutines();Remove(overlay);overlay=body=popup=null;arenas.Clear();if(wasOpen)Application.targetFrameRate=priorFrameRate;if(closed!=null)closed();}

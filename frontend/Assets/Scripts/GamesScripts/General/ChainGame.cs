@@ -420,6 +420,10 @@ public sealed class ChainGame : GamesScript
     }
     private void ShowOriginalResult() {
         safe.gameObject.SetActive(false);
+        if(saga!=null){
+            resultPanel=SagaResultView.Show(overlay,SagaRoute.Stop(saga.Game,level),state.Won,state.Won?state.Hearts:0,(saga.Game==SagaGame.Pairs?state.Position/2:state.Position).ToString(),()=>StartLevel(level),()=>{CardFaces.EndSession();ShowLevels();});
+            return;
+        }
         resultPanel=UnityEngine.Object.Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/"+(state.Won?"WinPanel":"LosePanel")),overlay,false);
         var content=resultPanel.transform.GetChild(0);
         UnityEngine.Events.UnityAction levels=()=>{CardFaces.EndSession();ShowLevels();};
@@ -447,7 +451,6 @@ public sealed class ChainGame : GamesScript
         if(athlete)foreach(var image in resultPanel.GetComponentsInChildren<Image>(true))if(image.name.IndexOf("Star",StringComparison.OrdinalIgnoreCase)>=0)image.gameObject.SetActive(false);
         if(saga!=null)ConfigureWinButtons(resultPanel,SagaRoute.Stop(saga.Game,level),()=>StartLevel(level),StartNextSaga,levels,SagaRoute.Count);
         else ConfigureWinButtons(resultPanel,level,()=>StartLevel(level),()=>StartLevel(level+1),levels);
-        if(sagaWon!=null)foreach(var button in resultPanel.GetComponentsInChildren<Button>(true))button.interactable=false;
     }
     private void StartNextSaga(){
         if(saga==null)return;
