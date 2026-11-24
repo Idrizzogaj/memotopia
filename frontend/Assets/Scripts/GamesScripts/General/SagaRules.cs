@@ -67,7 +67,7 @@ public sealed class SagaLevel
         if (number == 5) Seconds = 80;
         StudySeconds=Seconds;
         TimedShuffles = group;
-        if(game==SagaGame.Flash)ImageCount=new[]{3,4,5,6,7,8,9,10,11,12,14,16,18,20,21,22,24,26,28,32}[number-1];
+        if(game==SagaGame.Flash)ImageCount=new[]{7,12,20,30}[group];
         if(game==SagaGame.Pairs){ImageCount=number*2;Seconds=StudySeconds=90;TimedShuffles=0;}
         if(game==SagaGame.Boxes){ImageCount=5+group*5;TimedShuffles=0;}
         if(game==SagaGame.Says){ImageCount=3+(number-1)/2;TimedShuffles=0;}

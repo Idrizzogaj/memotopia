@@ -141,7 +141,7 @@ public static class SagaValidation
             Check(level.Seconds == seconds[n-1] && level.ImageCount == 10 + (n-1)/5*5, "Configuration " + n);
             Check(level.TimedShuffles == (n-1)/5, "Shuffle count " + n);
             var flash=new SagaLevel(SagaGame.Flash,n);
-            Check(flash.Game==SagaGame.Flash && flash.Seconds==level.Seconds && flash.ImageCount==new[]{3,4,5,6,7,8,9,10,11,12,14,16,18,20,21,22,24,26,28,32}[n-1] && flash.TimedShuffles==level.TimedShuffles,"Flash native count and Saga timing " + n);
+            Check(flash.Game==SagaGame.Flash && flash.Seconds==level.Seconds && flash.ImageCount==new[]{7,12,20,30}[(n-1)/5] && flash.TimedShuffles==level.TimedShuffles,"Approved Flash count groups and recall timing " + n);
         }
         var six = new SagaLevel(6);
         Check(!six.TimedShuffleDue(39.9f,0,15) && six.TimedShuffleDue(40,0,15), "One shuffle at halfway.");

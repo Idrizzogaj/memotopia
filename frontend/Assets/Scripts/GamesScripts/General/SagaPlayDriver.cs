@@ -61,7 +61,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         while(study==null){study=(SagaFlashStudy)Get(game,"flashStudy");yield return null;}
         int[] sequence=(int[])((ChainState)Get(game,"state")).Sequence.Clone();
         while(!(bool)Get(game,"recall"))yield return null;
-        Check(study.ShownCount==32 && study.ShownImages.SequenceEqual(sequence),"Original Flash animation must display all 32 pictures in order.");
+        Check(study.ShownCount==30 && study.ShownImages.SequenceEqual(sequence),"Original Flash animation must display all 30 pictures in order.");
         Check((float)Get(game,"recallSeconds")>49 && (float)Get(game,"recallSeconds")<=52,"Recall countdown starts after the entire sequence.");
         Check(CellController.onShowImage==oldShow && CellController.afterShownImage==oldHide && CellController.onAnimationFinished==oldFinish,"Flash global event handlers changed.");
         foreach(int id in sequence)game.Choose(id);
@@ -86,7 +86,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         var mapButton=result.transform.GetChild(0).GetChild(12).GetComponent<Button>();
         Check(mapButton.IsInteractable(),"Boxes MAP button enabled.");mapButton.OnPointerClick(new PointerEventData(system));
         Check(!game.IsSagaOpen,"Boxes MAP pointer click closes result.");
-        Debug.Log("SAGA_PLAY_PASSED: original full-speed Flash animation, all 32 pictures before recall, untouched static events, native Boxes drag/drop.");
+        Debug.Log("SAGA_PLAY_PASSED: original full-speed Flash animation, all 30 pictures before recall, untouched static events, native Boxes drag/drop.");
         EditorApplication.Exit(0);
     }
     IEnumerator ValidateMap(Transform canvas){
@@ -113,8 +113,15 @@ public sealed class SagaPlayDriver : MonoBehaviour
         while(!map.activeSelf || Get(page,"victory")!=null){sawPulse|=Get(page,"pulse")!=null;Check(Time.realtimeSinceStartup<limit,"Auto return/unlock timeout.");yield return null;}
         Check(sawPulse && Mathf.Abs(scroll.verticalNormalizedPosition-1f/11)<.002f,"20 to 21 scroll and electrical reveal.");
         Check(themes[1].GetVectorArray("_Cells")[0].z==1 && themes[1].GetVectorArray("_Cells")[1].z==0,"Next cell must be colored after unlock, future cell remains grey.");
+        scroll.verticalNormalizedPosition=0;Canvas.ForceUpdateCanvases();
         page.GetType().GetField("nextAmbientAt",Flags).SetValue(page,Time.unscaledTime-1);yield return null;yield return null;
-        Check((int)Get(page,"ambientStop")>0,"Spontaneous visible-cell animation did not start.");
+        int first=(int)Get(page,"ambientStop"),last=(int)Get(page,"ambientEndStop");
+        Check(first>0 && last>first+1,"A spontaneous signal must select a visible connected run of completed cells.");
+        page.GetType().GetField("ambientStarted",Flags).SetValue(page,Time.unscaledTime-1.05f);page.GetType().GetMethod("TickAmbient",Flags).Invoke(page,null);
+        var signal=(SagaUnlockGraphic)Get(page,"ambientPulse");Check(signal!=null && signal.Progress>.9f,"Signal must reach the end of a connection, rather than stop at35percent.");
+        page.GetType().GetField("ambientStarted",Flags).SetValue(page,Time.unscaledTime-1.11f);page.GetType().GetMethod("TickAmbient",Flags).Invoke(page,null);
+        Check((int)Get(page,"ambientStop")==first+1 && ReferenceEquals(signal,Get(page,"ambientPulse")),"The same nerve signal must continue through the next completed cell.");
+        for(int stop=first;stop<=last;stop++){var cleared=SagaRoute.At(stop);Check(SagaProgress.Stars(cleared.Game,cleared.Number)>0,"Ambient signal may only traverse cleared cells.");}
         page.GetType().GetMethod("ToggleMotion",Flags).Invoke(page,null);yield return null;
         Check((int)Get(page,"ambientStop")==0 && Get(page,"ambientPulse")==null,"Motion off cancels spontaneous effects.");
         page.GetType().GetMethod("PlayStage",Flags).Invoke(page,new object[]{21});focus.Begin();yield return SolveFocus(focus);
@@ -215,7 +222,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         }
         Check(won && SagaProgress.Stars(SagaGame.Boss,20)==2,"Boss level20 must be completable inside90seconds and preserve the lost heart.");
         foreach(var game in SagaRoute.Games)Check(SagaProgress.Stars(game,20)==0,"Boss child must not save ordinary Saga progress.");
-        Check(flashCount>=31,"Boss Flash must display entire32-image sequence before recall.");
+        Check(flashCount>=29,"Boss Flash must display entire30-image sequence before recall.");
         var fills=(System.Collections.Generic.Dictionary<SagaGame,Image>)Get(boss,"fills");Check(fills.Values.All(i=>i.fillAmount==1),"All six completion icons filled.");
         boss.Close();
         var carry=new SagaRoundContext(Time.realtimeSinceStartup+90,(success,lives)=>{},null,2);

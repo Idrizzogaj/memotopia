@@ -24,7 +24,7 @@ public class SagaPage : MonoBehaviour
     private SagaUnlockGraphic ambientPulse;
     private readonly System.Random ambientRandom=new System.Random();
     private float nextAmbientAt,ambientStarted;
-    private int ambientStop;
+    private int ambientStop,ambientEndStop;
     private Text motionCaption;
     private bool MotionEnabled {get{return PlayerPrefs.GetInt("saga.motion.v1",1)!=0;}}
     private static readonly Vector2[] Stops = {
@@ -207,7 +207,25 @@ public class SagaPage : MonoBehaviour
     private Material paintedHeaderTheme;
     private void ToggleMotion(){PlayerPrefs.SetInt("saga.motion.v1",MotionEnabled?0:1);PlayerPrefs.Save();StopAmbient();UpdateMotionCaption();}
     private void UpdateMotionCaption(){if(motionCaption!=null)motionCaption.text="Motion: "+(MotionEnabled?"On":"Off");}
-    private void StopAmbient(){ambientStop=0;if(ambientPulse!=null)Destroy(ambientPulse.gameObject);ambientPulse=null;foreach(var theme in mapThemes)theme.SetVector("_Charge",Vector4.zero);}
+    private void StopAmbient(){ambientStop=ambientEndStop=0;if(ambientPulse!=null)Destroy(ambientPulse.gameObject);ambientPulse=null;foreach(var theme in mapThemes)theme.SetVector("_Charge",Vector4.zero);}
+    private bool VisibleStop(int stop){
+        return stop>=1 && stop<=stageButtons.Count && mapScroll.viewport.rect.Contains(mapScroll.viewport.InverseTransformPoint(stageButtons[stop-1].transform.position));
+    }
+    private void BeginAmbientSegment(float now){
+        ambientStarted=now;
+        foreach(var theme in mapThemes)theme.SetVector("_Charge",Vector4.zero);
+        if(ambientStop>=ambientEndStop){if(ambientPulse!=null)ambientPulse.gameObject.SetActive(false);return;}
+        if(ambientPulse==null){
+            var obj=new GameObject("Saga spontaneous discharge",typeof(RectTransform),typeof(CanvasRenderer));obj.transform.SetParent(mapContent,false);
+            var rect=(RectTransform)obj.transform;rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;rect.pivot=new Vector2(.5f,0);rect.offsetMin=rect.offsetMax=Vector2.zero;
+            ambientPulse=obj.AddComponent<SagaUnlockGraphic>();ambientPulse.raycastTarget=false;
+        }
+        ambientPulse.gameObject.SetActive(true);
+        ambientPulse.From=mapContent.InverseTransformPoint(stageButtons[ambientStop-1].transform.position);
+        ambientPulse.To=mapContent.InverseTransformPoint(stageButtons[ambientStop].transform.position);
+        ambientPulse.Bend=(ambientPulse.From+ambientPulse.To)*.5f;
+        ambientPulse.SetProgress(0);
+    }
     private void TickAmbient(){
         if(!MotionEnabled || victory!=null || !Application.isPlaying)return;
         float now=Time.unscaledTime;
@@ -215,21 +233,25 @@ public class SagaPage : MonoBehaviour
             float elapsed=now-ambientStarted;Vector2 point=Stops[(ambientStop-1)%20];
             float strength=Mathf.Sin(Mathf.Clamp01(elapsed/.65f)*Mathf.PI);
             mapThemes[(ambientStop-1)/20].SetVector("_Charge",new Vector4(point.x,point.y,strength,elapsed));
-            if(ambientPulse!=null)ambientPulse.SetProgress(Mathf.Clamp01((elapsed-.3f)/.8f)*.35f);
-            if(elapsed>1.1f)StopAmbient();return;
+            // Travel the full connection, then carry the same signal to the next cleared cell.
+            if(ambientPulse!=null)ambientPulse.SetProgress(Mathf.Clamp01((elapsed-.3f)/.8f));
+            if(elapsed>1.1f){
+                if(ambientStop<ambientEndStop && Completed(ambientStop+1) && VisibleStop(ambientStop+1)){
+                    ambientStop++;BeginAmbientSegment(now);
+                }else{StopAmbient();nextAmbientAt=now+3+(float)ambientRandom.NextDouble()*6;}
+            }
+            return;
         }
         if(now<nextAmbientAt)return;
         nextAmbientAt=now+3+(float)ambientRandom.NextDouble()*6;
         var candidates=new System.Collections.Generic.List<int>();int current=CurrentStop();
-        for(int i=0;i<stageButtons.Count;i++)if((i+1==current || Completed(i+1)) && mapScroll.viewport.rect.Contains(mapScroll.viewport.InverseTransformPoint(stageButtons[i].transform.position)))candidates.Add(i+1);
+        for(int stop=1;stop<=stageButtons.Count;stop++)if((stop==current || Completed(stop)) && VisibleStop(stop))candidates.Add(stop);
         if(candidates.Count==0)return;
-        ambientStop=candidates[ambientRandom.Next(candidates.Count)];ambientStarted=now;
-        if(ambientStop<SagaRoute.Count){
-            var obj=new GameObject("Saga spontaneous discharge",typeof(RectTransform),typeof(CanvasRenderer));obj.transform.SetParent(mapContent,false);
-            var rect=(RectTransform)obj.transform;rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;rect.pivot=new Vector2(.5f,0);rect.offsetMin=rect.offsetMax=Vector2.zero;
-            ambientPulse=obj.AddComponent<SagaUnlockGraphic>();ambientPulse.raycastTarget=false;
-            ambientPulse.From=mapContent.InverseTransformPoint(stageButtons[ambientStop-1].transform.position);ambientPulse.To=mapContent.InverseTransformPoint(stageButtons[ambientStop].transform.position);ambientPulse.Bend=(ambientPulse.From+ambientPulse.To)*.5f;
-        }
+        int connected=candidates.Find(stop=>Completed(stop) && stop<SagaRoute.Count && Completed(stop+1) && VisibleStop(stop+1));
+        ambientStop=connected>0?connected:candidates[ambientRandom.Next(candidates.Count)];
+        ambientEndStop=ambientStop;
+        while(Completed(ambientEndStop) && ambientEndStop<SagaRoute.Count && Completed(ambientEndStop+1) && VisibleStop(ambientEndStop+1))ambientEndStop++;
+        BeginAmbientSegment(now);
     }
     private void Close(){if(victory!=null){StopCoroutine(victory);victory=null;}StopAmbient();if(pulse!=null)Destroy(pulse.gameObject);revealingStop=0;if(page!=null)page.SetActive(false);}
     private void Update(){
