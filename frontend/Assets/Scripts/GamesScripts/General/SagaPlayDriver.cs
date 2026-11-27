@@ -139,6 +139,23 @@ public sealed class SagaPlayDriver : MonoBehaviour
         result=(GameObject)Get(focus,"popup");var mapButton=result.transform.GetChild(0).GetChild(12).GetComponent<Button>();
         Check(mapButton.IsInteractable(),"Focus MAP enabled.");mapButton.OnPointerClick(new PointerEventData(null));yield return null;
         Check(map.activeSelf && !focus.IsSagaOpen && Get(page,"victory")==null,"Manual MAP must return immediately and stop pending auto-return.");
+        // Exercise a boss at the frontier, including its actual map-return coroutine.
+        page.GetType().GetMethod("ToggleMotion",Flags).Invoke(page,null);
+        for(int stop=22;stop<24;stop++){var stage=SagaRoute.At(stop);SagaProgress.Complete(stage.Game,GameManager.AchievementUserId,stage.Number,3);}
+        page.GetType().GetMethod("PlayStage",Flags).Invoke(page,new object[]{24});
+        var boss=(SagaBossGame)Get(page,"boss");boss.StartBoss();
+        for(int part=0;part<4;part++){
+            boss.GetType().GetMethod("RoundFinished",Flags).Invoke(boss,new object[]{true,5});
+            if(boss.WaitingForNext){yield return null;((GameObject)Get(boss,"intermission")).GetComponentsInChildren<Button>().Single(b=>b.name=="GO!").OnPointerClick(new PointerEventData(null));}
+        }
+        bool crossedSynapse=false;limit=Time.realtimeSinceStartup+10;
+        while(!map.activeSelf || Get(page,"victory")!=null){crossedSynapse|=Get(page,"synapseSignal")!=null;Check(Time.realtimeSinceStartup<limit,"Synaptic boss unlock timed out.");yield return null;}
+        Check(crossedSynapse && Get(page,"synapseSignal")==null,"Boss win sends a bounded discharge across the synaptic gap and cleans it up.");
+        Check(SagaProgress.Stars(SagaGame.FocusBoss,2)>0 && themes[1].GetVectorArray("_Cells")[4].z==1,"Crossing the Focus2boss reveals the first Memory3cell.");
+        var gates=(System.Collections.Generic.Dictionary<int,RectTransform>)Get(page,"synapseGates");
+        Vector2 from=((RectTransform)Get(page,"mapContent")).InverseTransformPoint(((System.Collections.Generic.List<Button>)Get(page,"stageButtons"))[23].transform.position);
+        Vector2 to=((RectTransform)Get(page,"mapContent")).InverseTransformPoint(((System.Collections.Generic.List<Button>)Get(page,"stageButtons"))[24].transform.position);
+        Check(Vector2.Distance(gates[24].anchoredPosition,Vector2.Lerp(from,to,.57f))<.1f,"Synapse stays on its real axon after scroll/layout.");
         PlayerPrefs.SetInt("saga.motion.v1",oldMotion);PlayerPrefs.Save();
         Debug.Log("SAGA_MAP_PLAY_PASSED:240stops, actual Focus Pairs/Boxes wins, automatic return, 20-21 scroll, grey/color reveal, electrical pulse, spontaneous discharge, motion-off cancellation.");
     }
@@ -157,6 +174,27 @@ public sealed class SagaPlayDriver : MonoBehaviour
             yield return null;
         }
     }
+    IEnumerator ContinueBossAfterPause(SagaBossGame boss){
+        float frozen=boss.Remaining;int completed=(int)Get(boss,"index");
+        if(PlayerPrefs.GetInt("saga.motion.v1",1)==0){var card=((GameObject)Get(boss,"intermission")).transform.GetChild(0);Check(card.localScale==Vector3.one && card.GetComponent<CanvasGroup>().alpha==1,"Motion Off shows the pause card immediately without movement.");}
+        Check(((Text)Get(boss,"clock")).text.Contains("PAUSED"),"Between-game HUD must explicitly show the paused clock.");
+        yield return new WaitForSecondsRealtime(.4f);
+        Check(Mathf.Abs(boss.Remaining-frozen)<.0001f,"Intermission must not consume boss time.");
+        Check(!((ChainGame)Get(boss,"chain")).IsSagaOpen && !((SaysGame)Get(boss,"says")).IsSagaOpen && !((FocusGame)Get(boss,"focus")).IsSagaOpen,"Completed board must close; next board cannot be previewed while paused.");
+        var panel=(GameObject)Get(boss,"intermission");var go=panel.GetComponentsInChildren<Button>().Single(b=>b.name=="GO!");
+        var events=EventSystem.current;if(events==null)events=new GameObject("Boss transition pointer events",typeof(EventSystem),typeof(StandaloneInputModule)).GetComponent<EventSystem>();
+        Canvas.ForceUpdateCanvases();var data=new PointerEventData(events){position=RectTransformUtility.WorldToScreenPoint(null,go.transform.position)};
+        var hits=new System.Collections.Generic.List<RaycastResult>();events.RaycastAll(data,hits);
+        Check(hits.Count>0 && ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject)==go.gameObject,"GO must be reachable through the actual EventSystem raycast.");
+        go.OnPointerClick(data);go.OnPointerClick(data);
+        Check(!boss.WaitingForNext && (int)Get(boss,"index")==completed,"A double GO cannot skip a game.");
+        Check(boss.Remaining<=frozen+.001f && boss.Remaining>frozen-.5f,"GO resumes the same remaining budget (remaining="+boss.Remaining+", paused="+frozen+").");
+        var says=(SaysGame)Get(boss,"says");var focus=(FocusGame)Get(boss,"focus");
+        var context=(SagaRoundContext)(says.IsSagaOpen?Get(says,"sagaContext"):focus.IsSagaOpen?Get(focus,"sagaContext"):Get((ChainGame)Get(boss,"chain"),"sagaContext"));
+        Check(Mathf.Abs(context.Remaining-boss.Remaining)<.01f,"Child clock and boss clock must agree after resource loading.");
+        yield return new WaitForSecondsRealtime(.06f);
+        Check(boss.Remaining<frozen,"The clock must count down again after GO.");
+    }
     IEnumerator ValidateFocusBoss(Transform canvas){
         UserConstants.s_user=new User{id=1999999821,username="Focus boss runtime"};
         foreach(SagaGame kind in Enum.GetValues(typeof(SagaGame)))for(int n=1;n<=20;n++)PlayerPrefs.SetInt("saga."+kind.ToString().ToLowerInvariant()+".stars.v1.1999999821."+n,0);
@@ -168,9 +206,11 @@ public sealed class SagaPlayDriver : MonoBehaviour
             Check(Time.realtimeSinceStartup<limit,"Focus boss watchdog.");Check(boss.Remaining<=previous+.001f,"Focus boss deadline reset.");previous=boss.Remaining;
             int round=(int)Get(boss,"index");
             if(round!=prior && focus.IsSagaOpen){Debug.Log("FOCUS_BOSS_ROUND: "+round+" remaining="+boss.Remaining);prior=round;Check((int)Get(focus,"sagaHearts")== (mistake?4:5),"Five shared Focus boss hearts must carry between games.");if(!mistake){focus.GetType().GetMethod("Award",Flags).Invoke(focus,new object[]{false});mistake=true;}}
-            if(focus.IsSagaOpen && (bool)Get(focus,"playing"))yield return SolveFocus(focus);else yield return null;
+            if(boss.WaitingForNext)yield return ContinueBossAfterPause(boss);
+            else if(focus.IsSagaOpen && (bool)Get(focus,"playing"))yield return SolveFocus(focus);else yield return null;
         }
         Check(won && SagaProgress.Stars(SagaGame.FocusBoss,20)==2,"Focus boss20 should complete with carried four hearts.");
+        Check(((GameObject)Get(boss,"result")).GetComponentsInChildren<Text>().Any(t=>t.text=="You won!"),"Focus boss ends with the shared native victory message.");
         foreach(var game in SagaRoute.FocusGames)Check(SagaProgress.Stars(game,20)==0,"Focus boss child progress must remain separate.");
         Check(PlayerPrefs.GetString("focus.stats.device.v1.1999999821","")==stats,"Focus boss must not save Training sessions.");
         Check(((System.Collections.Generic.Dictionary<SagaGame,Image>)Get(boss,"fills")).Values.All(i=>i.fillAmount==1),"All four Focus icons must fill.");
@@ -180,6 +220,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
     }
     IEnumerator ValidateBoss(Transform canvas){
         UserConstants.s_user=new User{id=1999999819,username="Boss runtime validation"};
+        int previousMotion=PlayerPrefs.GetInt("saga.motion.v1",1);PlayerPrefs.SetInt("saga.motion.v1",0);
         foreach(SagaGame kind in Enum.GetValues(typeof(SagaGame)))for(int n=1;n<=20;n++)PlayerPrefs.SetInt("saga."+kind.ToString().ToLowerInvariant()+".stars.v1.1999999819."+n,0);
         var host=new GameObject("Isolated boss",typeof(RectTransform));host.transform.SetParent(canvas,false);var boss=host.AddComponent<SagaBossGame>();bool won=false;
         boss.Open(20,()=>{},()=>won=true);boss.StartBoss();var order=(SagaGame[])Get(boss,"order");
@@ -188,6 +229,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         float previous=90,limit=Time.realtimeSinceStartup+92;int flashCount=0;
         while((bool)Get(boss,"running")){
             Check(Time.realtimeSinceStartup<limit,"Boss watchdog.");Check(boss.Remaining<=previous+.001f,"Shared clock reset between games.");previous=boss.Remaining;
+            if(boss.WaitingForNext){yield return ContinueBossAfterPause(boss);continue;}
             var chain=(ChainGame)Get(boss,"chain");var says=(SaysGame)Get(boss,"says");
             if(says.IsSagaOpen && (bool)Get(says,"input")){foreach(int digit in (int[])Get(says,"sequence"))says.Choose(digit);}
             if(chain.IsSagaOpen){
@@ -221,6 +263,9 @@ public sealed class SagaPlayDriver : MonoBehaviour
             yield return null;
         }
         Check(won && SagaProgress.Stars(SagaGame.Boss,20)==2,"Boss level20 must be completable inside90seconds and preserve the lost heart.");
+        var result=(GameObject)Get(boss,"result");
+        Check(result.GetComponentsInChildren<Text>().Any(t=>t.text=="You won!"),"Memory boss ends with You won while retaining the global Saga result.");
+        Check(result.GetComponent<SagaResultView>().Stop==SagaRoute.Stop(SagaGame.Boss,20),"Boss result retains its global map identity.");
         foreach(var game in SagaRoute.Games)Check(SagaProgress.Stars(game,20)==0,"Boss child must not save ordinary Saga progress.");
         Check(flashCount>=29,"Boss Flash must display entire30-image sequence before recall.");
         var fills=(System.Collections.Generic.Dictionary<SagaGame,Image>)Get(boss,"fills");Check(fills.Values.All(i=>i.fillAmount==1),"All six completion icons filled.");
@@ -230,7 +275,12 @@ public sealed class SagaPlayDriver : MonoBehaviour
         Check(((ChainState)Get(carriedChain,"state")).Hearts==2,"Boss child must inherit the remaining hearts.");
         var flashStudy=(SagaFlashStudy)Get(carriedChain,"flashStudy");Check(flashStudy.Root.GetComponentsInChildren<Image>().Count(i=>i.name.StartsWith("Exact heart "))==2,"Flash study must show carried hearts.");carriedChain.Close();
         var carriedSays=(SaysGame)Get(boss,"says");carriedSays.OpenSaga(1,()=>{},null,null,carry);Check((int)Get(carriedSays,"hearts")==2,"Says must inherit remaining boss hearts.");carriedSays.Close();
-        boss.Open(2,()=>{},()=>{});Check(((Text)Get(boss,"clock")).text.Contains("90 s"),"Later memory bosses retain90seconds.");boss.Close();
+        boss.Open(2,()=>{},()=>{});Check(((Text)Get(boss,"clock")).text.Contains("90 s"),"Later memory bosses retain90seconds.");boss.StartBoss();
+        boss.GetType().GetMethod("RoundFinished",Flags).Invoke(boss,new object[]{true,2});yield return null;
+        Check(boss.WaitingForNext,"A successful child opens the pause card.");boss.Close();
+        Check(!boss.IsOpen && Get(boss,"intermission")==null,"Back/close removes the pause card.");
+        boss.Open(2,()=>{},()=>{});boss.StartBoss();
+        Check(!boss.WaitingForNext && boss.Remaining>89 && ((System.Collections.Generic.Dictionary<SagaGame,Image>)Get(boss,"fills")).Values.All(i=>i.fillAmount==0),"Replay/new attempt starts full with no stale pause card or filled icons.");boss.Close();
         boss.Open(1,()=>{},()=>{},true);Check(((Text)Get(boss,"clock")).text.Contains("90 s"),"Focus boss remains90seconds.");boss.Close();
         boss.Open(1,()=>{},()=>{throw new Exception("Expired boss won.");});
         Check(((Text)Get(boss,"clock")).text.Contains("120 s") && ((GameObject)Get(boss,"intro")).GetComponentsInChildren<Text>().Any(t=>t.text.Contains("120 seconds total")),"First memory boss must show120seconds in HUD and intro.");
@@ -239,6 +289,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         Check(Mathf.Abs(firstContext.Remaining-boss.Remaining)<.1f,"The first child must share the120second boss deadline.");
         boss.GetType().GetField("deadline",Flags).SetValue(boss,Time.realtimeSinceStartup-1);yield return null;yield return null;
         Check(!(bool)Get(boss,"running") && SagaProgress.Stars(SagaGame.Boss,1)==0,"Boss deadline must fail without saving progress.");boss.Close();
+        PlayerPrefs.SetInt("saga.motion.v1",previousMotion);
         Debug.Log("SAGA_BOSS_PLAY_PASSED: six randomized native games, level20 actual animation/drag-drop, one90second deadline, all six icons, boss-only progress, expiration.");
     }
 }

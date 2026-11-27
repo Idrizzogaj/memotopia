@@ -27,14 +27,17 @@ Shader "UI/SagaMapProgress" {
     float2 chargeDelta=(i.uv-_Charge.xy)*float2(1,1.5);
     float influence=saturate(1-length(chargeDelta)/.13)*_Charge.z;
     float2 jitter=float2(sin(_Charge.w*27),cos(_Charge.w*31))*.0012*influence;
-    fixed4 c=tex2D(_MainTex,i.uv+jitter)*i.color;
-    // Composite the unchanged approved white-backed artwork over the UI backdrop.
-    c.a*=1-smoothstep(.94,.995,min(c.r,min(c.g,c.b)));
-    float nearest=100;float unlocked=0;
+    float nearest=100;float unlocked=0;float size=1;float2 center=i.uv;
     [unroll] for(int n=0;n<20;n++){
      float2 delta=(i.uv-_Cells[n].xy)*float2(1,1.5);float distance=dot(delta,delta);
-     if(distance<nearest){nearest=distance;unlocked=_Cells[n].z;}
+     if(distance<nearest){nearest=distance;unlocked=_Cells[n].z;size=_Cells[n].w;center=_Cells[n].xy;}
     }
+    // Scale the original cell locally; leave the surrounding axon path anchored.
+    float shrink=size>0?size:1;
+    float weight=1-smoothstep(shrink>1?.055:.035,shrink>1?.12:.095,sqrt(nearest));
+    float2 sampleUV=center+(i.uv-center)*(1+(1/shrink-1)*weight);
+    fixed4 c=tex2D(_MainTex,sampleUV+jitter)*i.color;
+    c.a*=1-smoothstep(.94,.995,min(c.r,min(c.g,c.b)));
     float grey=dot(c.rgb,float3(.2126,.7152,.0722));
     c.rgb=lerp(lerp(float3(grey,grey,grey),float3(1,1,1),.22),c.rgb,unlocked);
     #ifdef UNITY_UI_CLIP_RECT

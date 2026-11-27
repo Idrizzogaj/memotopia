@@ -16,6 +16,9 @@ public class SagaPage : MonoBehaviour
     private readonly System.Collections.Generic.List<RectTransform> sections = new System.Collections.Generic.List<RectTransform>();
     private float sectionHeight;
     private Sprite paintedHeader;
+    private readonly Material[] bossThemes=new Material[2];
+    private readonly System.Collections.Generic.Dictionary<int,RectTransform> synapseGates=new System.Collections.Generic.Dictionary<int,RectTransform>();
+    private SagaUnlockGraphic synapseSignal;
     private readonly System.Collections.Generic.List<Material> mapThemes = new System.Collections.Generic.List<Material>();
     private Coroutine victory;
     private int playingStop,frontierBefore,revealingStop;
@@ -105,6 +108,11 @@ public class SagaPage : MonoBehaviour
         mapContent=(RectTransform)ChainGame.Panel(viewport.transform,"Saga route 1-100",Vector2.zero,new Vector2(1,0),Color.clear).transform;
         mapContent.pivot=new Vector2(.5f,0);mapContent.GetComponent<Image>().raycastTarget=false;mapScroll.content=mapContent;
         var mapSprite=Resources.Load<Sprite>("Saga/MapUnnumbered");var texture=mapSprite.texture;
+        for(int state=0;state<2;state++){
+            bossThemes[state]=new Material(Resources.Load<Shader>("Saga/MapProgress"));
+            var cells=new Vector4[20];for(int n=0;n<cells.Length;n++)cells[n]=new Vector4(.5f,.5f,state,0);
+            bossThemes[state].SetVectorArray("_Cells",cells);
+        }
         for(int block=0;block<Mathf.CeilToInt(SagaRoute.Count/20f);block++){
             var section=(RectTransform)ChainGame.Panel(mapContent,"Saga section "+(block*20+1)+"-"+Mathf.Min(block*20+20,SagaRoute.Count),Vector2.zero,new Vector2(1,0),Color.clear).transform;
             section.pivot=new Vector2(.5f,0);section.GetComponent<Image>().raycastTarget=false;sections.Add(section);
@@ -114,13 +122,35 @@ public class SagaPage : MonoBehaviour
             var fit=art.AddComponent<AspectRatioFitter>();fit.aspectMode=AspectRatioFitter.AspectMode.FitInParent;fit.aspectRatio=(float)texture.width/texture.height;
             for(int i=0;i<Stops.Length && block*20+i<SagaRoute.Count;i++){
                 int stop=block*20+i+1;Vector2 point=Stops[i];
-                var node=ChainGame.Panel(art.transform,"Saga level "+stop,point-new Vector2(.065f,.04f),point+new Vector2(.065f,.04f),Color.clear);
+                int phase=(stop-1)%12;
+                if(phase==0 || phase==7){
+                    string caption=(phase==0?"Memory ":"Focus ")+((stop-1)/12+1);
+                    Vector2 at=BlockCaptionPosition(i);
+                    var ribbon=ChainGame.Panel(art.transform,"Block "+caption,at-new Vector2(.105f,.018f),at+new Vector2(.105f,.018f),new Color(1,1,1,.94f));
+                    ribbon.GetComponent<Image>().sprite=ContentSelectorBar.Rounded();ribbon.GetComponent<Image>().type=Image.Type.Sliced;ribbon.GetComponent<Image>().raycastTarget=false;
+                    ChainGame.Label(ribbon.transform,caption,Vector2.zero,Vector2.one,28,phase==0?ChainGame.Purple:FocusGame.Teal).fontStyle=FontStyle.Bold;
+                }
+                bool isBoss=SagaRoute.At(stop).Game==SagaGame.Boss || SagaRoute.At(stop).Game==SagaGame.FocusBoss;
+                Vector2 radius=isBoss?new Vector2(.092f,.062f):new Vector2(.065f,.04f);
+                var node=ChainGame.Panel(art.transform,"Saga level "+stop,point-radius,point+radius,Color.clear);
                 var button=node.AddComponent<Button>();button.transition=Selectable.Transition.None;
                 button.onClick.AddListener(()=>PlayStage(stop));stageButtons.Add(button);
                 var label=ChainGame.Label(node.transform,stop.ToString(),new Vector2(.26f,.20f),new Vector2(.74f,.80f),38,Color.white);
                 label.fontStyle=FontStyle.Bold;label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=38;label.raycastTarget=false;
-                if(SagaRoute.At(stop).Game==SagaGame.Boss || SagaRoute.At(stop).Game==SagaGame.FocusBoss){var badge=ChainGame.Panel(node.transform,"Boss marker",new Vector2(.66f,.66f),new Vector2(.98f,.98f),Color.white).GetComponent<Image>();badge.sprite=Resources.Load<Sprite>("GamesResources/Levels/Asset 15");badge.preserveAspect=true;badge.raycastTarget=false;}
+                if(isBoss){
+                    var badge=ChainGame.Panel(node.transform,"Boss marker",new Vector2(.68f,.68f),new Vector2(1.05f,1.09f),Color.white).GetComponent<Image>();
+                    badge.sprite=Resources.Load<Sprite>("GamesResources/Levels/Asset 15");badge.preserveAspect=true;badge.raycastTarget=false;
+                    var tag=ChainGame.Panel(node.transform,"Boss label",new Vector2(.22f,-.10f),new Vector2(.78f,.16f),ChainGame.Purple);
+                    tag.GetComponent<Image>().sprite=ContentSelectorBar.Rounded();tag.GetComponent<Image>().type=Image.Type.Sliced;tag.GetComponent<Image>().raycastTarget=false;
+                    ChainGame.Label(tag.transform,"BOSS",Vector2.zero,Vector2.one,22,Color.white).fontStyle=FontStyle.Bold;
+                }
             }
+        }
+        for(int stop=1;stop<SagaRoute.Count;stop++){
+            var kind=SagaRoute.At(stop).Game;if(kind!=SagaGame.Boss && kind!=SagaGame.FocusBoss)continue;
+            var gate=(RectTransform)ChainGame.Panel(mapContent,"Synapse gate "+stop,new Vector2(.5f,0),new Vector2(.5f,0),Color.white).transform;
+            gate.pivot=new Vector2(.5f,.5f);var image=gate.GetComponent<Image>();image.sprite=Resources.Load<Sprite>("Saga/SynapseGate");image.preserveAspect=true;image.raycastTarget=false;
+            synapseGates.Add(stop,gate);
         }
         Canvas.ForceUpdateCanvases();LayoutMap();mapScroll.verticalNormalizedPosition=0;
         var motion=ChainGame.Button(page.transform,"",new Vector2(.66f,.008f),new Vector2(.97f,.043f),ToggleMotion);
@@ -128,13 +158,32 @@ public class SagaPage : MonoBehaviour
         nextAmbientAt=Time.unscaledTime+3;
         RefreshProgress();
     }
+    private static Vector2 BlockCaptionPosition(int index){
+        switch(index){
+            case 0:return new Vector2(.22f,.115f);case 12:return new Vector2(.80f,.65f);
+            case 4:return new Vector2(.15f,.395f);case 16:return new Vector2(.115f,.855f);
+            case 8:return new Vector2(.48f,.54f);case 7:return new Vector2(.78f,.52f);
+            case 19:return new Vector2(.75f,.925f);case 11:return new Vector2(.51f,.68f);
+            case 3:return new Vector2(.16f,.16f);default:return new Vector2(.36f,.69f);
+        }
+    }
+    private void LayoutSynapses(){
+        foreach(var pair in synapseGates){
+            Vector2 from=mapContent.InverseTransformPoint(stageButtons[pair.Key-1].transform.position);
+            Vector2 to=mapContent.InverseTransformPoint(stageButtons[pair.Key].transform.position);
+            var rect=pair.Value;rect.anchoredPosition=Vector2.Lerp(from,to,.57f);
+            float width=Mathf.Min(mapScroll.viewport.rect.width*.19f,Vector2.Distance(from,to)*.70f);
+            rect.sizeDelta=new Vector2(width,width/3f);Vector2 direction=to-from;
+            rect.localRotation=Quaternion.Euler(0,0,Mathf.Atan2(direction.y,direction.x)*Mathf.Rad2Deg);
+        }
+    }
     private void LayoutMap(){
         if(mapScroll==null || mapContent==null)return;
         float height=mapScroll.viewport.rect.height;if(height<=0 || Mathf.Approximately(height,sectionHeight))return;
         float position=mapScroll.verticalNormalizedPosition;sectionHeight=height;
         mapContent.sizeDelta=new Vector2(0,height*sections.Count);
         for(int i=0;i<sections.Count;i++){sections[i].sizeDelta=new Vector2(0,height);sections[i].anchoredPosition=new Vector2(0,i*height);}
-        Canvas.ForceUpdateCanvases();mapScroll.verticalNormalizedPosition=position;
+        Canvas.ForceUpdateCanvases();LayoutSynapses();mapScroll.verticalNormalizedPosition=position;
     }
     private void PlayStage(int stop){
         if(!SagaRoute.Unlocked(stop) || chain.IsSagaOpen || says.IsSagaOpen || boss.IsOpen || focus.IsSagaOpen)return;
@@ -158,18 +207,26 @@ public class SagaPage : MonoBehaviour
         int current=CurrentStop();
         for(int i=0;i<stageButtons.Count;i++){
             stageButtons[i].interactable=SagaRoute.Unlocked(i+1);
-            var badge=stageButtons[i].transform.Find("Boss marker");if(badge!=null)badge.GetComponent<Image>().color=Completed(i+1) || i+1==current?new Color(1,.78f,.20f):new Color(.65f,.65f,.65f);
+            var badge=stageButtons[i].transform.Find("Boss marker");
+            if(badge!=null){
+                bool colored=Completed(i+1) || i+1==current;
+                badge.GetComponent<Image>().color=Color.white;badge.GetComponent<Image>().material=bossThemes[colored?1:0];
+                stageButtons[i].transform.Find("Boss label").GetComponent<Image>().color=colored?ChainGame.Purple:new Color(.45f,.45f,.45f);
+            }
         }
+        foreach(var pair in synapseGates)pair.Value.GetComponent<Image>().material=bossThemes[Completed(pair.Key)?1:0];
         for(int block=0;block<mapThemes.Count;block++){
             var cells=new Vector4[20];
             for(int i=0;i<20;i++){
                 int stop=block*20+i+1;float visible=stop<=SagaRoute.Count && (Completed(stop) || stop==current)?1:0;
                 if(stop==revealingStop)visible=revealProgress;
-                cells[i]=new Vector4(Stops[i].x,Stops[i].y,visible,0);
+                bool bossCell=stop<=SagaRoute.Count && (SagaRoute.At(stop).Game==SagaGame.Boss || SagaRoute.At(stop).Game==SagaGame.FocusBoss);
+                cells[i]=new Vector4(Stops[i].x,Stops[i].y,visible,bossCell?1.4f:.78f);
             }
             mapThemes[block].SetVectorArray("_Cells",cells);
         }
     }
+    private void ClearSynapseSignal(){if(synapseSignal!=null)Destroy(synapseSignal.gameObject);synapseSignal=null;}
     private static bool Completed(int stop){var stage=SagaRoute.At(stop);return SagaProgress.Stars(stage.Game,stage.Number)>0;}
     private static int CurrentStop(){for(int stop=1;stop<=SagaRoute.Count;stop++)if(!Completed(stop))return stop;return SagaRoute.Count+1;}
     private void OnWon(){if(Application.isPlaying){if(victory!=null)StopCoroutine(victory);victory=StartCoroutine(ReturnAndUnlock());}}
@@ -199,13 +256,25 @@ public class SagaPage : MonoBehaviour
             pulse=obj.AddComponent<SagaUnlockGraphic>();pulse.raycastTarget=false;
             pulse.From=mapContent.InverseTransformPoint(stageButtons[completed-1].transform.position);pulse.To=mapContent.InverseTransformPoint(stageButtons[completed].transform.position);
             pulse.Bend=(pulse.From+pulse.To)*.5f;
-            for(float elapsed=0;MotionEnabled && elapsed<1.25f;elapsed+=Time.unscaledDeltaTime){float t=elapsed/1.25f;pulse.SetProgress(t);revealProgress=Mathf.SmoothStep(0,1,Mathf.InverseLerp(.65f,1,t));RefreshProgress();yield return null;}
-            Destroy(obj);pulse=null;
+            RectTransform gate;bool crossesGate=synapseGates.TryGetValue(completed,out gate);
+            if(crossesGate){
+                var spark=new GameObject("Synaptic discharge",typeof(RectTransform),typeof(CanvasRenderer));spark.transform.SetParent(gate,false);
+                var sparkRect=(RectTransform)spark.transform;sparkRect.anchorMin=Vector2.zero;sparkRect.anchorMax=Vector2.one;sparkRect.offsetMin=sparkRect.offsetMax=Vector2.zero;
+                synapseSignal=spark.AddComponent<SagaUnlockGraphic>();synapseSignal.raycastTarget=false;
+                float gap=gate.rect.width*.08f;synapseSignal.From=new Vector2(-gap,0);synapseSignal.To=new Vector2(gap,0);synapseSignal.Bend=new Vector2(0,gate.rect.height*.15f);
+            }
+            float duration=crossesGate?1.8f:1.25f;
+            for(float elapsed=0;MotionEnabled && elapsed<duration;elapsed+=Time.unscaledDeltaTime){
+                float t=elapsed/duration;pulse.SetProgress(t);
+                if(synapseSignal!=null){synapseSignal.gameObject.SetActive(t>=.35f && t<=.72f);synapseSignal.SetProgress(Mathf.InverseLerp(.35f,.72f,t));}
+                revealProgress=Mathf.SmoothStep(0,1,Mathf.InverseLerp(crossesGate?.72f:.65f,1,t));RefreshProgress();yield return null;
+            }
+            ClearSynapseSignal();Destroy(obj);pulse=null;
         }
         revealingStop=0;RefreshProgress();victory=null;nextAmbientAt=Time.unscaledTime+3;
     }
     private Material paintedHeaderTheme;
-    private void ToggleMotion(){PlayerPrefs.SetInt("saga.motion.v1",MotionEnabled?0:1);PlayerPrefs.Save();StopAmbient();UpdateMotionCaption();}
+    private void ToggleMotion(){PlayerPrefs.SetInt("saga.motion.v1",MotionEnabled?0:1);PlayerPrefs.Save();StopAmbient();ClearSynapseSignal();UpdateMotionCaption();}
     private void UpdateMotionCaption(){if(motionCaption!=null)motionCaption.text="Motion: "+(MotionEnabled?"On":"Off");}
     private void StopAmbient(){ambientStop=ambientEndStop=0;if(ambientPulse!=null)Destroy(ambientPulse.gameObject);ambientPulse=null;foreach(var theme in mapThemes)theme.SetVector("_Charge",Vector4.zero);}
     private bool VisibleStop(int stop){
@@ -253,12 +322,12 @@ public class SagaPage : MonoBehaviour
         while(Completed(ambientEndStop) && ambientEndStop<SagaRoute.Count && Completed(ambientEndStop+1) && VisibleStop(ambientEndStop+1))ambientEndStop++;
         BeginAmbientSegment(now);
     }
-    private void Close(){if(victory!=null){StopCoroutine(victory);victory=null;}StopAmbient();if(pulse!=null)Destroy(pulse.gameObject);revealingStop=0;if(page!=null)page.SetActive(false);}
+    private void Close(){if(victory!=null){StopCoroutine(victory);victory=null;}StopAmbient();ClearSynapseSignal();if(pulse!=null)Destroy(pulse.gameObject);revealingStop=0;if(page!=null)page.SetActive(false);}
     private void Update(){
         if(page==null || !page.activeSelf)return;
         LayoutMap();
         TickAmbient();
         if(owner!=GameManager.AchievementUserId || Input.GetKeyDown(KeyCode.Escape))Close();
     }
-    private void OnDestroy(){if(page!=null)Destroy(page);if(paintedHeader!=null)Destroy(paintedHeader);if(paintedHeaderTheme!=null)Destroy(paintedHeaderTheme);foreach(var theme in mapThemes)if(theme!=null)Destroy(theme);}
+    private void OnDestroy(){if(page!=null)Destroy(page);if(paintedHeader!=null)Destroy(paintedHeader);if(paintedHeaderTheme!=null)Destroy(paintedHeaderTheme);foreach(var theme in mapThemes)if(theme!=null)Destroy(theme);foreach(var theme in bossThemes)if(theme!=null)Destroy(theme);}
 }

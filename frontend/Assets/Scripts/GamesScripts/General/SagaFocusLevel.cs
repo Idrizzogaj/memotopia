@@ -10,6 +10,6 @@ public sealed class SagaFocusLevel
     public SagaFocusLevel(int kind,int number){
         if(kind<0 || kind>=Targets.Length)throw new ArgumentOutOfRangeException("kind");
         if(number<1 || number>20)throw new ArgumentOutOfRangeException("number");
-        Kind=kind;Number=number;Target=Targets[kind][(number-1)/5];Seconds=kind==0 && number<=5?20:Times[number-1];
+        Kind=kind;Number=number;Target=Targets[kind][(number-1)/5];Seconds=(kind==0 && number<=5?20:Times[number-1])+(kind==0?10:0);
     }
 }

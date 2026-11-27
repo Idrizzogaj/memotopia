@@ -5,10 +5,14 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
-// Six games, without replacement, one clock. Child wins never write normal progress.
+// One active-play clock, paused between games. Child wins never write normal progress.
 public sealed class SagaBossGame : MonoBehaviour
 {
-    GameObject overlay,hud,intro,result;
+    GameObject overlay,hud,intro,result,intermission;
+    Coroutine intermissionMotion;
+    readonly System.Random feedbackRandom=new System.Random();
+    int lastPraise=-1;
+    static readonly string[] Praise={"Great work!","Memorable!","Focus complete!","Brilliant!","Well done!"};
     ChainGame chain;
     SaysGame says;
     FocusGame focus;
@@ -17,13 +21,14 @@ public sealed class SagaBossGame : MonoBehaviour
     string Title {get{return focusMode?"FOCUS BOSS":"BOSS";}}
     Action closed,won;
     int owner,level,index,hearts;
-    float deadline,totalSeconds;
-    bool running,switching;
+    float deadline,totalSeconds,pausedSeconds;
+    bool running,switching,betweenRounds;
     SagaGame[] order;
     readonly Dictionary<SagaGame,Image> fills=new Dictionary<SagaGame,Image>();
     Text clock;
     public bool IsOpen {get{return overlay!=null;}}
-    public float Remaining {get{return running?Mathf.Max(0,deadline-Time.realtimeSinceStartup):0;}}
+    public bool WaitingForNext {get{return running && betweenRounds;}}
+    public float Remaining {get{return running?(betweenRounds?pausedSeconds:Mathf.Max(0,deadline-Time.realtimeSinceStartup)):0;}}
     public void Open(int value,Action closed,Action won,bool focusMode=false){
         if(IsOpen || SprintRuntime.Active)return;totalSeconds=new SagaLevel(focusMode?SagaGame.FocusBoss:SagaGame.Boss,value).Seconds;this.focusMode=focusMode;availableGames=focusMode?SagaRoute.FocusGames:SagaRoute.Games;level=value;owner=GameManager.AchievementUserId;this.closed=closed;this.won=won;
         var canvas=GetComponentInParent<Canvas>().rootCanvas;var safe=canvas.GetComponent<MobileSafeArea>();Transform parent=safe!=null && safe.Content!=null?safe.Content:canvas.transform;
@@ -49,37 +54,86 @@ public sealed class SagaBossGame : MonoBehaviour
         ChainGame.Button(intro.transform,"START",new Vector2(.16f,.10f),new Vector2(.84f,.34f),StartBoss);
     }
     public void StartBoss(){
-        StopAllCoroutines();CloseChildren();if(intro!=null)CardFaces.DestroyGenerated(intro);intro=null;if(result!=null)CardFaces.DestroyGenerated(result);result=null;
+        StopAllCoroutines();intermissionMotion=null;ClearIntermission();betweenRounds=false;CloseChildren();if(intro!=null)CardFaces.DestroyGenerated(intro);intro=null;if(result!=null)CardFaces.DestroyGenerated(result);result=null;
         index=0;hearts=focusMode?5:SagaLevel.Hearts;foreach(var image in fills.Values)image.fillAmount=0;
         order=(SagaGame[])availableGames.Clone();var random=new System.Random();for(int i=order.Length-1;i>0;i--){int j=random.Next(i+1);var game=order[i];order[i]=order[j];order[j]=game;}
-        deadline=Time.realtimeSinceStartup+totalSeconds;running=true;OpenRound();
+        pausedSeconds=totalSeconds;betweenRounds=true;running=true;OpenRound();
     }
     void OpenRound(){
         if(!running)return;CloseChildren();
         if(Remaining<=0){Finish(false);return;}
-        var context=new SagaRoundContext(deadline,RoundFinished,null,hearts);
+        var context=new SagaRoundContext(()=>Remaining,RoundFinished,hearts);
         if(focusMode)focus.OpenSaga(new SagaFocusLevel(Array.IndexOf(SagaRoute.FocusGames,order[index]),level),ChildClosed,null,context);
         else if(order[index]==SagaGame.Says)says.OpenSaga(level,ChildClosed,null,null,context);
         else chain.OpenSaga(order[index],level,ChildClosed,null,null,context);
+        // Native board/resource setup is part of the paused transition, not play.
+        deadline=Time.realtimeSinceStartup+pausedSeconds;betweenRounds=false;
     }
     void RoundFinished(bool success,int remainingHearts){
-        if(!running || owner!=GameManager.AchievementUserId)return;
+        if(!running || betweenRounds || owner!=GameManager.AchievementUserId)return;
         if(!success || remainingHearts<=0 || Remaining<=0){Finish(false);return;}
         hearts=Mathf.Min(hearts,remainingHearts);fills[order[index]].fillAmount=1;index++;
         if(index==order.Length){Finish(true);return;}
-        StartCoroutine(NextRound());
+        pausedSeconds=Remaining;betweenRounds=true;ShowIntermission();
     }
-    IEnumerator NextRound(){yield return new WaitForSecondsRealtime(.25f);OpenRound();}
+    static string GameName(SagaGame game){return game.ToString().Replace("Focus","").ToUpperInvariant();}
+    void ShowIntermission(){
+        intermission=ChainGame.Panel(overlay.transform,"Boss intermission",Vector2.zero,new Vector2(1,.88f),new Color32(242,239,250,255));
+        var layer=intermission.AddComponent<Canvas>();layer.overrideSorting=true;layer.sortingOrder=151;intermission.AddComponent<GraphicRaycaster>();
+        var card=ChainGame.Panel(intermission.transform,"Challenge complete card",new Vector2(.07f,.16f),new Vector2(.93f,.88f),Color.white);
+        card.GetComponent<Image>().sprite=ContentSelectorBar.Rounded();card.GetComponent<Image>().type=Image.Type.Sliced;
+        Color theme=SagaRoute.ColorFor(focusMode?SagaGame.FocusBoss:SagaGame.Boss);
+        ChainGame.Label(card.transform,index+" / "+order.Length+" complete",new Vector2(.08f,.88f),new Vector2(.92f,.96f),24,theme);
+        int praise=feedbackRandom.Next(lastPraise<0?Praise.Length:Praise.Length-1);if(lastPraise>=0 && praise>=lastPraise)praise++;lastPraise=praise;
+        ChainGame.Label(card.transform,Praise[praise],new Vector2(.06f,.75f),new Vector2(.94f,.88f),48,ChainGame.Purple).fontStyle=FontStyle.Bold;
+        var neuron=ChainGame.Panel(card.transform,"Existing Saga neuron",new Vector2(.28f,.48f),new Vector2(.72f,.75f),Color.white).GetComponent<Image>();
+        neuron.sprite=Resources.Load<Sprite>("Saga/Neuron");neuron.preserveAspect=true;neuron.raycastTarget=false;
+        ChainGame.Label(card.transform,GameName(order[index-1])+" complete!",new Vector2(.08f,.42f),new Vector2(.92f,.50f),26,theme);
+        ChainGame.Label(card.transform,"Next challenge",new Vector2(.08f,.32f),new Vector2(.92f,.41f),26,ChainGame.Purple);
+        ChainGame.Label(card.transform,GameName(order[index]),new Vector2(.08f,.22f),new Vector2(.92f,.33f),38,theme).fontStyle=FontStyle.Bold;
+        var go=ChainGame.Button(card.transform,"GO!",new Vector2(.14f,.055f),new Vector2(.86f,.20f),ContinueBoss);
+        go.image.color=theme;go.GetComponentInChildren<Text>().color=Color.white;
+        clock.text=Title+" "+level+" · PAUSED · "+Mathf.CeilToInt(pausedSeconds)+" s";
+        var group=card.AddComponent<CanvasGroup>();
+        if(Application.isPlaying && PlayerPrefs.GetInt("saga.motion.v1",1)!=0){group.alpha=0;card.transform.localScale=Vector3.one*.96f;}
+        if(Application.isPlaying)intermissionMotion=StartCoroutine(RevealIntermission((RectTransform)card.transform));else CloseChildren();
+    }
+    IEnumerator RevealIntermission(RectTransform card){
+        // Let the native answer callback return before closing its board.
+        yield return null;
+        if(!WaitingForNext || intermission==null)yield break;
+        CloseChildren();
+        var group=card.GetComponent<CanvasGroup>();
+        if(PlayerPrefs.GetInt("saga.motion.v1",1)!=0){
+            for(float elapsed=0;elapsed<.28f;elapsed+=Time.unscaledDeltaTime){
+                if(PlayerPrefs.GetInt("saga.motion.v1",1)==0)break;
+                float t=Mathf.SmoothStep(0,1,elapsed/.28f);group.alpha=t;card.localScale=Vector3.one*Mathf.Lerp(.96f,1,t);yield return null;
+            }
+        }
+        group.alpha=1;card.localScale=Vector3.one;intermissionMotion=null;
+    }
+    void ContinueBoss(){
+        if(!WaitingForNext || owner!=GameManager.AchievementUserId)return;
+        ClearIntermission();OpenRound();
+    }
+    void ClearIntermission(){
+        if(intermissionMotion!=null)StopCoroutine(intermissionMotion);intermissionMotion=null;
+        if(intermission!=null)CardFaces.DestroyGenerated(intermission);intermission=null;
+    }
     void Finish(bool success){
-        if(!running)return;running=false;StopAllCoroutines();CloseChildren();
+        if(!running)return;running=false;betweenRounds=false;StopAllCoroutines();intermissionMotion=null;ClearIntermission();CloseChildren();
         int stars=focusMode?SagaProgress.StarsFromFocusHearts(hearts):hearts;
         if(success)SagaProgress.Complete(focusMode?SagaGame.FocusBoss:SagaGame.Boss,owner,level,stars);
         result=SagaResultView.Show(overlay.transform,SagaRoute.Stop(focusMode?SagaGame.FocusBoss:SagaGame.Boss,level),success,success?stars:0,order.Length.ToString(),StartBoss,Close);
-        if(success && won!=null)won();
+        if(success){
+            var message=result.GetComponentsInChildren<Text>(true).FirstOrDefault(t=>t.text=="AWESOME");
+            if(message!=null)message.text="You won!";
+            if(won!=null)won();
+        }
     }
     void ChildClosed(){if(!switching)Close();}
     void CloseChildren(){switching=true;if(chain!=null)chain.Close();if(says!=null)says.Close();if(focus!=null)focus.Close();switching=false;}
-    public void Close(){StopAllCoroutines();running=false;CloseChildren();if(overlay!=null)CardFaces.DestroyGenerated(overlay);overlay=null;fills.Clear();var callback=closed;closed=won=null;if(callback!=null)callback();}
-    void Update(){if(!IsOpen)return;if(owner!=GameManager.AchievementUserId){Close();return;}if(running){clock.text=Title+" "+level+" · "+Mathf.CeilToInt(Remaining)+" s";if(Remaining<=0)Finish(false);}}
+    public void Close(){StopAllCoroutines();intermissionMotion=null;ClearIntermission();running=betweenRounds=false;CloseChildren();if(overlay!=null)CardFaces.DestroyGenerated(overlay);overlay=null;fills.Clear();var callback=closed;closed=won=null;if(callback!=null)callback();}
+    void Update(){if(!IsOpen)return;if(owner!=GameManager.AchievementUserId){Close();return;}if(running){clock.text=Title+" "+level+" · "+(betweenRounds?"PAUSED · ":"")+Mathf.CeilToInt(Remaining)+" s";if(Remaining<=0)Finish(false);}}
     void OnDisable(){if(IsOpen)Close();}
 }

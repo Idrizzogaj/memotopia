@@ -96,9 +96,24 @@ public static class SagaValidation
             }
             scroll.verticalNormalizedPosition=0;
             Check(Resources.Load<Sprite>("Saga/Neuron") != null, "Neuron sprite not imported.");
+            foreach(var node in levels){
+                int stop=int.Parse(node.name.Substring("Saga level ".Length));var kind=SagaRoute.At(stop).Game;
+                bool boss=kind==SagaGame.Boss || kind==SagaGame.FocusBoss;
+                Check((node.transform.Find("Boss label")!=null)==boss,"Only boss stops get the larger hit area and boss label.");
+                if(boss){Check(node.transform.Find("Boss label").GetComponentInChildren<Text>().text=="BOSS","Boss label must remain identifiable without relying on color.");Check(node.transform.Find("Boss marker").GetComponent<Image>().sprite==Resources.Load<Sprite>("GamesResources/Levels/Asset 15"),"Boss reuses native star artwork.");Check(node.transform.Find("Boss marker").GetComponent<Image>().material.GetVectorArray("_Cells")[0].z==0,"Future boss badges must be genuinely greyscale.");}
+            }
             Capture(canvas, camera, 800, 1734, "saga-map-phone");
             Capture(canvas,camera,800,1734,"saga-map-20-visible");
-            Check(!mapPage.GetComponentsInChildren<Text>(true).Any(t=>SagaRoute.Games.Any(g=>t.text.ToUpperInvariant().Contains(g.ToString().ToUpperInvariant()))),"No game captions on map.");
+            int[] beforeBoss=SagaRoute.Games.Select(g=>SagaProgress.Stars(g,1)).ToArray();
+            foreach(var kind in SagaRoute.Games)SagaProgress.Complete(kind,GameManager.AchievementUserId,1,3);
+            Call(page,"RefreshProgress");Capture(canvas,camera,800,1734,"saga-map-boss-frontier-phone");
+            for(int mode=0;mode<SagaRoute.Games.Length;mode++)PlayerPrefs.SetInt("saga."+SagaRoute.Games[mode].ToString().ToLowerInvariant()+".stars.v1.1999999801.1",beforeBoss[mode]);
+            Call(page,"RefreshProgress");
+            Check(!mapPage.GetComponentsInChildren<Text>(true).Any(t=>SagaRoute.Games.Any(g=>t.text.ToUpperInvariant().Contains(g.ToString().ToUpperInvariant()))),"No individual game captions on map.");
+            var captions=mapPage.GetComponentsInChildren<Text>(true).Select(t=>t.text).ToArray();
+            for(int tier=1;tier<=20;tier++){Check(captions.Count(t=>t=="Memory "+tier)==1 && captions.Count(t=>t=="Focus "+tier)==1,"One Memory/Focus block heading per tier.");}
+            var gates=(System.Collections.Generic.Dictionary<int,RectTransform>)Get(page,"synapseGates");
+            Check(gates.Count==39 && Resources.Load<Sprite>("Saga/SynapseGate")!=null,"Synapse gate at each inter-block boss connection.");
             canvasRect.sizeDelta = new Vector2(1200, 1600); camera.orthographicSize = 800;
             Capture(canvas, camera, 1200, 1600, "saga-map-tablet");
             canvasRect.sizeDelta = new Vector2(800, 1734); camera.orthographicSize = 867;
@@ -305,7 +320,14 @@ public static class SagaValidation
                 Check(mapPage.activeSelf && !game.IsSagaOpen,"MAP returns from "+kind+" "+level);
                 Call(page,"PlayStage",stop+1);
                 var next=SagaRoute.At(stop+1);
-                if(next.Game==SagaGame.Boss){var boss=(SagaBossGame)Get(page,"boss");Check(boss.IsOpen,"SORT next opens boss.");if(level==1)Capture(canvas,camera,800,1734,"saga-boss-start-phone");boss.Close();}
+                if(next.Game==SagaGame.Boss){var boss=(SagaBossGame)Get(page,"boss");Check(boss.IsOpen,"SORT next opens boss.");if(level==1){
+                    Capture(canvas,camera,800,1734,"saga-boss-start-phone");boss.StartBoss();Call(boss,"RoundFinished",true,3);
+                    Check(boss.WaitingForNext,"Boss must pause between completed games.");
+                    Capture(canvas,camera,800,1734,"saga-boss-transition-phone");
+                    ((RectTransform)canvas.transform).sizeDelta=new Vector2(1200,1600);camera.orthographicSize=800;
+                    Capture(canvas,camera,1200,1600,"saga-boss-transition-tablet");
+                    ((RectTransform)canvas.transform).sizeDelta=new Vector2(800,1734);camera.orthographicSize=867;
+                }boss.Close();}
                 else if(next.Game==SagaGame.Says){
                     var says=(SaysGame)Get(page,"says");Check(says.IsSagaOpen,"Map entry must open Says.");says.Close();
                 }else{
