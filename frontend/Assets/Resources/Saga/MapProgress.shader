@@ -22,6 +22,7 @@ Shader "UI/SagaMapProgress" {
    struct appdata {float4 vertex:POSITION;float2 uv:TEXCOORD0;fixed4 color:COLOR;};
    struct v2f {float4 vertex:SV_POSITION;float2 uv:TEXCOORD0;fixed4 color:COLOR;float4 local:TEXCOORD1;};
    sampler2D _MainTex;float4 _ClipRect;float4 _Cells[20];float4 _Charge;
+   float4 _CutCenters[8];float4 _CutAxes[8];int _CutCount;
    v2f vert(appdata v){v2f o;o.local=v.vertex;o.vertex=UnityObjectToClipPos(v.vertex);o.uv=v.uv;o.color=v.color;return o;}
    fixed4 frag(v2f i):SV_Target {
     float2 chargeDelta=(i.uv-_Charge.xy)*float2(1,1.5);
@@ -38,6 +39,17 @@ Shader "UI/SagaMapProgress" {
     float2 sampleUV=center+(i.uv-center)*(1+(1/shrink-1)*weight);
     fixed4 c=tex2D(_MainTex,sampleUV+jitter)*i.color;
     c.a*=1-smoothstep(.94,.995,min(c.r,min(c.g,c.b)));
+    // Remove only the old painted axon under each new synapse. Protect cell cores.
+    float erased=0;
+    [unroll] for(int cut=0;cut<8;cut++){
+     if(cut<_CutCount){
+      float2 delta=(i.uv-_CutCenters[cut].xy)*float2(1,1.5);float2 axis=_CutAxes[cut].xy;
+      float2 q=abs(float2(dot(delta,axis),dot(delta,float2(-axis.y,axis.x))))-_CutCenters[cut].zw;
+      float distance=length(max(q,0))+min(max(q.x,q.y),0);
+      erased=max(erased,(1-smoothstep(-.003,.003,distance))*smoothstep(_CutAxes[cut].z,_CutAxes[cut].w,sqrt(nearest)));
+     }
+    }
+    c.a*=1-erased;
     float grey=dot(c.rgb,float3(.2126,.7152,.0722));
     c.rgb=lerp(lerp(float3(grey,grey,grey),float3(1,1,1),.22),c.rgb,unlocked);
     #ifdef UNITY_UI_CLIP_RECT

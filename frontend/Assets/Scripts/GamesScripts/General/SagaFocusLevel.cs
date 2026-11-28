@@ -3,7 +3,8 @@ using System;
 public sealed class SagaFocusLevel
 {
     public readonly int Kind,Number,Target,Seconds;
-    public SagaGame Game {get{return new[]{SagaGame.FocusPairs,SagaGame.FocusBoxes,SagaGame.FocusFlash,SagaGame.FocusChain}[Kind];}}
+    public SagaGame Game {get{return Games[Kind];}}
+    static readonly SagaGame[] Games={SagaGame.FocusPairs,SagaGame.FocusBoxes,SagaGame.FocusFlash,SagaGame.FocusChain};
     static readonly int[] Times={20,19,18,17,15,30,29,28,27,25,40,39,38,37,35,60,58,56,54,50};
     // Targets are Idriz's specifications, not scores invented from existing records.
     static readonly int[][] Targets={new[]{10,15,20,30},new[]{20,30,40,60},new[]{10,20,30,50},new[]{30,50,70,100}};

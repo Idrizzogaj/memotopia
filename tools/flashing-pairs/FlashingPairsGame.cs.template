@@ -1,0 +1,143 @@
+using System;
+using System.Linq;
+using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
+
+// Experimental Training game. It deliberately has no statistics, XP, badge or server hooks.
+public sealed class FlashingPairsGame : MonoBehaviour
+{
+    public static readonly Color Tone=new Color32(36,189,224,255);
+    GameObject overlay,levels,intro,result,quitDialog;
+    Material theme,whiteTheme;
+    SagaPairsBoard board;
+    ChainState state;
+    Text phase;
+    int owner,level;
+    float remaining;
+    bool studying,recalling,backgrounded,resultConsumed;
+    int[] faces;
+    public static int Pairs(int value){Validate(value);return Math.Min(value,20)+1;}
+    public static int StudySeconds(int value){Validate(value);return Math.Min(value,20)+2;}
+    public const int RecallSeconds=60;
+    static void Validate(int value){if(value<1 || value>MemoryAthlete.Level)throw new ArgumentOutOfRangeException("value");}
+    static string Key(int user,int number){return "training.flashing-pairs.stars.v1."+user+"."+number;}
+    public static int Stars(int user,int number){return number>=1 && number<=20?Mathf.Clamp(PlayerPrefs.GetInt(Key(user,number),0),0,3):0;}
+    bool Unlocked(int number){return number==1 || number==20 || (number==21?Stars(owner,20)>0:Stars(owner,number)>0 || Stars(owner,number-1)>0);}
+    public static FlashingPairsGame Open(RectTransform parent){
+        var game=parent.GetComponent<FlashingPairsGame>()??parent.gameObject.AddComponent<FlashingPairsGame>();game.Show();return game;
+    }
+    void Show(){
+        Close();owner=GameManager.AchievementUserId;
+        var canvas=GetComponentInParent<Canvas>().rootCanvas;var safe=canvas.GetComponent<MobileSafeArea>();
+        overlay=ChainGame.Panel(safe!=null && safe.Content!=null?safe.Content:canvas.transform,"Flashing Pairs",Vector2.zero,Vector2.one,Tone);
+        theme=new Material(Resources.Load<Shader>("MemotopiaTheme"));theme.SetColor("_ThemeColor",Tone);
+        whiteTheme=new Material(Resources.Load<Shader>("MemotopiaTheme"));whiteTheme.SetColor("_ThemeColor",Color.white);
+        ShowLevels();
+    }
+    public void ShowLevels(){
+        if(overlay==null || owner!=GameManager.AchievementUserId){Close();return;}
+        ClearRound();if(levels!=null)CardFaces.DestroyGenerated(levels);
+        levels=Instantiate(Resources.Load<GameObject>("Prefabs/ExactFlashChainLevels"),overlay.transform,false);
+        Stretch(levels);var background=levels.GetComponent<Image>();background.sprite=Resources.Load<Sprite>("GamesResources/Levels/FlashBackground");background.material=theme;
+        foreach(var button in levels.GetComponentsInChildren<Button>(true)){button.onClick=new Button.ButtonClickedEvent();button.onClick.AddListener(Close);}
+        foreach(var text in levels.GetComponentsInChildren<Text>(true))if(text.text.Trim().Equals("Challenge",StringComparison.OrdinalIgnoreCase))text.gameObject.SetActive(false);
+        var images=levels.GetComponentsInChildren<Image>(true);
+        foreach(var image in images){
+            if(image.name=="Chain title"){
+                image.sprite=Resources.Load<Sprite>("GamesResources/Levels/FlashTop");image.color=Color.white;image.material=whiteTheme;
+                var cover=ChainGame.Panel(image.transform,"Flashing Pairs title",new Vector2(.21f,.50f),new Vector2(.79f,.85f),Color.white);cover.GetComponent<Image>().raycastTarget=false;
+                var word=ChainGame.Label(cover.transform,"FLASHING\nPAIRS",Vector2.zero,Vector2.one,42,Tone);word.fontStyle=FontStyle.Bold;word.raycastTarget=false;
+            }
+            if(!image.name.StartsWith("Chain Level "))continue;
+            int number=int.Parse(image.name.Substring(12));bool unlocked=Unlocked(number);
+            image.sprite=Resources.Load<Sprite>(unlocked?"GamesResources/Levels/AAA-11":"GamesResources/Levels/FlashLevelCell");if(!unlocked)image.material=theme;
+            var button=image.transform.GetChild(1).GetComponent<Button>();button.interactable=unlocked;button.onClick=new Button.ButtonClickedEvent();button.onClick.AddListener(()=>StartLevel(number));
+            var label=button.GetComponentInChildren<Text>(true);label.text=number.ToString();label.color=Tone;
+            var stars=image.transform.GetChild(0);int earned=Stars(owner,number);stars.gameObject.SetActive(earned>0);
+            for(int n=0;n<stars.childCount;n++){stars.GetChild(n).gameObject.SetActive(n<earned);var star=stars.GetChild(n).GetComponent<Image>();if(star!=null)star.sprite=Resources.Load<Sprite>("GamesResources/Levels/Asset "+(15-n));}
+        }
+        TrainingAthleteTile.Attach(images.First(i=>i.name=="Chain Level 20"),images.First(i=>i.name=="Chain Level 16"),Tone,()=>StartLevel(21),Stars(owner,20)>0);
+    }
+    public void StartLevel(int value){
+        Validate(value);if(overlay==null || owner!=GameManager.AchievementUserId || !Unlocked(value))return;
+        ClearRound();if(levels!=null)CardFaces.DestroyGenerated(levels);levels=null;level=value;resultConsumed=false;
+        intro=ChainGame.Panel(overlay.transform,"Flashing Pairs instructions",new Vector2(.06f,.16f),new Vector2(.94f,.84f),Color.white);
+        intro.GetComponent<Image>().sprite=ContentSelectorBar.Rounded();intro.GetComponent<Image>().type=Image.Type.Sliced;
+        string title=level==21?"MEMORY ATHLETE":"FLASHING PAIRS · "+level;
+        ChainGame.Label(intro.transform,title,new Vector2(.05f,.83f),new Vector2(.95f,.98f),38,Tone).fontStyle=FontStyle.Bold;
+        ChainGame.Label(intro.transform,__INTRO_RULES__+"\n\n"+Pairs(level)+" pairs · "+StudySeconds(level)+" s to memorize\n60 s to recall · "+(level==21?1:5)+" hearts",new Vector2(.08f,.29f),new Vector2(.92f,.82f),30,ChainGame.Ink);
+        ChainGame.Button(intro.transform,"LEVELS",new Vector2(.08f,.07f),new Vector2(.43f,.22f),ShowLevels);
+        var start=ChainGame.Button(intro.transform,"START",new Vector2(.50f,.07f),new Vector2(.92f,.22f),BeginStudy);start.image.color=Tone;start.GetComponentInChildren<Text>().color=Color.white;
+    }
+    public void BeginStudy(){
+        if(intro==null || overlay==null || owner!=GameManager.AchievementUserId)return;
+        CardFaces.DestroyGenerated(intro);intro=null;CardFaces.BeginSession();
+        int[] pool=Enumerable.Range(1,CardFaces.ContentCount).OrderBy(id=>UnityEngine.Random.value).ToArray();
+        faces=__FACE_SELECTION__;
+        state=new ChainState(Enumerable.Range(1,Pairs(level)*2).ToArray(),level==21?1:5);
+        studying=true;recalling=false;
+        board=new SagaPairsBoard(overlay.transform,state.Sequence,Quit,theme,Compare,true,id=>CardFaces.SmallFace(faces[id-1]),CanRecall,state.Hearts);
+        board.FitAll(state.Sequence.Length<=10?2:state.Sequence.Length<=24?4:6);
+        __STUDY_LABELS__
+        phase=ChainGame.Label(board.Root.transform,"FLASHING PAIRS\nMEMORIZE",new Vector2(.26f,.94f),new Vector2(.76f,.99f),24,Tone);phase.raycastTarget=false;phase.fontStyle=FontStyle.Bold;
+        foreach(var heart in board.Root.GetComponentsInChildren<Image>(true).Where(i=>i.name.StartsWith("Saga pair heart "))){int n=int.Parse(heart.name.Substring("Saga pair heart ".Length));heart.rectTransform.anchorMin=new Vector2(.30f+n*.075f,.90f);heart.rectTransform.anchorMax=new Vector2(.36f+n*.075f,.93f);}
+        remaining=StudySeconds(level);board.ShowClock(Mathf.CeilToInt(remaining));board.Hearts(state.Hearts);
+    }
+    bool CanRecall(){return recalling && quitDialog==null && result==null && owner==GameManager.AchievementUserId && state!=null && !state.Finished;}
+    bool Compare(int first,int second){
+        if(!CanRecall())return false;
+        bool correct=state.ChoosePair(first,second);board.Hearts(state.Hearts);
+        if(state.Finished)Finish();return correct;
+    }
+    public void Tick(float elapsed){
+        if(overlay==null)return;if(owner!=GameManager.AchievementUserId){Close();return;}
+        if(backgrounded || quitDialog!=null || board==null || state==null || state.Finished)return;
+        if(!studying && !recalling)return;
+        remaining=Mathf.Max(0,remaining-Mathf.Max(0,elapsed));board.ShowClock(Mathf.CeilToInt(remaining));
+        if(studying && remaining<=0){studying=false;recalling=true;remaining=RecallSeconds;board.BeginRecall(__SHUFFLE_RECALL__);phase.text="FLASHING PAIRS\nRECALL";board.ShowClock(RecallSeconds);return;}
+        if(recalling && remaining<=0){state.Expire();Finish();return;}
+        if(recalling)board.Tick(elapsed);
+    }
+    void Finish(){
+        if(state==null || result!=null || owner!=GameManager.AchievementUserId)return;
+        studying=recalling=false;
+        bool won=state.Won;int stars=level==21?0:state.Hearts==5?3:state.Hearts>=3?2:1;
+        if(won && level<=20 && owner>0){PlayerPrefs.SetInt(Key(owner,level),Mathf.Max(stars,Stars(owner,level)));PlayerPrefs.Save();}
+        result=Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/"+(won?"WinPanel":"LosePanel")),overlay.transform,false);result.name="Flashing Pairs result";
+        var content=result.transform.GetChild(0);UnityAction replay=()=>UseResult(()=>StartLevel(level)),back=()=>UseResult(ShowLevels);
+        string title=level==21?"MEMORY ATHLETE":"FLASHING PAIRS LEVEL "+level;
+        if(won){
+            content.GetChild(0).GetChild(0).GetComponent<Text>().text=title;content.GetChild(10).GetChild(0).GetComponent<Text>().text=(state.Position/2).ToString();
+            foreach(var fill in result.GetComponentsInChildren<StarFillScript>(true)){
+                fill.EarnedStarsOverride=stars;fill.enabled=level!=21;
+                if(!Application.isPlaying){var fills=new[]{fill.leftStar,fill.midStar,fill.rightStar};var visible=new[]{fill.leftStarG,fill.midStarG,fill.rightStarG};for(int n=0;n<3;n++){visible[n].SetActive(n<stars);fills[n].GetComponent<Image>().fillAmount=n<stars?1:0;}}
+            }
+            if(level==21)foreach(var image in result.GetComponentsInChildren<Image>(true))if(image.name.IndexOf("Star",StringComparison.OrdinalIgnoreCase)>=0)image.gameObject.SetActive(false);
+            GamesScript.ConfigureWinButtons(result,level,replay,()=>UseResult(()=>StartLevel(level+1)),back);
+        }else{
+            var heading=content.GetComponentsInChildren<Text>(true).FirstOrDefault(t=>t.text.Trim().Equals("Game Over",StringComparison.OrdinalIgnoreCase));if(heading!=null)heading.text=title;
+            var again=content.GetChild(2).GetComponent<Button>();var levelsButton=content.GetChild(3).GetComponent<Button>();again.onClick=new Button.ButtonClickedEvent();levelsButton.onClick=new Button.ButtonClickedEvent();again.onClick.AddListener(replay);levelsButton.onClick.AddListener(back);again.GetComponentInChildren<Text>().text="REPLAY";levelsButton.GetComponentInChildren<Text>().text="LEVELS";
+        }
+        foreach(var button in result.GetComponentsInChildren<Button>(true))button.interactable=true;
+    }
+    void UseResult(UnityAction action){if(resultConsumed || owner!=GameManager.AchievementUserId)return;resultConsumed=true;action();}
+    void Quit(){
+        if(board==null || state==null || state.Finished){ShowLevels();return;}if(quitDialog!=null)return;
+        quitDialog=Instantiate(Resources.Load<GameObject>("Prefabs/GamePopUps/MidGameQuitPanel"),overlay.transform,false);
+        var content=quitDialog.transform.GetChild(0);var no=content.GetChild(2).GetComponent<Button>();var yes=content.GetChild(3).GetComponent<Button>();no.onClick=new Button.ButtonClickedEvent();yes.onClick=new Button.ButtonClickedEvent();no.onClick.AddListener(()=>{CardFaces.DestroyGenerated(quitDialog);quitDialog=null;});yes.onClick.AddListener(ShowLevels);
+    }
+    void ClearRound(){
+        studying=recalling=false;state=null;phase=null;faces=null;
+        if(board!=null)board.Destroy();board=null;
+        foreach(var obj in new[]{intro,result,quitDialog})if(obj!=null){obj.SetActive(false);CardFaces.DestroyGenerated(obj);}intro=result=quitDialog=null;CardFaces.EndSession();
+    }
+    public void Close(){
+        ClearRound();if(overlay!=null){overlay.SetActive(false);CardFaces.DestroyGenerated(overlay);}overlay=levels=null;
+        if(theme!=null)CardFaces.DestroyGenerated(theme);theme=null;if(whiteTheme!=null)CardFaces.DestroyGenerated(whiteTheme);whiteTheme=null;
+    }
+    static void Stretch(GameObject obj){var rect=(RectTransform)obj.transform;rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;rect.offsetMin=rect.offsetMax=Vector2.zero;rect.localScale=Vector3.one;rect.anchoredPosition3D=Vector3.zero;}
+    void Update(){if(overlay==null)return;if(Input.GetKeyDown(KeyCode.Escape)){if(levels!=null)Close();else Quit();}Tick(Time.unscaledDeltaTime);}
+    void OnApplicationPause(bool paused){backgrounded=paused;}
+    void OnDisable(){if(overlay!=null)Close();}
+}

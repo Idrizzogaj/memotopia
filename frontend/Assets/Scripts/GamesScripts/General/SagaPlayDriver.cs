@@ -109,6 +109,11 @@ public sealed class SagaPlayDriver : MonoBehaviour
         Check(themes[0].GetVectorArray("_Cells")[19].z==1 && themes[1].GetVectorArray("_Cells")[0].z==0,"Only completed/current cells are colored.");
         page.GetType().GetMethod("PlayStage",Flags).Invoke(page,new object[]{20});
         var focus=(FocusGame)Get(page,"focus");focus.Begin();yield return SolveFocus(focus);
+        var held=(GameObject)Get(focus,"popup");
+        yield return new WaitForSecondsRealtime(6);
+        Check(held!=null && !map.activeSelf && Get(page,"victory")==null,"The result must wait for an explicit MAP click.");
+        Check(held.GetComponentsInChildren<Text>().Any(t=>t.text=="SAGA LEVEL 20") && held.GetComponentsInChildren<Text>().Any(t=>t.text=="You won!"),"Global Saga title and shared victory caption.");
+        held.transform.GetChild(0).GetChild(12).GetComponent<Button>().OnPointerClick(new PointerEventData(null));
         bool sawPulse=false;float limit=Time.realtimeSinceStartup+10;
         while(!map.activeSelf || Get(page,"victory")!=null){sawPulse|=Get(page,"pulse")!=null;Check(Time.realtimeSinceStartup<limit,"Auto return/unlock timeout.");yield return null;}
         Check(sawPulse && Mathf.Abs(scroll.verticalNormalizedPosition-1f/11)<.002f,"20 to 21 scroll and electrical reveal.");
@@ -125,6 +130,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         page.GetType().GetMethod("ToggleMotion",Flags).Invoke(page,null);yield return null;
         Check((int)Get(page,"ambientStop")==0 && Get(page,"ambientPulse")==null,"Motion off cancels spontaneous effects.");
         page.GetType().GetMethod("PlayStage",Flags).Invoke(page,new object[]{21});focus.Begin();yield return SolveFocus(focus);
+        ((GameObject)Get(focus,"popup")).transform.GetChild(0).GetChild(12).GetComponent<Button>().OnPointerClick(new PointerEventData(null));
         limit=Time.realtimeSinceStartup+8;
         while(!map.activeSelf || Get(page,"victory")!=null){Check(Get(page,"pulse")==null,"Motion off must suppress unlock pulse.");Check(Time.realtimeSinceStartup<limit,"Reduced-motion return timeout.");yield return null;}
         Check(themes[1].GetVectorArray("_Cells")[1].z==1,"Reduced-motion completion still unlocks next stage.");
@@ -148,6 +154,10 @@ public sealed class SagaPlayDriver : MonoBehaviour
             boss.GetType().GetMethod("RoundFinished",Flags).Invoke(boss,new object[]{true,5});
             if(boss.WaitingForNext){yield return null;((GameObject)Get(boss,"intermission")).GetComponentsInChildren<Button>().Single(b=>b.name=="GO!").OnPointerClick(new PointerEventData(null));}
         }
+        yield return new WaitForSecondsRealtime(2);
+        var bossResult=(GameObject)Get(boss,"result");
+        Check(bossResult!=null && !map.activeSelf,"Boss victory must also wait for MAP.");
+        bossResult.transform.GetChild(0).GetChild(12).GetComponent<Button>().OnPointerClick(new PointerEventData(null));
         bool crossedSynapse=false;limit=Time.realtimeSinceStartup+10;
         while(!map.activeSelf || Get(page,"victory")!=null){crossedSynapse|=Get(page,"synapseSignal")!=null;Check(Time.realtimeSinceStartup<limit,"Synaptic boss unlock timed out.");yield return null;}
         Check(crossedSynapse && Get(page,"synapseSignal")==null,"Boss win sends a bounded discharge across the synaptic gap and cleans it up.");
@@ -157,7 +167,7 @@ public sealed class SagaPlayDriver : MonoBehaviour
         Vector2 to=((RectTransform)Get(page,"mapContent")).InverseTransformPoint(((System.Collections.Generic.List<Button>)Get(page,"stageButtons"))[24].transform.position);
         Check(Vector2.Distance(gates[24].anchoredPosition,Vector2.Lerp(from,to,.57f))<.1f,"Synapse stays on its real axon after scroll/layout.");
         PlayerPrefs.SetInt("saga.motion.v1",oldMotion);PlayerPrefs.Save();
-        Debug.Log("SAGA_MAP_PLAY_PASSED:240stops, actual Focus Pairs/Boxes wins, automatic return, 20-21 scroll, grey/color reveal, electrical pulse, spontaneous discharge, motion-off cancellation.");
+        Debug.Log("SAGA_MAP_PLAY_PASSED:240stops, actual Focus Pairs/Boxes wins, explicit MAP return, 20-21 scroll, grey/color reveal, electrical pulse, spontaneous discharge, motion-off cancellation.");
     }
     IEnumerator SolveFocus(FocusGame game){
         float limit=Time.realtimeSinceStartup+95;

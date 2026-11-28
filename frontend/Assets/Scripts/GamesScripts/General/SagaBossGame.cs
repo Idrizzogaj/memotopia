@@ -125,11 +125,7 @@ public sealed class SagaBossGame : MonoBehaviour
         int stars=focusMode?SagaProgress.StarsFromFocusHearts(hearts):hearts;
         if(success)SagaProgress.Complete(focusMode?SagaGame.FocusBoss:SagaGame.Boss,owner,level,stars);
         result=SagaResultView.Show(overlay.transform,SagaRoute.Stop(focusMode?SagaGame.FocusBoss:SagaGame.Boss,level),success,success?stars:0,order.Length.ToString(),StartBoss,Close);
-        if(success){
-            var message=result.GetComponentsInChildren<Text>(true).FirstOrDefault(t=>t.text=="AWESOME");
-            if(message!=null)message.text="You won!";
-            if(won!=null)won();
-        }
+        if(success && won!=null)won();
     }
     void ChildClosed(){if(!switching)Close();}
     void CloseChildren(){switching=true;if(chain!=null)chain.Close();if(says!=null)says.Close();if(focus!=null)focus.Close();switching=false;}

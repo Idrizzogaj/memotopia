@@ -72,7 +72,7 @@ public sealed class FocusGame : MonoBehaviour {
   if(kind==2 && flashWatching){flashRemaining=Mathf.Max(0,flashRemaining-elapsed);if(flashRemaining<=0)HideFlashNumbers();}
   if(kind==1 && !transition)foreach(var arena in arenas)foreach(var ball in arena.Balls){
    bool armed=ball.State.Armed;int wall=ball.State.Step(Mathf.Min(elapsed,.06f));
-   if(wall>=0){if(!armed && ball.State.Hits<arena.Target){Award(false);Flash(arena.Walls[wall],Red);if(!playing)return;}ball.State.Armed=false;}
+   if(wall>=0){if(!armed && ball.State.Hits<arena.Target){Award(false);if(!playing)return;Flash(arena.Walls[wall],Red);}ball.State.Armed=false;}
    PlaceBall(ball,arena.Target);
   }
   Hud();
@@ -95,7 +95,7 @@ public sealed class FocusGame : MonoBehaviour {
  void NewQuestion(){sum=FocusRules.Question(level,random);answer="";questionText.text=sum.A+" "+sum.Operator+" "+sum.B;answerText.text="?";rule.text="Up to "+sum.Limit+"  ·  "+(questionIndex+1)+" / "+sum.Count;}
  public void MathKey(string key){if(!playing || transition)return;
   if(key=="Clear")answer="";
-  else if(key=="OK"){int parsed;if(!int.TryParse(answer,out parsed))return;if(parsed==sum.Answer){Award(true);if(!playing)return;questionIndex++;if(questionIndex>=sum.Count){NextLevel();return;}NewQuestion();}else{Award(false);answer="";}}
+  else if(key=="OK"){int parsed;if(!int.TryParse(answer,out parsed))return;if(parsed==sum.Answer){Award(true);if(!playing)return;questionIndex++;if(questionIndex>=sum.Count){NextLevel();return;}NewQuestion();}else{Award(false);if(!playing)return;answer="";}}
   else if(answer.Length<4)answer+=key;
   answerText.text=answer.Length==0?"?":answer;
  }
@@ -173,7 +173,7 @@ public sealed class FocusGame : MonoBehaviour {
  }
  void PlaceBall(NativeBall ball,int target){ball.Image.rectTransform.anchorMin=ball.Image.rectTransform.anchorMax=ball.State.Position;ball.Image.rectTransform.anchoredPosition=Vector2.zero;ball.Image.color=ball.State.Armed?Green:ball.State.Hits>=target?Color.gray:Red;if(ball.Halo!=null)ball.Halo.gameObject.SetActive(ball.State.Armed);}
  void Counts(Arena arena){arena.Count.text=string.Join("  ",arena.Balls.Select(b=>b.State.Hits+"/"+arena.Target).ToArray());}
- void Wall(Arena arena,int wall){if(!playing || transition)return;var ball=arena.Balls.Where(b=>b.State.Hits<arena.Target && !b.State.Armed && b.State.NextWall()==wall).OrderBy(b=>b.State.Arrival()).FirstOrDefault();if(ball==null){Award(false);Flash(arena.Walls[wall],Red);return;} // guessing a wall costs a point and vibrates
+ void Wall(Arena arena,int wall){if(!playing || transition)return;var ball=arena.Balls.Where(b=>b.State.Hits<arena.Target && !b.State.Armed && b.State.NextWall()==wall).OrderBy(b=>b.State.Arrival()).FirstOrDefault();if(ball==null){Award(false);if(!playing)return;Flash(arena.Walls[wall],Red);return;} // guessing a wall costs a point and vibrates
   ball.State.Armed=true;ball.State.Hits++;Award(true);if(!playing)return;Flash(arena.Walls[wall],Green);
   // Single big box only: a correct tap sends the ball back, so the next wall comes sooner.
   if(arenas.Count==1){ball.State.Bounce(wall);ball.State.Armed=false;}

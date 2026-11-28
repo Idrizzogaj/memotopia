@@ -100,7 +100,8 @@ public static class SagaValidation
                 int stop=int.Parse(node.name.Substring("Saga level ".Length));var kind=SagaRoute.At(stop).Game;
                 bool boss=kind==SagaGame.Boss || kind==SagaGame.FocusBoss;
                 Check((node.transform.Find("Boss label")!=null)==boss,"Only boss stops get the larger hit area and boss label.");
-                if(boss){Check(node.transform.Find("Boss label").GetComponentInChildren<Text>().text=="BOSS","Boss label must remain identifiable without relying on color.");Check(node.transform.Find("Boss marker").GetComponent<Image>().sprite==Resources.Load<Sprite>("GamesResources/Levels/Asset 15"),"Boss reuses native star artwork.");Check(node.transform.Find("Boss marker").GetComponent<Image>().material.GetVectorArray("_Cells")[0].z==0,"Future boss badges must be genuinely greyscale.");}
+                Check(node.transform.Find("Boss marker")==null,"No redundant star on the boss cell.");
+                if(boss)Check(node.transform.Find("Boss label").GetComponentInChildren<Text>().text=="BOSS","Boss label remains identifiable without color.");
             }
             Capture(canvas, camera, 800, 1734, "saga-map-phone");
             Capture(canvas,camera,800,1734,"saga-map-20-visible");
@@ -114,6 +115,12 @@ public static class SagaValidation
             for(int tier=1;tier<=20;tier++){Check(captions.Count(t=>t=="Memory "+tier)==1 && captions.Count(t=>t=="Focus "+tier)==1,"One Memory/Focus block heading per tier.");}
             var gates=(System.Collections.Generic.Dictionary<int,RectTransform>)Get(page,"synapseGates");
             Check(gates.Count==39 && Resources.Load<Sprite>("Saga/SynapseGate")!=null,"Synapse gate at each inter-block boss connection.");
+            var axons=mapPage.GetComponentsInChildren<SagaAxonGraphic>(true);Check(axons.Length==11,"Connect all twelve map sections with myelin.");
+            foreach(var axon in axons)Check(axon.Source==Resources.Load<Sprite>("Saga/MapUnnumbered").texture && axon.UnitWidth>0 && Vector2.Distance(axon.From,axon.To)>axon.EndPadding*2,"Each section connection reuses approved map art and has a real path.");
+            scroll.verticalNormalizedPosition=.5f/11;Capture(canvas,camera,800,1734,"saga-map-seam-20-21-phone");
+            scroll.verticalNormalizedPosition=1.5f/11;Capture(canvas,camera,800,1734,"saga-map-seam-40-41-phone");
+            scroll.verticalNormalizedPosition=2.5f/11;Capture(canvas,camera,800,1734,"saga-map-seam-60-61-boss-phone");
+            scroll.verticalNormalizedPosition=0;
             canvasRect.sizeDelta = new Vector2(1200, 1600); camera.orthographicSize = 800;
             Capture(canvas, camera, 1200, 1600, "saga-map-tablet");
             canvasRect.sizeDelta = new Vector2(800, 1734); camera.orthographicSize = 867;
@@ -178,7 +185,7 @@ public static class SagaValidation
         for(int n=1;n<=20;n++){
             var sort=new SagaLevel(SagaGame.Sort,n);Check(sort.StudySeconds==sortSeconds[n-1] && sort.ImageCount==5+5*((n-1)/5),"SORT configuration.");
             var boxes=new SagaLevel(SagaGame.Boxes,n);Check(boxes.ImageCount==5+5*((n-1)/5),"Approved Boxes five-level count groups.");
-            var pairs=new SagaLevel(SagaGame.Pairs,n);Check(pairs.ImageCount==2*n && pairs.Seconds==90 && pairs.SharedStudyRecallClock,"Pairs count/shared clock.");
+            var pairs=new SagaLevel(SagaGame.Pairs,n);Check(pairs.ImageCount==2*Mathf.Max(5,n) && pairs.Seconds==(n<=10?30:n<=15?45:60) && pairs.SharedStudyRecallClock,"Pairs approved count/shared clock.");
         }
         float now=0;int reports=0;var context=new SagaRoundContext(90,(win,lives)=>reports++,()=>now);
         now=17;Check(context.Remaining==73,"Boss clock consumes study and recall together.");now=91;Check(context.Remaining==0,"Boss clock expires.");context.Report(false,0);context.Report(true,3);Check(reports==1,"One boss round result only.");
@@ -252,6 +259,15 @@ public static class SagaValidation
     {
         game.ShowLevels();
         var mapPage=(GameObject)Get(page,"page");
+        float bossTime=120;
+        game.OpenSaga(SagaGame.Pairs,1,()=>{},null,null,new SagaRoundContext(()=>bossTime,(won,lives)=>{}));
+        Check(((ChainOriginalPresentation)Get(game,"originalGame")).Root.GetComponentsInChildren<Text>().Any(t=>t.name=="Exact study timer" && t.text=="120"),"The initial Pairs boss view must already show the boss clock, not30seconds.");
+        Call(game,"TickSagaStudyClock",31f);
+        Check(!State(game).Finished && !(bool)Get(game,"recall") && (float)Get(game,"studySeconds")==120,"Pairs cannot impose its ordinary 30s cap on the shared boss clock.");
+        bossTime=97;Recall(game);
+        Check((float)Get(game,"recallSeconds")==97,"Pairs boss recall keeps the same total clock.");game.Close();
+        game.OpenSaga(SagaGame.Sort,1,()=>{},null,null,new SagaRoundContext(()=>bossTime,(won,lives)=>{}));
+        Check((float)Get(game,"studySeconds")==5 && ((SagaSortBoard)Get(game,"sortBoard")).Root.GetComponentsInChildren<Text>().Any(t=>t.name=="Exact recall timer" && t.text=="97"),"SORT retains its short study phase but displays the same boss time from the first frame.");game.Close();
         foreach(var kind in SagaRoute.Games){
             foreach(int level in new[]{1,5,6,11,16,20}){
                 int stop=SagaRoute.Stop(kind,level);
@@ -286,18 +302,23 @@ public static class SagaValidation
                     Call(game,"TickTrainingClock",1f);Check(clock.text==(config.Seconds-1).ToString(),"Flash recall digits count down.");
                     if(level==1)Capture(canvas,camera,800,1734,"saga-flash-recall-phone");
                 }else {
-                    if(kind==SagaGame.Pairs){Call(game,"TickSagaStudyClock",17f);Check((float)Get(game,"studySeconds")==73,"Pairs study consumes shared clock.");}
+                    if(kind==SagaGame.Pairs){Call(game,"TickSagaStudyClock",17f);Check((float)Get(game,"studySeconds")==new SagaLevel(kind,level).Seconds-17,"Pairs study consumes shared clock.");}
                     if(kind==SagaGame.Sort && level==1)Capture(canvas,camera,800,1734,"saga-sort-study-phone");
                     if(kind==SagaGame.Boxes){var board=(SagaBoxesBoard)Get(game,"boxesBoard");Check(board.Root.GetComponentsInChildren<Image>().Count(i=>i.name=="ImgPref" && i.enabled)==config.ImageCount,"Every Boxes picture must be visible during study.");}
                     Recall(game);
-                    if(kind==SagaGame.Pairs)Check((float)Get(game,"recallSeconds")==73,"Pairs recall must not reset the clock.");
+                    if(kind==SagaGame.Pairs)Check((float)Get(game,"recallSeconds")==new SagaLevel(kind,level).Seconds-17,"Pairs recall must not reset the clock.");
                 }
                 var state=State(game);var images=(int[])state.Sequence.Clone();
                 if(kind==SagaGame.Pairs){
                     var board=(SagaPairsBoard)Get(game,"pairsBoard");
                     var visibleCards=board.Root.GetComponentsInChildren<Button>().Where(b=>b.name.StartsWith("Saga pair ")).ToArray();
                     Check(visibleCards.Length==config.ImageCount && visibleCards.All(b=>b.image.rectTransform.rect.width>100),"Pairs cards must be active and visible.");
-                    if(level==1)Capture(canvas,camera,800,1734,"saga-pairs-recall-phone");
+                    if(level==1){
+                        Capture(canvas,camera,800,1734,"saga-pairs-recall-phone");
+                        for(int error=0;error<8;error++){board.Choose(images[0]);board.Choose(images[2]);board.Tick(.6f);}
+                        Check(state.Hearts==3 && state.Position==0 && !state.Finished,"Saga Pairs mismatches must never cost hearts.");
+                        Check(!board.Root.GetComponentsInChildren<Image>().Any(i=>i.name.StartsWith("Saga pair heart")),"Saga Pairs hides unused hearts.");
+                    }
                     for(int i=0;i<images.Length;i+=2){board.Choose(images[i]);board.Choose(images[i+1]);}
                 }else if(kind==SagaGame.Boxes){
                     var board=(SagaBoxesBoard)Get(game,"boxesBoard");
@@ -360,6 +381,7 @@ public static class SagaValidation
         var view=panel.GetComponent<SagaResultView>();
         Check(view!=null && view.Stop==stop && view.Won==won,"Shared result identity.");
         Check(panel.GetComponentsInChildren<Text>().Any(t=>t.text=="SAGA LEVEL "+stop),"Result uses global Saga number.");
+        if(won)Check(panel.GetComponentsInChildren<Text>().Any(t=>t.text=="You won!"),"All Saga wins use the same victory caption.");
         var buttons=panel.GetComponentsInChildren<Button>();
         Check(buttons.Length==2 && buttons.All(b=>b.IsInteractable()),"REPLAY and MAP remain usable.");
     }
@@ -370,7 +392,7 @@ public static class SagaValidation
         camera.cullingMask=1<<30;
         foreach(var graphic in canvas.GetComponentsInChildren<Graphic>(true))graphic.SetAllDirty();
         Canvas.ForceUpdateCanvases();
-        foreach(var sagaPage in canvas.GetComponentsInChildren<SagaPage>(true))Call(sagaPage,"LayoutMap");
+        foreach(var sagaPage in Resources.FindObjectsOfTypeAll<SagaPage>().Where(p=>p.gameObject.scene.IsValid()))Call(sagaPage,"LayoutMap");
         Canvas.ForceUpdateCanvases();
         var target=new RenderTexture(width,height,24);camera.targetTexture=target;camera.Render();
         var prior=RenderTexture.active;RenderTexture.active=target;

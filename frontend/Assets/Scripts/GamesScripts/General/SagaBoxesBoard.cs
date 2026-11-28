@@ -9,6 +9,7 @@ public sealed class SagaBoxesBoard
     public GameObject Root {get;private set;}
     private readonly SagaBoxesLayout layout;
     private readonly List<Image> pictures=new List<Image>();
+    private readonly List<Image> trayImages=new List<Image>();
     private readonly Dictionary<int,GameObject> tray=new Dictionary<int,GameObject>();
     private readonly Func<int,int,bool> place;
     private readonly Func<bool> ready;
@@ -43,7 +44,7 @@ public sealed class SagaBoxesBoard
             foreach(var cell in item.GetComponentsInChildren<DragAndDropCell>(true))cell.enabled=false;
             var picture=item.GetComponentsInChildren<Image>(true).Last();picture.name=id.ToString();picture.sprite=CardFaces.SmallFace(id);BoxesPicturePerspective.Attach(picture);
             if(picture.GetComponent<DragAndDropItem>()==null)picture.gameObject.AddComponent<DragAndDropItem>();
-            item.transform.SetParent(layout.Tray,false);item.SetActive(false);tray.Add(id,item);
+            item.transform.SetParent(layout.Tray,false);item.SetActive(false);tray.Add(id,item);trayImages.AddRange(item.GetComponentsInChildren<Image>(true));
         }
         var recallButton=layout.RecallButton.GetComponent<Button>();recallButton.onClick=new Button.ButtonClickedEvent();recallButton.onClick.AddListener(recall);
         layout.RecallButton.SetActive(true);layout.Bottom.SetActive(false);Hearts(SagaLevel.Hearts);
@@ -64,7 +65,7 @@ public sealed class SagaBoxesBoard
     }
     public void Tick(){
         if(disposed || DragAndDropItem.draggedItem!=null)return;
-        foreach(var item in tray.Values)foreach(var image in item.GetComponentsInChildren<Image>(true))image.raycastTarget=true;
+        foreach(var image in trayImages)image.raycastTarget=true;
     }
     public void ShowClock(int seconds){layout.Clock.text=seconds.ToString();}
     public void Hearts(int remaining){for(int i=0;i<layout.Hearts.Length;i++)layout.Hearts[i].gameObject.SetActive(i<remaining);}

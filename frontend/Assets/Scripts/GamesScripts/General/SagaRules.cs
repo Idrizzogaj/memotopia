@@ -10,15 +10,23 @@ public static class SagaRoute
     public const float BossSeconds=90;
     public static int Count { get { return 12*20; } }
     public static readonly Color FlashColor = new Color32(254,191,75,255);
+    private static readonly SagaLevel[] stages=CreateStages();
+    private static SagaLevel[] CreateStages(){
+        var values=new SagaLevel[Count];
+        for(int stop=1;stop<=values.Length;stop++){
+            int index=(stop-1)%12;
+            values[stop-1]=new SagaLevel(index<6?Games[index]:index==6?SagaGame.Boss:index==11?SagaGame.FocusBoss:FocusGames[index-7],(stop-1)/12+1);
+        }
+        return values;
+    }
     public static SagaLevel At(int stop)
     {
         if(stop<1 || stop>Count)throw new ArgumentOutOfRangeException("stop");
-        int index=(stop-1)%12;
-        return new SagaLevel(index<6?Games[index]:index==6?SagaGame.Boss:index==11?SagaGame.FocusBoss:FocusGames[index-7],(stop-1)/12+1);
+        return stages[stop-1];
     }
     public static int Stop(SagaGame game,int level)
     {
-        new SagaLevel(game,level);
+        SagaLevel.ValidateGame(game);if(level<1 || level>20)throw new ArgumentOutOfRangeException("level");
         int index=Array.IndexOf(Games,game);if(index<0)index=game==SagaGame.Boss?6:game==SagaGame.FocusBoss?11:7+Array.IndexOf(FocusGames,game);
         return (level-1)*12+index+1;
     }
@@ -51,6 +59,8 @@ public sealed class SagaLevel
     public bool SharedStudyRecallClock {get{return Game==SagaGame.Pairs;}}
     public bool ShuffleLastTen { get { return Number >= 16; } }
     public const int Hearts = 3;
+    private static readonly int[] FlashCounts={7,12,20,30};
+    private static readonly int[] SortStudySeconds={10,9,8,7,5,20,19,18,17,15,25,24,23,22,20,30,28,26,24,20};
 
     public SagaLevel(int number) : this(SagaGame.Chain, number) { }
 
@@ -67,11 +77,11 @@ public sealed class SagaLevel
         if (number == 5) Seconds = 80;
         StudySeconds=Seconds;
         TimedShuffles = group;
-        if(game==SagaGame.Flash)ImageCount=new[]{7,12,20,30}[group];
-        if(game==SagaGame.Pairs){ImageCount=number*2;Seconds=StudySeconds=90;TimedShuffles=0;}
+        if(game==SagaGame.Flash)ImageCount=FlashCounts[group];
+        if(game==SagaGame.Pairs){ImageCount=2*Mathf.Max(5,number);Seconds=StudySeconds=number<=10?30:number<=15?45:60;TimedShuffles=0;}
         if(game==SagaGame.Boxes){ImageCount=5+group*5;TimedShuffles=0;}
         if(game==SagaGame.Says){ImageCount=3+(number-1)/2;TimedShuffles=0;}
-        if(game==SagaGame.Sort){ImageCount=5+group*5;Seconds=90;StudySeconds=new[]{10,9,8,7,5,20,19,18,17,15,25,24,23,22,20,30,28,26,24,20}[number-1];TimedShuffles=0;}
+        if(game==SagaGame.Sort){ImageCount=5+group*5;Seconds=90;StudySeconds=SortStudySeconds[number-1];TimedShuffles=0;}
         if(game==SagaGame.Boss){ImageCount=0;Seconds=StudySeconds=number==1?120:(int)SagaRoute.BossSeconds;TimedShuffles=0;}
         if(Array.IndexOf(SagaRoute.FocusGames,game)>=0){var focus=new SagaFocusLevel(Array.IndexOf(SagaRoute.FocusGames,game),number);ImageCount=0;Seconds=focus.Seconds;StudySeconds=0;TimedShuffles=0;}
         if(game==SagaGame.FocusBoss){ImageCount=0;Seconds=(int)SagaRoute.BossSeconds;StudySeconds=0;TimedShuffles=0;}

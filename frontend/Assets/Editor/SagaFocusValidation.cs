@@ -14,6 +14,7 @@ public static class SagaFocusValidation
     static object Get(object value,string field){return value.GetType().GetField(field,Flags).GetValue(value);}
     static void Call(object value,string method,params object[] args){value.GetType().GetMethod(method,Flags).Invoke(value,args);}
     static void Check(bool okay,string reason){if(!okay)throw new Exception("Saga Focus: "+reason);}
+    public static void ValidateWithNative(){Validate();System.IO.Directory.CreateDirectory(System.IO.Path.GetFullPath("../ChainReuseFix"));FocusNativeValidation.Review();}
     public static void Validate(){
         Check(Application.productName=="MemotopiaSagaValidation","Use isolated project.");
         var oldUser=UserConstants.s_user;UserConstants.s_user=new User{id=1999999820,username="Focus Saga validation"};
@@ -61,6 +62,21 @@ public static class SagaFocusValidation
             for(int i=0;i<5;i++)Call(game,"Award",false);
             Check(!(bool)Get(game,"playing") && (int)Get(game,"sagaHearts")==0 && (int)Get(game,"score")==-5,"Five errors fail, preserving minus1 score.");game.Close();
             game.OpenSaga(first,()=>{},()=>{throw new Exception("Timeout won.");});game.Begin();game.Tick(first.Seconds);Check(!(bool)Get(game,"playing"),"Saga Focus timeout.");game.Close();
+            // A terminal native callback may synchronously close its entire boss board.
+            // No answer text, wall feedback or coroutine may touch it afterwards.
+            for(int kind=0;kind<=1;kind++){
+                int failures=0;var context=new SagaRoundContext(()=>90,(success,lives)=>{Check(!success && lives==0,"Terminal native error reports failure.");failures++;game.Close();},5);
+                game.OpenSaga(new SagaFocusLevel(kind,1),()=>{},null,context);
+                for(int error=0;error<5;error++){
+                    if(kind==0){game.MathKey("Clear");foreach(char digit in "9999")game.MathKey(digit.ToString());game.MathKey("OK");}
+                    else {var arena=((IList)Get(game,"arenas"))[0];var balls=(IList)Get(arena,"Balls");int wall=Enumerable.Range(0,4).First(w=>balls.Cast<object>().All(b=>((FocusRules.Ball)Get(b,"State")).NextWall()!=w));Call(game,"Wall",arena,wall);}
+                }
+                Check(failures==1 && !game.IsSagaOpen,"The fifth wrong native answer closes the boss child safely.");
+            }
+            int collisions=0;var collisionContext=new SagaRoundContext(()=>90,(success,lives)=>{Check(!success && lives==0,"Missed wall reports last heart loss.");collisions++;game.Close();},1);
+            game.OpenSaga(new SagaFocusLevel(1,1),()=>{},null,collisionContext);
+            var collisionArena=((IList)Get(game,"arenas"))[0];var collisionBall=(FocusRules.Ball)Get(((IList)Get(collisionArena,"Balls"))[0],"State");collisionBall.Position=new Vector2(.99f,.5f);collisionBall.Velocity=Vector2.right;
+            game.Tick(.06f);Check(collisions==1 && !game.IsSagaOpen,"A missed wall may close the child without starting stale feedback.");
             Check(PlayerPrefs.GetString("focus.stats.device.v1.1999999820","")==stats && PlayerPrefs.GetString("achievements.verified.v2.1999999820","")==badges,"Saga must not mutate Training Focus stats or badge keys.");
             Debug.Log("SAGA_FOCUS_VALIDATION_PASSED: all80 targets, native callbacks, level1 progression,5hearts, minus1, goal, timeout, isolated saves.");
         }finally{game.Close();UnityEngine.Object.DestroyImmediate(root);UnityEngine.Object.DestroyImmediate(cameraObject);UserConstants.s_user=oldUser;}

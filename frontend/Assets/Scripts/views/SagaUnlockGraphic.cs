@@ -6,8 +6,9 @@ public sealed class SagaUnlockGraphic : MaskableGraphic
 {
     public Vector2 From, To, Bend;
     public float Progress;
+    public bool Cubic;
     public void SetProgress(float value){Progress=value;SetVerticesDirty();}
-    Vector2 Point(float t){return (1-t)*(1-t)*From+2*(1-t)*t*Bend+t*t*To;}
+    Vector2 Point(float t){return Cubic?SagaAxonGraphic.RoutePoint(From,To,t,true):(1-t)*(1-t)*From+2*(1-t)*t*Bend+t*t*To;}
     protected override void OnPopulateMesh(VertexHelper mesh){
         mesh.Clear();float start=Mathf.Max(0,Progress-.28f);
         for(int i=0;i<24;i++){
